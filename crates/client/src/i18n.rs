@@ -233,7 +233,7 @@ fn portuguese(en: &str) -> Option<&'static str> {
         "Send" => "Enviar",
         "Settings" => "Configurações",
         "Shift + drag · A / D" => "Shift + arrastar · A / D",
-        "Shoot" => "Tacar",
+        "Shoot" => "Tacada",
         "Shooting…" => "Tacando…",
         "Short" => "Curto",
         "Show the controls panel" => "Mostrar o painel de controles",
@@ -475,6 +475,11 @@ fn portuguese(en: &str) -> Option<&'static str> {
             "Arraste para a direita para mais força e solte para tacar"
         }
         "Drag the power bar right, release" => "Arraste a barra de força para a direita e solte",
+        "Interface size  {v}%" => "Tamanho da interface  {v}%",
+        "Drag to set the power" => "Arraste para ajustar a força",
+        "Set the power, then press Shoot" => "Ajuste a força e aperte Tacar",
+        "Shoot!" => "Jogar",
+        "Set the power, then press the green button" => "Ajuste a força e aperte o botão verde",
         _ => return None,
     })
 }

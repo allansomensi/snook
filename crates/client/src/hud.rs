@@ -34,8 +34,9 @@ pub struct Hud {
     stroking: bool,
     /// The cue-setting panel that is open above the bottom bar.
     popover: Option<Pop>,
-    /// The current stroke was cancelled (right click / Esc) until release.
-    stroke_cancelled: bool,
+    /// The power the player last chose (kept from one turn to the next).
+    power: f32,
+    power_key: Option<(u32, u32)>,
 }
 
 /// What the player asked for through the HUD.
@@ -65,7 +66,8 @@ impl Default for Hud {
             fine_last: None,
             stroking: false,
             popover: None,
-            stroke_cancelled: false,
+            power: 0.5,
+            power_key: None,
         }
     }
 }
@@ -290,7 +292,7 @@ impl Hud {
                 (t("Aim"), t("Drag the cue · click a spot")),
                 (t("Fine aim"), t("Shift + drag · A / D")),
                 (t("Quick aim"), t("Click a ball or a spot")),
-                (t("Shoot"), t("Drag the power bar right, release")),
+                (t("Shoot"), t("Set the power, then press the green button")),
                 (t("Spin"), t("Spin ball · ↑ ↓ · Q / E")),
                 (t("Elevation"), t("W / S (jump & massé)")),
                 (t("Camera"), t("Right-drag · Wheel · Tab · C")),
@@ -745,10 +747,28 @@ impl Hud {
 
         // Power bar in the middle: press, drag right for more power, release
         // to shoot. Right click or Esc cancels.
+        // The shoot button sits between the power bar and the cue settings.
+        let shoot_w = 128.0;
+        let shoot = Rect::new(bx0 - 16.0 - shoot_w, bar.y + 10.0, shoot_w, bar.h - 20.0);
         let px0 = log_w + 30.0;
-        let px1 = bx0 - 24.0;
+        let px1 = shoot.x - 56.0;
         let track = Rect::new(px0, bar.y + bar.h / 2.0 - 9.0, (px1 - px0).max(120.0), 18.0);
-        if my_turn && !m.is_placing_cue_ball() {
+        // A new turn starts with the power the player chose last time.
+        let key = (m.games_played, m.game.shots_taken());
+        if my_turn && self.power_key != Some(key) {
+            self.power_key = Some(key);
+            m.aim.power = self.power;
+            m.aim.charging = self.power > 0.02;
+        }
+        let can_shoot = my_turn && !m.is_placing_cue_ball();
+        if shoot_button(ui, shoot, can_shoot && m.aim.power > 0.02) {
+            if m.game.needs_called_pocket() && m.called_pocket.is_none() {
+                m.notify(t("Call a pocket for the 8-ball first: click a pocket."), true);
+            } else {
+                m.shoot();
+            }
+        }
+        if can_shoot {
             self.stroke(ui, m, track);
         } else {
             self.stroking = false;
@@ -782,60 +802,21 @@ impl Hud {
         }
     }
 
+    /// The power bar: drag (or click) to set the power. Shooting is a separate
+    /// button, so the player can set everything up first.
     fn stroke(&mut self, ui: &mut Ui, m: &mut Match, track: Rect) {
         let hit = Rect::new(track.x - 10.0, track.y - 14.0, track.w + 20.0, track.h + 28.0);
         let drag = ui.drag_area(90, hit);
-        match drag {
-            crate::ui::Drag::Held(_)
-                if self.stroke_cancelled
-                    || is_mouse_button_pressed(MouseButton::Right)
-                    || is_key_pressed(KeyCode::Escape) =>
-            {
-                self.stroke_cancelled = true;
-                self.stroking = false;
-                m.aim.charging = false;
-                m.aim.power = 0.0;
-            }
-            crate::ui::Drag::Held(p) => {
-                if m.game.needs_called_pocket() && m.called_pocket.is_none() {
-                    if !self.stroking {
-                        m.notify(t("Call a pocket for the 8-ball first: click a pocket."), true);
-                    }
-                    self.stroking = true;
-                } else {
-                    self.stroking = true;
-                    m.aim.charging = true;
-                    m.aim.power = ((p.x - track.x) / track.w).clamp(0.0, 1.0);
-                }
-            }
-            crate::ui::Drag::Released(_) => {
-                if self.stroking && m.aim.charging {
-                    if m.aim.power > 0.02 {
-                        m.shoot();
-                    } else {
-                        m.aim.charging = false;
-                        m.aim.power = 0.0;
-                    }
-                }
-                self.stroking = false;
-                self.stroke_cancelled = false;
-            }
-            _ => {
-                self.stroke_cancelled = false;
-                self.stroking = false;
-            }
+        if let crate::ui::Drag::Held(p) | crate::ui::Drag::Released(p) = drag {
+            let power = ((p.x - track.x) / track.w).clamp(0.0, 1.0);
+            m.aim.power = power;
+            m.aim.charging = power > 0.02;
+            self.power = power;
         }
         let hot = matches!(drag, crate::ui::Drag::Held(_) | crate::ui::Drag::Hover);
-        let p = if m.aim.charging { m.aim.power } else { 0.0 };
-        draw_power_track(ui, track, p, hot, true);
-        let hint = if self.stroking && m.aim.charging {
-            Some(t("Right click or Esc cancels"))
-        } else if hot {
-            Some(t("Drag right for more power, release to shoot"))
-        } else {
-            None
-        };
-        if let Some(hint) = hint {
+        draw_power_track(ui, track, m.aim.power, hot, true);
+        if hot && !matches!(drag, crate::ui::Drag::Held(_)) {
+            let hint = t("Drag to set the power");
             let w = ui.text_size(hint, 13.0, false).x + 20.0;
             let r = Rect::new(track.x + (track.w - w) / 2.0, track.y - 40.0, w, 24.0);
             crate::ui::rrect(r, 12.0, Color::new(0.0, 0.0, 0.0, 0.8));
@@ -1150,4 +1131,61 @@ fn draw_log(ui: &mut Ui, m: &Match, r: Rect) {
         let text = ui.ellipsize(text, r.w - 16.0, 13.0);
         ui.text(&text, r.x + 8.0, r.y + 4.0 + k as f32 * 17.0, 13.0, base, newest);
     }
+}
+
+/// The big "Shoot" button: green with a cue ball, unmistakable.
+fn shoot_button(ui: &mut Ui, r: Rect, enabled: bool) -> bool {
+    ui.block(r);
+    let hover = enabled && r.contains(ui.mouse());
+    let down = hover && is_mouse_button_down(MouseButton::Left);
+    let bg = if !enabled {
+        Color::new(0.12, 0.16, 0.12, 0.9)
+    } else if down {
+        Color::new(0.10, 0.42, 0.20, 1.0)
+    } else if hover {
+        Color::new(0.20, 0.66, 0.34, 1.0)
+    } else {
+        Color::new(0.13, 0.52, 0.27, 1.0)
+    };
+    if enabled {
+        // A soft glow so it reads as the main action.
+        let pulse = 0.5 + 0.5 * (get_time() as f32 * 3.0).sin();
+        crate::ui::rrect(
+            Rect::new(r.x - 3.0, r.y - 3.0, r.w + 6.0, r.h + 6.0),
+            12.0,
+            Color::new(0.3, 0.9, 0.45, 0.10 + 0.12 * pulse),
+        );
+    }
+    crate::ui::rrect(r, 10.0, bg);
+    crate::ui::rrect(
+        Rect::new(r.x + 1.0, r.y + 1.0, r.w - 2.0, r.h * 0.45),
+        9.0,
+        Color::new(1.0, 1.0, 1.0, if enabled { 0.10 } else { 0.03 }),
+    );
+    crate::ui::rrect_lines(
+        r,
+        10.0,
+        1.5,
+        if hover { GOLD } else { Color::new(0.35, 0.75, 0.5, if enabled { 1.0 } else { 0.35 }) },
+    );
+    // Cue ball icon and the label.
+    let label = t("Shoot!");
+    let size = ui.fit(20.0, label, r.w - 46.0);
+    let tw_ = ui.text_size(label, size, true).x;
+    let total = 22.0 + 8.0 + tw_;
+    let x0 = r.x + (r.w - total) / 2.0;
+    let cy = r.y + r.h / 2.0;
+    let white =
+        if enabled { Color::new(0.97, 0.96, 0.92, 1.0) } else { Color::new(0.5, 0.52, 0.5, 1.0) };
+    draw_circle(x0 + 11.0, cy, 11.0, white);
+    draw_circle(x0 + 7.5, cy - 3.5, 3.5, Color::new(1.0, 1.0, 1.0, 0.8));
+    ui.text(
+        label,
+        x0 + 30.0,
+        cy - size / 2.0 - 1.0,
+        size,
+        if enabled { WHITE } else { MUTED },
+        true,
+    );
+    enabled && hover && is_mouse_button_released(MouseButton::Left)
 }
