@@ -37,6 +37,7 @@ pub struct Hud {
     /// The power the player last chose (kept from one turn to the next).
     power: f32,
     power_key: Option<(u32, u32)>,
+    panel_key: Option<(u32, u32)>,
 }
 
 /// What the player asked for through the HUD.
@@ -68,6 +69,7 @@ impl Default for Hud {
             popover: None,
             power: 0.5,
             power_key: None,
+            panel_key: None,
         }
     }
 }
@@ -756,6 +758,11 @@ impl Hud {
 
         // A new turn starts with the power the player chose last time.
         let key = (m.games_played, m.game.shots_taken());
+        // Any shot (by anyone) closes the open cue-setting panel.
+        if self.panel_key != Some(key) {
+            self.panel_key = Some(key);
+            self.popover = None;
+        }
         if my_turn && self.power_key != Some(key) {
             self.power_key = Some(key);
             m.aim.power = self.power;
@@ -765,8 +772,8 @@ impl Hud {
         if shoot_button(ui, shoot, can_shoot && m.aim.power > 0.02) {
             if m.game.needs_called_pocket() && m.called_pocket.is_none() {
                 m.notify(t("Call a pocket for the 8-ball first: click a pocket."), true);
-            } else {
-                m.shoot();
+            } else if m.shoot() {
+                self.popover = None;
             }
         }
         if can_shoot {
@@ -784,7 +791,10 @@ impl Hud {
 
         // The open panel.
         if let Some(pop) = self.popover {
+            // Closed as soon as the shot is taken (button, Space or online),
+            // and when the turn passes.
             if !my_turn {
+                self.popover = None;
                 return;
             }
             let w = 250.0;
