@@ -29,8 +29,8 @@ impl Default for Menu {
 
 impl Menu {
     pub fn draw(&mut self, ui: &mut Ui, settings: &mut Config) -> MenuAction {
-        let sw = screen_width();
-        let sh = screen_height();
+        let sw = crate::ui::vw();
+        let sh = crate::ui::vh();
         let mut action = MenuAction::None;
 
         // Title.
@@ -118,14 +118,11 @@ impl Menu {
         }
         y += 58.0;
 
-        let bw = (inner - 20.0) / 3.0;
-        if ui.button(Rect::new(x, y, bw, 32.0), t("Settings"), true) {
+        let bw = (inner - 10.0) / 2.0;
+        if ui.button(Rect::new(x, y, bw, 34.0), t("Settings"), true) {
             action = MenuAction::Settings;
         }
-        if ui.button(Rect::new(x + bw + 10.0, y, bw, 32.0), t("Watch demo"), true) {
-            action = MenuAction::Start(MatchMode::Demo);
-        }
-        if ui.button(Rect::new(x + 2.0 * (bw + 10.0), y, bw, 32.0), t("Quit"), true) {
+        if ui.button(Rect::new(x + bw + 10.0, y, bw, 34.0), t("Quit"), true) {
             action = MenuAction::Quit;
         }
 

@@ -18,6 +18,7 @@ mod icon;
 mod menu;
 mod net;
 mod online;
+mod paint;
 mod play;
 mod scene;
 mod settings;
@@ -102,6 +103,9 @@ fn parse_args() -> LaunchOptions {
             "--online" => o.online = true,
             "--settings" => o.settings = true,
             "--on-eight" => o.on_eight = true,
+            "--window" => {
+                args.next();
+            }
             "--screenshot" => o.screenshot = args.next(),
             "--frames" => o.frames = args.next().and_then(|s| s.parse().ok()).unwrap_or(120),
             "--help" | "-h" => {
@@ -122,10 +126,19 @@ fn parse_args() -> LaunchOptions {
 
 fn window_conf() -> macroquad::conf::Conf {
     let config = Config::load();
+    // `--window WxH` (development): start with this window size.
+    let args: Vec<String> = std::env::args().collect();
+    let size = args
+        .iter()
+        .position(|a| a == "--window")
+        .and_then(|i| args.get(i + 1))
+        .and_then(|v| v.split_once('x'))
+        .and_then(|(w, h)| Some((w.parse().ok()?, h.parse().ok()?)))
+        .unwrap_or((1280, 760));
     let window = Conf {
         window_title: "Snook".into(),
-        window_width: 1280,
-        window_height: 760,
+        window_width: size.0,
+        window_height: size.1,
         // Safe graphics mode (troubleshooting) also turns multisampling off.
         sample_count: if std::env::var_os("SNOOK_SAFE_GRAPHICS").is_some() {
             1
@@ -217,9 +230,11 @@ async fn main() {
     // Fades the screen in from black after a scene change.
     let mut fade = 1.0f32;
     let mut was_in_match = current.is_some();
+    let mut hud_opacity = 1.0f32;
     let mut frame = 0u32;
     loop {
         let dt = get_frame_time().min(0.1);
+        ui::update_scale(config.ui_size);
         ui.begin();
 
         if is_key_pressed(KeyCode::F11) {
@@ -293,6 +308,8 @@ async fn main() {
             None => scene.draw(&cam, &menu_rack, dt, &Overlay::default()),
         }
 
+        // From here on: the 2D interface, in interface units.
+        ui::begin_ui_camera();
         if config.vignette {
             draw_texture_ex(
                 &vignette,
@@ -300,7 +317,7 @@ async fn main() {
                 0.0,
                 WHITE,
                 DrawTextureParams {
-                    dest_size: Some(vec2(screen_width(), screen_height())),
+                    dest_size: Some(vec2(ui::vw(), ui::vh())),
                     ..Default::default()
                 },
             );
@@ -334,42 +351,46 @@ async fn main() {
             }
         } else {
             match current.as_mut() {
-                Some(m) => match hud.draw(&mut ui, m) {
-                    HudAction::MainMenu => {
-                        current = None;
-                        hud = Hud::new(config.show_help);
-                        rig.reset();
-                    }
-                    HudAction::Lounge => {
-                        if let Some(o) = online.as_mut() {
-                            o.leave_match(m);
-                        }
-                        current = None;
-                        hud = Hud::new(config.show_help);
-                        rig.reset();
-                    }
-                    HudAction::Settings => settings_open = true,
-                    HudAction::ToggleView => {
-                        if rig.mode == CameraMode::Top {
-                            rig.enter_3d();
-                        } else {
+                Some(m) => {
+                    let action =
+                        hud_draw(&mut hud, &mut ui, m, controls.aiming(), &mut hud_opacity, dt);
+                    match action {
+                        HudAction::MainMenu => {
+                            current = None;
+                            hud = Hud::new(config.show_help);
                             rig.reset();
                         }
-                    }
-                    HudAction::ResetCamera => rig.reset(),
-                    HudAction::None => {
-                        if hud.show_help != config.show_help {
-                            config.show_help = hud.show_help;
-                            config.save();
+                        HudAction::Lounge => {
+                            if let Some(o) = online.as_mut() {
+                                o.leave_match(m);
+                            }
+                            current = None;
+                            hud = Hud::new(config.show_help);
+                            rig.reset();
                         }
-                        if m.is_online()
-                            && let Some(o) = online.as_mut()
-                            && o.pending_invites() > 0
-                        {
-                            o.draw_invites(&mut ui, true);
+                        HudAction::Settings => settings_open = true,
+                        HudAction::ToggleView => {
+                            if rig.mode == CameraMode::Top {
+                                rig.enter_3d();
+                            } else {
+                                rig.reset();
+                            }
+                        }
+                        HudAction::ResetCamera => rig.reset(),
+                        HudAction::None => {
+                            if hud.show_help != config.show_help {
+                                config.show_help = hud.show_help;
+                                config.save();
+                            }
+                            if m.is_online()
+                                && let Some(o) = online.as_mut()
+                                && o.pending_invites() > 0
+                            {
+                                o.draw_invites(&mut ui, true);
+                            }
                         }
                     }
-                },
+                }
                 None => match screen {
                     Screen::Menu => match menu.draw(&mut ui, &mut config) {
                         MenuAction::Start(mode) => {
@@ -442,11 +463,11 @@ async fn main() {
             *t -= dt;
             let alpha = t.clamp(0.0, 1.0);
             let w = ui.text_size(text, 15.0, false).x + 32.0;
-            let r = Rect::new((screen_width() - w) / 2.0, screen_height() - 60.0, w, 34.0);
+            let r = Rect::new((ui::vw() - w) / 2.0, ui::vh() - 60.0, w, 34.0);
             ui::rrect(r, 17.0, Color::new(0.0, 0.0, 0.0, 0.7 * alpha));
             ui.text_centered(
                 text,
-                screen_width() / 2.0,
+                ui::vw() / 2.0,
                 r.y + 9.0,
                 15.0,
                 Color::new(1.0, 0.95, 0.85, alpha),
@@ -463,27 +484,14 @@ async fn main() {
             fade = 0.85;
         }
         if fade > 0.0 {
-            draw_rectangle(
-                0.0,
-                0.0,
-                screen_width(),
-                screen_height(),
-                Color::new(0.0, 0.0, 0.0, fade),
-            );
+            draw_rectangle(0.0, 0.0, ui::vw(), ui::vh(), Color::new(0.0, 0.0, 0.0, fade));
             fade -= dt * 2.2;
         }
 
         if config.show_fps || options.show_fps {
             let text = format!("{} FPS", get_fps());
             let w = ui.text_size(&text, 13.0, true).x;
-            ui.text(
-                &text,
-                screen_width() - w - 10.0,
-                screen_height() - 20.0,
-                13.0,
-                ui::MUTED,
-                true,
-            );
+            ui.text(&text, ui::vw() - w - 10.0, ui::vh() - 20.0, 13.0, ui::MUTED, true);
         }
         frame += 1;
         if options.show_fps && frame.is_multiple_of(120) {
@@ -530,4 +538,29 @@ fn name_or(name: &str, default: &str) -> String {
         "" => i18n::t(default).to_string(),
         n => n.to_string(),
     }
+}
+
+/// Draws the in-game HUD, fading it away while the player aims.
+fn hud_draw(
+    hud: &mut Hud,
+    ui: &mut Ui,
+    m: &mut Match,
+    aiming: bool,
+    opacity: &mut f32,
+    dt: f32,
+) -> HudAction {
+    let target = if aiming { 0.0 } else { 1.0 };
+    let speed = if target < *opacity { 7.0 } else { 5.0 };
+    *opacity += (target - *opacity) * (1.0 - (-dt * speed).exp());
+    paint::set_opacity(*opacity);
+    let action = if *opacity < 0.6 {
+        let saved = ui.suspend_input();
+        let a = hud.draw(ui, m);
+        ui.resume_input(saved);
+        a
+    } else {
+        hud.draw(ui, m)
+    };
+    paint::set_opacity(1.0);
+    action
 }

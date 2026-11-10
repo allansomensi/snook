@@ -163,7 +163,8 @@ impl CameraRig {
                         // Height that fits the whole table (with the HUD) in the window.
                         // The space between the top and bottom bars of the HUD.
                         let (sw, sh) = (screen_width(), screen_height().max(1.0));
-                        let (top_px, bottom_px) = (54.0, 78.0);
+                        let k = crate::ui::ui_scale();
+                        let (top_px, bottom_px) = (54.0 * k, 78.0 * k);
                         let free = (sh - top_px - bottom_px).max(100.0) / sh;
                         let tan = (TOP_FOV / 2.0).tan();
                         let aspect = sw / sh;

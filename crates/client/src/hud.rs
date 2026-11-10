@@ -2,6 +2,9 @@
 
 use macroquad::prelude::*;
 
+#[allow(unused_imports)]
+use crate::paint::{draw_circle, draw_circle_lines, draw_line, draw_rectangle, draw_triangle};
+
 use crate::i18n::{t, tw};
 use snook_core::{BallId, BallInHand, Group};
 
@@ -201,8 +204,8 @@ fn status_line(m: &Match) -> Option<String> {
 
 impl Hud {
     pub fn draw(&mut self, ui: &mut Ui, m: &mut Match) -> HudAction {
-        let sw = screen_width();
-        let sh = screen_height();
+        let sw = crate::ui::vw();
+        let sh = crate::ui::vh();
         let mut action = HudAction::None;
 
         if !ui.wants_keyboard {
@@ -217,8 +220,17 @@ impl Hud {
 
         // Top bar: menu and camera on the left, the players in the middle.
         draw_bar(Rect::new(0.0, 0.0, sw, TOP_BAR), true);
-        let card_w = ((sw - 2.0 * 330.0) / 2.0).clamp(190.0, 270.0);
-        let x0 = (sw - (card_w * 2.0 + 10.0)) / 2.0;
+        // Cards centred, but never under the buttons on the left.
+        let view = if self.top_view { t("3D view") } else { t("Top view") };
+        let buttons_w: f32 = [t("Menu"), view, t("Reset camera")]
+            .iter()
+            .map(|l| ui.text_size(l, 13.0, true).x + 28.0)
+            .sum::<f32>()
+            + 14.0;
+        let room = sw - 2.0 * buttons_w;
+        let card_w = ((room - 10.0) / 2.0).clamp(150.0, 270.0);
+        let total = card_w * 2.0 + 10.0;
+        let x0 = ((sw - total) / 2.0).max(buttons_w).min(sw - total - 8.0);
         player_card(ui, m, 0, x0, 6.0, card_w);
         player_card(ui, m, 1, x0 + card_w + 10.0, 6.0, card_w);
         let mut y = TOP_BAR + 8.0;
@@ -512,7 +524,7 @@ const CHAT_H: f32 = 190.0;
 impl Hud {
     /// The chat with the opponent (online matches).
     fn draw_chat(&mut self, ui: &mut Ui, m: &mut Match) {
-        let sh = screen_height();
+        let sh = crate::ui::vh();
         let Some(o) = m.online.as_mut() else { return };
         if !self.chat_open {
             let label = if o.unread > 0 {
@@ -587,8 +599,8 @@ impl Hud {
         let t = *age;
         let alpha = (t / 0.18).min(1.0) * ((BANNER_TIME - t) / 0.45).min(1.0);
         let slide = (1.0 - (t / 0.25).min(1.0)).powi(2) * 30.0;
-        let sw = screen_width();
-        let y = screen_height() * 0.21 + slide;
+        let sw = crate::ui::vw();
+        let y = crate::ui::vh() * 0.21 + slide;
         let size = 40.0;
         let w = ui.text_size(title, size, true).x.max(ui.text_size(subtitle, 17.0, false).x) + 80.0;
         let r = Rect::new((sw - w) / 2.0, y - 14.0, w, 92.0);
@@ -660,8 +672,8 @@ fn draw_power_meter(ui: &mut Ui, m: &Match) {
     if !m.aim.charging || !matches!(m.phase, Phase::Turn { .. }) || m.is_human_turn() {
         return;
     }
-    let sw = screen_width();
-    let sh = screen_height();
+    let sw = crate::ui::vw();
+    let sh = crate::ui::vh();
     let w = (sw * 0.32).clamp(260.0, 420.0);
     let r = Rect::new((sw - w) / 2.0, sh - 78.0, w, 22.0);
     crate::ui::rrect(
@@ -708,8 +720,8 @@ fn draw_power_meter(ui: &mut Ui, m: &Match) {
 impl Hud {
     /// The bottom bar: game log, the power bar and the cue settings.
     fn draw_bottom_bar(&mut self, ui: &mut Ui, m: &mut Match) {
-        let sw = screen_width();
-        let sh = screen_height();
+        let sw = crate::ui::vw();
+        let sh = crate::ui::vh();
         let bar = Rect::new(0.0, sh - BOTTOM_BAR, sw, BOTTOM_BAR);
         draw_bar(bar, false);
         let my_turn = m.is_human_turn() && !self.paused;
@@ -1025,7 +1037,7 @@ fn draw_bar(r: Rect, top: bool) {
 
 /// Choosing the pocket for the 8-ball: a little map of the table.
 fn draw_call_panel(ui: &mut Ui, m: &mut Match) {
-    let sh = screen_height();
+    let sh = crate::ui::vh();
     let w = 250.0;
     let h = 214.0;
     let r = Rect::new(12.0, (sh * 0.22).max(56.0), w, h);
@@ -1118,6 +1130,9 @@ const CARD_H: f32 = 44.0;
 
 /// The game log inside the bottom bar: the last few things that happened.
 fn draw_log(ui: &mut Ui, m: &Match, r: Rect) {
+    if m.log.is_empty() {
+        return;
+    }
     ui.block(r);
     crate::ui::rrect(r, 6.0, Color::new(0.0, 0.0, 0.0, 0.35));
     let lines_fit = ((r.h - 6.0) / 17.0).floor().max(1.0) as usize;

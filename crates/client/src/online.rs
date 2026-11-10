@@ -365,8 +365,8 @@ impl Online {
 
     /// Invitations received while at the table: answered from a small banner.
     pub fn draw_invites(&mut self, ui: &mut Ui, in_match: bool) {
-        let sw = screen_width();
-        let sh = screen_height();
+        let sw = crate::ui::vw();
+        let sh = crate::ui::vh();
         let mut y = if in_match { 116.0 } else { (sh * 0.3).max(90.0) };
         if !in_match && !self.incoming.is_empty() {
             draw_rectangle(0.0, 0.0, sw, sh, Color::new(0.0, 0.0, 0.0, 0.4));
@@ -423,8 +423,8 @@ impl Online {
     }
 
     fn waiting(&mut self, ui: &mut Ui, text: &str) -> OnlineAction {
-        let sw = screen_width();
-        let sh = screen_height();
+        let sw = crate::ui::vw();
+        let sh = crate::ui::vh();
         let r = Rect::new(sw / 2.0 - 230.0, sh / 2.0 - 70.0, 460.0, 140.0);
         ui.panel(r);
         ui.text_centered(text, sw / 2.0, r.y + 28.0, 16.0, CREAM, false);
@@ -438,8 +438,8 @@ impl Online {
     }
 
     fn draw_sign_in(&mut self, ui: &mut Ui, config: &mut Config) -> OnlineAction {
-        let sw = screen_width();
-        let sh = screen_height();
+        let sw = crate::ui::vw();
+        let sh = crate::ui::vh();
         let w = 420.0;
         let h = 372.0;
         let r = Rect::new((sw - w) / 2.0, ((sh - h) / 2.0).max(10.0), w, h);
@@ -545,8 +545,8 @@ impl Online {
     }
 
     fn draw_lounge(&mut self, ui: &mut Ui, config: &mut Config) -> OnlineAction {
-        let sw = screen_width();
-        let sh = screen_height();
+        let sw = crate::ui::vw();
+        let sh = crate::ui::vh();
         draw_rectangle(0.0, 0.0, sw, sh, Color::new(0.0, 0.0, 0.0, 0.5));
         let mut action = OnlineAction::None;
         let margin = 14.0;

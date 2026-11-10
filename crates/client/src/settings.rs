@@ -24,16 +24,18 @@ pub struct SettingsScreen {
     /// MSAA when the game started (changes apply after a restart).
     pub startup_msaa: Option<i32>,
     tab: Tab,
+    /// The interface size being dragged (applied on release).
+    pending_size: Option<f32>,
 }
 
 impl SettingsScreen {
     pub fn draw(&mut self, ui: &mut Ui, config: &mut Config, in_match: bool) -> SettingsAction {
-        let sw = screen_width();
-        let sh = screen_height();
+        let sw = crate::ui::vw();
+        let sh = crate::ui::vh();
         let startup_msaa = *self.startup_msaa.get_or_insert(config.msaa);
         draw_rectangle(0.0, 0.0, sw, sh, Color::new(0.0, 0.0, 0.0, 0.5));
         let w = 520.0;
-        let h = 470.0;
+        let h = 520.0;
         let r = Rect::new((sw - w) / 2.0, ((sh - h) / 2.0).max(8.0), w, h);
         ui.panel(r);
         let x = r.x + 28.0;
@@ -128,6 +130,32 @@ impl SettingsScreen {
                     0.3,
                     2.5,
                 );
+                y += 38.0;
+                ui.text(
+                    &tw(
+                        "Interface size  {v}%",
+                        &[("v", &format!("{:.0}", config.ui_size * 100.0))],
+                    ),
+                    x,
+                    y,
+                    15.0,
+                    CREAM,
+                    false,
+                );
+                let mut size = config.ui_size;
+                ui.slider(73, Rect::new(x + 262.0, y, inner - 262.0, 18.0), &mut size, 0.7, 1.5);
+                // Applied when the slider is let go, so it doesn't move under the pointer.
+                if !is_mouse_button_down(MouseButton::Left) {
+                    config.ui_size = (size * 20.0).round() / 20.0;
+                } else {
+                    self.pending_size = Some(size);
+                }
+                if let Some(p) =
+                    self.pending_size.filter(|_| !is_mouse_button_down(MouseButton::Left))
+                {
+                    config.ui_size = (p * 20.0).round() / 20.0;
+                    self.pending_size = None;
+                }
                 y += 38.0;
                 ui.checkbox(x, y, t("Camera follows the cue"), &mut config.camera_follow);
                 if config.camera_follow {

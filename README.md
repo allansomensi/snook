@@ -101,6 +101,7 @@ Useful flags (for development):
 ```bash
 cargo run --release -p snook -- --vs hard        # straight into a game
 cargo run --release -p snook -- --demo           # computer vs computer
+cargo run --release -p snook -- --window 900x600 # start with this window size
 cargo run --release -p snook -- --screenshot shot.png --frames 200
 cargo run --release -p snook -- --demo --fps     # print frames per second
 cargo run --release -p snook -- --online         # open the lounge directly

@@ -2,6 +2,9 @@
 
 use macroquad::prelude::*;
 
+#[allow(unused_imports)]
+use crate::paint::{draw_circle, draw_circle_lines, draw_line, draw_rectangle, draw_triangle};
+
 pub const GOLD: Color = Color::new(0.91, 0.75, 0.38, 1.0);
 pub const CREAM: Color = Color::new(0.94, 0.89, 0.80, 1.0);
 pub const MUTED: Color = Color::new(0.70, 0.64, 0.56, 1.0);
@@ -19,6 +22,45 @@ pub enum Drag {
     Held(Vec2),
     /// The drag ended this frame, here.
     Released(Vec2),
+}
+
+static UI_SCALE: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0x3f80_0000);
+
+/// Size factor of the interface: 1.0 at 1280×760, larger on big screens,
+/// smaller on small windows (times the player's own preference).
+pub fn ui_scale() -> f32 {
+    f32::from_bits(UI_SCALE.load(std::sync::atomic::Ordering::Relaxed))
+}
+
+/// Width of the screen in interface units.
+pub fn vw() -> f32 {
+    screen_width() / ui_scale()
+}
+
+/// Height of the screen in interface units.
+pub fn vh() -> f32 {
+    screen_height() / ui_scale()
+}
+
+/// Works out the interface scale for this frame. `preference` is the
+/// player's setting (1.0 = automatic size).
+pub fn update_scale(preference: f32) {
+    let (sw, sh) = (screen_width().max(1.0), screen_height().max(1.0));
+    // The layout is designed for about 1180×720 interface units.
+    let auto = (sw / 1180.0).min(sh / 720.0).clamp(0.62, 2.6);
+    let scale = (auto * preference.clamp(0.7, 1.5)).max(0.55);
+    UI_SCALE.store(scale.to_bits(), std::sync::atomic::Ordering::Relaxed);
+}
+
+/// Draws the interface from here on in interface units (see [`vw`]).
+pub fn begin_ui_camera() {
+    let (w, h) = (vw(), vh());
+    let cam = Camera2D {
+        target: vec2(w / 2.0, h / 2.0),
+        zoom: vec2(2.0 / w, 2.0 / h),
+        ..Default::default()
+    };
+    set_camera(&cam);
 }
 
 pub struct Ui {
@@ -70,7 +112,7 @@ impl Ui {
 
     /// Call once at the start of each frame.
     pub fn begin(&mut self) {
-        self.mouse = mouse_position().into();
+        self.mouse = Vec2::from(mouse_position()) / ui_scale();
         self.pressed = is_mouse_button_pressed(MouseButton::Left);
         self.released = is_mouse_button_released(MouseButton::Left);
         self.down = is_mouse_button_down(MouseButton::Left);
@@ -104,7 +146,10 @@ impl Ui {
 
     pub fn text_size(&self, text: &str, size: f32, bold: bool) -> Vec2 {
         let font = if bold { &self.bold } else { &self.regular };
-        let d = measure_text(text, Some(font), size as u16, 1.0);
+        // Fonts are rasterised at the real pixel size, so text stays sharp at
+        // any interface scale.
+        let k = ui_scale();
+        let d = measure_text(text, Some(font), (size * k).round().max(1.0) as u16, 1.0 / k);
         vec2(d.width, size)
     }
 
@@ -113,9 +158,15 @@ impl Ui {
         let font = if bold { &self.bold } else { &self.regular };
         draw_text_ex(
             text,
-            x.round(),
-            (y + size * 0.8).round(),
-            TextParams { font: Some(font), font_size: size as u16, color, ..Default::default() },
+            (x * ui_scale()).round() / ui_scale(),
+            ((y + size * 0.8) * ui_scale()).round() / ui_scale(),
+            TextParams {
+                font: Some(font),
+                font_size: (size * ui_scale()).round().max(1.0) as u16,
+                font_scale: 1.0 / ui_scale(),
+                color: crate::paint::fade(color),
+                ..Default::default()
+            },
         );
     }
 
@@ -285,6 +336,22 @@ impl Ui {
         let size = self.fit((r.h * 0.5).clamp(12.0, 20.0), label, r.w - 8.0);
         self.text_centered(label, r.x + r.w / 2.0, r.y + (r.h - size) / 2.0, size, CREAM, true);
         held
+    }
+
+    /// While the HUD is faded out it must not react to the pointer (a drag
+    /// that ends over a hidden button is not a click). Returns what to give
+    /// back to [`Ui::resume_input`].
+    pub fn suspend_input(&mut self) -> (Vec2, bool, bool, bool) {
+        let saved = (self.mouse, self.pressed, self.released, self.down);
+        self.mouse = vec2(-1.0e6, -1.0e6);
+        self.pressed = false;
+        self.released = false;
+        self.down = false;
+        saved
+    }
+
+    pub fn resume_input(&mut self, saved: (Vec2, bool, bool, bool)) {
+        (self.mouse, self.pressed, self.released, self.down) = saved;
     }
 
     pub fn mouse(&self) -> Vec2 {

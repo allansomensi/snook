@@ -91,6 +91,8 @@ pub struct Config {
     /// Dark stage around the table (off: the whole bar room).
     pub focused_scene: bool,
     pub show_fps: bool,
+    /// Interface size (1.0 = automatic for the window size).
+    pub ui_size: f32,
     /// Multiplier for fine aiming with the mouse.
     pub aim_sensitivity: f32,
     pub quality: Quality,
@@ -107,16 +109,10 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Config {
-            player_name: if crate::i18n::Lang::system() == crate::i18n::Lang::Portuguese {
-                "Jogador".into()
-            } else {
-                "Player".into()
-            },
-            second_player_name: if crate::i18n::Lang::system() == crate::i18n::Lang::Portuguese {
-                "Jogador 2".into()
-            } else {
-                "Player 2".into()
-            },
+            // Empty: the field shows the default name as a hint, in the
+            // current language, and that name is used if it stays empty.
+            player_name: String::new(),
+            second_player_name: String::new(),
             guide: AimGuide::Standard,
             show_help: false,
             shot_camera: true,
@@ -127,6 +123,7 @@ impl Default for Config {
             focused_scene: true,
             show_fps: false,
             aim_sensitivity: 1.0,
+            ui_size: 1.0,
             quality: Quality::High,
             msaa: 4,
             fullscreen: false,
@@ -183,6 +180,9 @@ impl Config {
                 "vignette" => c.vignette = v == "true",
                 "focused_scene" => c.focused_scene = v == "true",
                 "show_fps" => c.show_fps = v == "true",
+                "ui_size" => {
+                    c.ui_size = v.parse::<f32>().map(|x| x.clamp(0.7, 1.5)).unwrap_or(c.ui_size)
+                }
                 "aim_sensitivity" => {
                     c.aim_sensitivity =
                         v.parse::<f32>().map(|x| x.clamp(0.3, 2.5)).unwrap_or(c.aim_sensitivity)
@@ -207,7 +207,7 @@ impl Config {
 
     pub fn to_text(&self) -> String {
         format!(
-            "# Snook settings\nplayer_name = {}\nsecond_player_name = {}\nguide = {}\nshow_help = {}\nshot_camera = {}\ncamera_follow = {}\ngraphics_checked = {}\nlanguage = {}\nvignette = {}\nfocused_scene = {}\nshow_fps = {}\naim_sensitivity = {:.2}\n\
+            "# Snook settings\nplayer_name = {}\nsecond_player_name = {}\nguide = {}\nshow_help = {}\nshot_camera = {}\ncamera_follow = {}\ngraphics_checked = {}\nlanguage = {}\nvignette = {}\nfocused_scene = {}\nshow_fps = {}\naim_sensitivity = {:.2}\nui_size = {:.2}\n\
              quality = {}\nmsaa = {}\nfullscreen = {}\nvolume = {:.2}\nserver = {}\nusername = {}\ntoken = {}\n",
             self.player_name,
             self.second_player_name,
@@ -221,6 +221,7 @@ impl Config {
             self.focused_scene,
             self.show_fps,
             self.aim_sensitivity,
+            self.ui_size,
             self.quality.name(),
             self.msaa,
             self.fullscreen,
