@@ -58,7 +58,7 @@ The interface is available in English and Brazilian Portuguese (Settings → Gam
 | Ball in hand | drag the cue ball | B toggles, Enter confirms |
 | Call the 8-ball pocket | click a pocket on the table or on the little map (mandatory: the 8 in any other pocket loses) | |
 | Camera | right-drag to orbit, wheel to zoom | Tab top view, C reset |
-| Menu / help | | Esc / H |
+| Menu / controls help | **Menu** button | Esc / H |
 | Full screen | | F11 |
 
 Settings are saved in `%APPDATA%\Snook\settings.ini` (Windows),
@@ -139,6 +139,10 @@ client.
 3. ~~Game server: accounts, lounge with chat, invitations, authoritative matches~~
 4. ~~Rated games and the global leaderboard~~
 5. Installers for Windows, macOS and Linux; friends list; private rooms
+
+## License
+
+[MIT](LICENSE). The bundled DejaVu fonts keep their own license (below).
 
 ## Credits
 

@@ -272,11 +272,6 @@ impl Hud {
                 }
                 x += w + 6.0;
             }
-            let help = if self.show_help { t("Hide controls") } else { t("Controls (H)") };
-            let w = ui.text_size(help, 13.0, true).x + 22.0;
-            if ui.button(Rect::new(sw - w - 10.0, 12.0, w, 30.0), help, true) {
-                self.show_help = !self.show_help;
-            }
         }
         if self.show_help && !self.paused {
             let lines = [
@@ -437,7 +432,7 @@ impl Hud {
         if self.paused {
             let online = m.is_online();
             draw_rectangle(0.0, 0.0, sw, sh, Color::new(0.0, 0.0, 0.0, 0.45));
-            let r = Rect::new(sw / 2.0 - 160.0, sh / 2.0 - 150.0, 320.0, 300.0);
+            let r = Rect::new(sw / 2.0 - 160.0, sh / 2.0 - 172.0, 320.0, 344.0);
             ui.panel(r);
             ui.text_centered(
                 if online { t("Menu") } else { t("Paused") },
@@ -466,9 +461,14 @@ impl Hud {
             if ui.button(Rect::new(bx, r.y + 116.0, bw, 34.0), t("Settings"), true) {
                 action = HudAction::Settings;
             }
+            let help = if self.show_help { t("Hide controls") } else { t("Controls") };
+            if ui.button(Rect::new(bx, r.y + 160.0, bw, 34.0), help, true) {
+                self.show_help = !self.show_help;
+                self.paused = false;
+            }
             let my_turn = m.current_controller() == Controller::Human;
             let can_resign = m.game.game_over().is_none() && (online || my_turn);
-            if ui.button(Rect::new(bx, r.y + 160.0, bw, 34.0), t("Resign this game"), can_resign) {
+            if ui.button(Rect::new(bx, r.y + 204.0, bw, 34.0), t("Resign this game"), can_resign) {
                 m.resign();
                 self.paused = false;
             }
@@ -477,23 +477,23 @@ impl Hud {
                 ui.text_centered(
                     t("Leaving now counts as a loss."),
                     sw / 2.0,
-                    r.y + 206.0,
+                    r.y + 250.0,
                     13.0,
                     ALERT,
                     false,
                 );
-                if ui.button(Rect::new(bx, r.y + 228.0, bw / 2.0 - 5.0, 34.0), t("Leave"), true) {
+                if ui.button(Rect::new(bx, r.y + 272.0, bw / 2.0 - 5.0, 34.0), t("Leave"), true) {
                     self.paused = false;
                     action = if online { HudAction::Lounge } else { HudAction::MainMenu };
                 }
                 if ui.button(
-                    Rect::new(bx + bw / 2.0 + 5.0, r.y + 228.0, bw / 2.0 - 5.0, 34.0),
+                    Rect::new(bx + bw / 2.0 + 5.0, r.y + 272.0, bw / 2.0 - 5.0, 34.0),
                     t("Stay"),
                     true,
                 ) {
                     self.confirm_leave = false;
                 }
-            } else if ui.button(Rect::new(bx, r.y + 212.0, bw, 34.0), leave, true) {
+            } else if ui.button(Rect::new(bx, r.y + 256.0, bw, 34.0), leave, true) {
                 if online && m.game.game_over().is_none() {
                     self.confirm_leave = true;
                 } else {

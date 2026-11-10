@@ -60,8 +60,10 @@ impl MatchSettings {
     fn from_config(mode: MatchMode, c: &Config) -> Self {
         MatchSettings {
             mode,
-            player_name: c.player_name.trim().to_string(),
-            second_player_name: c.second_player_name.trim().to_string(),
+            // An empty name field means the default name (the field itself is
+            // left empty while the player types).
+            player_name: name_or(&c.player_name, "Player"),
+            second_player_name: name_or(&c.second_player_name, "Player 2"),
             guide: c.guide,
         }
     }
@@ -521,4 +523,11 @@ fn vignette_texture() -> Texture2D {
     let tex = Texture2D::from_rgba8(N, N, &rgba);
     tex.set_filter(FilterMode::Linear);
     tex
+}
+
+fn name_or(name: &str, default: &str) -> String {
+    match name.trim() {
+        "" => i18n::t(default).to_string(),
+        n => n.to_string(),
+    }
 }

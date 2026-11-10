@@ -46,6 +46,11 @@ pub struct ComputerTurn {
     decision: Option<AiDecision>,
     elapsed: f32,
     start_yaw: f64,
+    /// How long the computer "studies the table" before moving the cue.
+    think: f32,
+    waited: f32,
+    /// A small first aiming error, corrected before the stroke (like a person).
+    first_miss: f64,
 }
 
 pub enum Phase {
@@ -343,7 +348,19 @@ impl Match {
                         .unwrap_or_else(|_| fallback_decision(&game));
                     *slot.lock().unwrap_or_else(|e| e.into_inner()) = Some(decision);
                 });
-                Some(ComputerTurn { result, decision: None, elapsed: 0.0, start_yaw: 0.0 })
+                // Pseudo-random pacing from the seed: 1.0–2.8 s of thinking.
+                let r = |k: u64| {
+                    ((seed.wrapping_mul(0x9E37_79B9_7F4A_7C15) >> k) & 0xffff) as f32 / 65535.0
+                };
+                Some(ComputerTurn {
+                    result,
+                    decision: None,
+                    elapsed: 0.0,
+                    start_yaw: 0.0,
+                    think: 1.0 + 1.8 * r(3),
+                    waited: 0.0,
+                    first_miss: ((r(19) - 0.5) * 6.0).to_radians() as f64,
+                })
             }
             Controller::Human | Controller::Remote => None,
         };
@@ -493,8 +510,12 @@ impl Match {
     }
 }
 
-const AI_AIM_TIME: f32 = 0.9;
-const AI_STROKE_TIME: f32 = 0.7;
+/// The computer's pacing, so its turns read like a person's: turn the cue
+/// towards the shot, refine the aim, pause, then draw the cue back and shoot.
+const AI_AIM_TIME: f32 = 1.3;
+const AI_REFINE_TIME: f32 = 0.9;
+const AI_SETTLE_TIME: f32 = 0.5;
+const AI_STROKE_TIME: f32 = 1.1;
 
 impl Match {
     /// Advances the match by `dt` seconds of real time.
@@ -550,7 +571,11 @@ impl Match {
         let Phase::Turn { computer: Some(turn), .. } = &mut self.phase else {
             return;
         };
+        turn.waited += dt;
         if turn.decision.is_none() {
+            if turn.waited < turn.think {
+                return;
+            }
             let ready = turn.result.lock().unwrap_or_else(|e| e.into_inner()).take();
             match ready {
                 Some(decision) => {
@@ -582,21 +607,29 @@ impl Match {
             self.game.place_cue_ball(p);
         }
         let target_power = ((decision.shot.speed / max_speed).powf(1.0 / 1.3)) as f32;
-        let k = (t / AI_AIM_TIME).clamp(0.0, 1.0);
-        let ease = (k * k * (3.0 - 2.0 * k)) as f64;
+        let first_miss = turn.first_miss;
+        let ease = |k: f32| {
+            let k = k.clamp(0.0, 1.0);
+            (k * k * (3.0 - 2.0 * k)) as f64
+        };
         let mut delta = (decision.shot.yaw - start_yaw).rem_euclid(std::f64::consts::TAU);
         if delta > std::f64::consts::PI {
             delta -= std::f64::consts::TAU;
         }
-        self.aim.yaw = start_yaw + delta * ease;
+        // Swing the cue near the line, then refine it slowly onto the shot.
+        let rough = start_yaw + (delta + first_miss) * ease(t / AI_AIM_TIME);
+        let fine = ease((t - AI_AIM_TIME) / AI_REFINE_TIME);
+        self.aim.yaw = rough - first_miss * fine;
         self.aim.tip = decision.shot.tip;
         self.aim.elevation = decision.shot.elevation;
         self.called_pocket = decision.called_pocket;
-        if t > AI_AIM_TIME {
+        let stroke_start = AI_AIM_TIME + AI_REFINE_TIME + AI_SETTLE_TIME;
+        if t > stroke_start {
             self.aim.charging = true;
-            self.aim.power = target_power * ((t - AI_AIM_TIME) / AI_STROKE_TIME).clamp(0.0, 1.0);
+            let k = ((t - stroke_start) / AI_STROKE_TIME).clamp(0.0, 1.0);
+            self.aim.power = target_power * (k * k * (3.0 - 2.0 * k));
         }
-        if t > AI_AIM_TIME + AI_STROKE_TIME + 0.15 {
+        if t > stroke_start + AI_STROKE_TIME + 0.35 {
             self.aim.yaw = decision.shot.yaw;
             self.aim.power = target_power;
             if !self.shoot() {

@@ -73,6 +73,9 @@ impl Menu {
             &mut settings.player_name,
             20,
         );
+        if settings.player_name.is_empty() && ui.focus != Some(10) {
+            ui.text(t("Player"), x + 109.0, y + 7.0, 15.0, MUTED, false);
+        }
         y += 48.0;
 
         ui.text(t("Play against the computer"), x, y, 16.0, GOLD, true);
@@ -99,6 +102,9 @@ impl Menu {
             &mut settings.second_player_name,
             20,
         );
+        if settings.second_player_name.is_empty() && ui.focus != Some(11) {
+            ui.text(t("Player 2"), x + 109.0, y + 7.0, 15.0, MUTED, false);
+        }
         y += 40.0;
         if ui.button(Rect::new(x, y, inner, 34.0), t("Play two players"), true) {
             action = MenuAction::Start(MatchMode::HotSeat);
@@ -126,9 +132,6 @@ impl Menu {
         let version = concat!("v", env!("CARGO_PKG_VERSION"));
         let vw = ui.text_size(version, 12.0, false).x;
         ui.text(version, sw - vw - 12.0, sh - 22.0, 12.0, MUTED, false);
-        if settings.player_name.trim().is_empty() {
-            settings.player_name = t("Player").into();
-        }
         action
     }
 }

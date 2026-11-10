@@ -867,11 +867,16 @@ fn clip_to_hole(table: &Table, a: DVec2, b: DVec2) -> DVec2 {
     let f = a - c;
     let (qa, qb, qc) = (d.dot(d), 2.0 * f.dot(d), f.dot(f) - r * r);
     let disc = qb * qb - 4.0 * qa * qc;
-    if qa < 1e-12 || disc < 0.0 {
-        return b;
+    if qa >= 1e-12 && disc >= 0.0 {
+        let t = (-qb - disc.sqrt()) / (2.0 * qa);
+        if (0.0..=1.0).contains(&t) {
+            return a + d * t.max(0.05);
+        }
     }
-    let t = (-qb - disc.sqrt()) / (2.0 * qa);
-    if (0.0..=1.0).contains(&t) { a + d * t.max(0.05) } else { b }
+    // The jaw line passes beside the hole: stop where it comes closest to it,
+    // so the throat never cuts a slit into the rail beyond the pocket.
+    let t = (-f.dot(d) / qa.max(1e-12)).clamp(0.05, 1.0);
+    a + d * t
 }
 
 fn is_axis_aligned(a: DVec2, b: DVec2) -> bool {
@@ -925,9 +930,11 @@ fn jaw_wall(mb: &mut MeshBuilder, table: &Table, a: DVec2, b: DVec2, into_throat
     ds.retain(|d| *d <= d_end + 1e-9);
     ds.sort_by(|x, y| x.total_cmp(y));
     ds.dedup_by(|x, y| (*x - *y).abs() < 1e-7);
+    // Lit like the cushion nose: facing the throat and tilted a little up,
+    // so the facings don't read as black slabs.
     let n = surface(into_throat, 0.0) - surface(DVec2::ZERO, 0.0);
-    let n = n.normalize_or_zero();
-    let color = rgb(205, 215, 205);
+    let n = (n.normalize_or_zero() + Vec3::Y * 0.6).normalize_or_zero();
+    let color = rgb(170, 180, 170);
     for w in ds.windows(2) {
         let (d0, d1) = (w[0], w[1]);
         let p0 = a + dir * (d0 / rate);
