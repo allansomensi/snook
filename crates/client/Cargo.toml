@@ -1,0 +1,19 @@
+[package]
+name = "snook"
+description = "Snook desktop client"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+snook_core = { path = "../core" }
+# Same glam version as snook_core (macroquad bundles an older one).
+glam.workspace = true
+macroquad = { version = "0.4.16", default-features = false, features = ["audio"] }
+snook_proto = { path = "../proto" }
+# Online play: a blocking WebSocket client on a background thread (ws:// and wss://).
+tungstenite = { version = "0.30", default-features = false, features = ["handshake", "rustls-tls-webpki-roots"] }
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12", "logging"] }
+sys-locale = "0.3"
+serde_json = "1"

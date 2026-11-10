@@ -1,0 +1,27 @@
+[package]
+name = "snook_server"
+description = "Snook game server: accounts, lounge, chat, rated matches, leaderboard"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "snook-server"
+path = "src/main.rs"
+
+[dependencies]
+snook_core = { path = "../core" }
+snook_proto = { path = "../proto" }
+glam.workspace = true
+axum = { version = "0.8", features = ["ws"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time", "net", "signal"] }
+futures-util = "0.3"
+rusqlite = { version = "0.41", features = ["bundled"] }
+argon2 = "0.5"
+rand = "0.8"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+[dev-dependencies]
+tokio-tungstenite = "0.30"
