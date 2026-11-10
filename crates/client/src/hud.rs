@@ -728,31 +728,31 @@ impl Hud {
         draw_bar(bar, false);
         let my_turn = m.is_human_turn() && !self.paused;
 
-        // Log on the left.
-        let log_w = (sw * 0.30).clamp(230.0, 400.0);
-        draw_log(ui, m, Rect::new(8.0, bar.y + 8.0, log_w, bar.h - 16.0));
-
-        // Cue setting buttons on the right; each opens a small panel above.
-        let bw = 92.0;
-        let pops = [Pop::Spin, Pop::Elevation, Pop::FineAim];
-        let bx0 = sw - 10.0 - pops.len() as f32 * (bw + 6.0) + 6.0;
+        // Left to right: power, cue elevation, contact point, fine aim, and
+        // the shoot button in the corner.
+        let gap = 8.0;
+        let bh = bar.h - 18.0;
+        let shoot = Rect::new(sw - 10.0 - bh * 1.15, bar.y + 9.0, bh * 1.15, bh);
+        let bw = 84.0;
+        let pops = [Pop::Elevation, Pop::Spin, Pop::FineAim];
+        let bx0 = shoot.x - 14.0 - pops.len() as f32 * (bw + gap) + gap;
+        let mut anchors = [0.0f32; 3];
         for (k, pop) in pops.into_iter().enumerate() {
-            let r = Rect::new(bx0 + k as f32 * (bw + 6.0), bar.y + 10.0, bw, bar.h - 20.0);
+            let r = Rect::new(bx0 + k as f32 * (bw + gap), bar.y + 9.0, bw, bh);
+            anchors[k] = r.x + r.w / 2.0;
             let open = self.popover == Some(pop);
             if ui.toggle(r, open) {
                 self.popover = if open { None } else { Some(pop) };
             }
             draw_pop_icon(ui, m, pop, r);
         }
-
-        // Power bar in the middle: press, drag right for more power, release
-        // to shoot. Right click or Esc cancels.
-        // The shoot button sits between the power bar and the cue settings.
-        let shoot_w = 128.0;
-        let shoot = Rect::new(bx0 - 16.0 - shoot_w, bar.y + 10.0, shoot_w, bar.h - 20.0);
-        let px0 = log_w + 30.0;
-        let px1 = shoot.x - 56.0;
+        let px0 = 24.0;
+        let px1 = bx0 - 70.0;
         let track = Rect::new(px0, bar.y + bar.h / 2.0 - 9.0, (px1 - px0).max(120.0), 18.0);
+
+        // The recent game messages float just above the bar, on the left.
+        draw_log(ui, m, Rect::new(14.0, bar.y - 66.0, (sw * 0.4).clamp(260.0, 460.0), 60.0));
+
         // A new turn starts with the power the player chose last time.
         let key = (m.games_played, m.game.shots_taken());
         if my_turn && self.power_key != Some(key) {
@@ -792,7 +792,13 @@ impl Hud {
                 Pop::Elevation => 92.0,
                 Pop::FineAim => 96.0,
             };
-            let r = Rect::new(sw - w - 10.0, bar.y - h - 8.0, w, h);
+            let k = match pop {
+                Pop::Elevation => 0,
+                Pop::Spin => 1,
+                Pop::FineAim => 2,
+            };
+            let x = (anchors[k] - w / 2.0).clamp(10.0, sw - w - 10.0);
+            let r = Rect::new(x, bar.y - h - 8.0, w, h);
             ui.panel(r);
             match pop {
                 Pop::Spin => self.spin_panel(ui, m, r),
@@ -1111,35 +1117,38 @@ const CARD_H: f32 = 44.0;
 
 /// The game log inside the bottom bar: the last few things that happened.
 fn draw_log(ui: &mut Ui, m: &Match, r: Rect) {
-    if m.log.is_empty() {
-        return;
-    }
-    ui.block(r);
-    crate::ui::rrect(r, 6.0, Color::new(0.0, 0.0, 0.0, 0.35));
-    let lines_fit = ((r.h - 6.0) / 17.0).floor().max(1.0) as usize;
+    // Just text with a soft shadow, newest at the bottom, older lines fading:
+    // it never takes clicks away from the table.
+    let lines_fit = ((r.h - 4.0) / 18.0).floor().max(1.0) as usize;
     let start = m.log.len().saturating_sub(lines_fit);
     let lines = &m.log[start..];
+    let base_y = r.y + r.h - 18.0 * lines.len() as f32;
     for (k, (text, important)) in lines.iter().enumerate() {
-        let newest = k + 1 == lines.len();
-        let base = if *important {
-            ALERT
-        } else if newest {
-            CREAM
-        } else {
-            MUTED
-        };
-        let text = ui.ellipsize(text, r.w - 16.0, 13.0);
-        ui.text(&text, r.x + 8.0, r.y + 4.0 + k as f32 * 17.0, 13.0, base, newest);
+        let age = (lines.len() - 1 - k) as f32;
+        let alpha = 1.0 - age * 0.3;
+        let base = if *important { ALERT } else { CREAM };
+        let color = Color::new(base.r, base.g, base.b, alpha);
+        let text = ui.ellipsize(text, r.w, 14.0);
+        let y = base_y + k as f32 * 18.0;
+        ui.text(
+            &text,
+            r.x + 1.0,
+            y + 1.0,
+            14.0,
+            Color::new(0.0, 0.0, 0.0, 0.8 * alpha),
+            k + 1 == lines.len(),
+        );
+        ui.text(&text, r.x, y, 14.0, color, k + 1 == lines.len());
     }
 }
 
-/// The big "Shoot" button: green with a cue ball, unmistakable.
+/// The shoot button: a cue striking a ball, on green. Unmistakable, no text.
 fn shoot_button(ui: &mut Ui, r: Rect, enabled: bool) -> bool {
     ui.block(r);
     let hover = enabled && r.contains(ui.mouse());
     let down = hover && is_mouse_button_down(MouseButton::Left);
     let bg = if !enabled {
-        Color::new(0.12, 0.16, 0.12, 0.9)
+        Color::new(0.11, 0.14, 0.11, 0.9)
     } else if down {
         Color::new(0.10, 0.42, 0.20, 1.0)
     } else if hover {
@@ -1148,12 +1157,11 @@ fn shoot_button(ui: &mut Ui, r: Rect, enabled: bool) -> bool {
         Color::new(0.13, 0.52, 0.27, 1.0)
     };
     if enabled {
-        // A soft glow so it reads as the main action.
         let pulse = 0.5 + 0.5 * (get_time() as f32 * 3.0).sin();
         crate::ui::rrect(
             Rect::new(r.x - 3.0, r.y - 3.0, r.w + 6.0, r.h + 6.0),
             12.0,
-            Color::new(0.3, 0.9, 0.45, 0.10 + 0.12 * pulse),
+            Color::new(0.3, 0.9, 0.45, 0.10 + 0.14 * pulse),
         );
     }
     crate::ui::rrect(r, 10.0, bg);
@@ -1162,30 +1170,52 @@ fn shoot_button(ui: &mut Ui, r: Rect, enabled: bool) -> bool {
         9.0,
         Color::new(1.0, 1.0, 1.0, if enabled { 0.10 } else { 0.03 }),
     );
-    crate::ui::rrect_lines(
-        r,
-        10.0,
-        1.5,
-        if hover { GOLD } else { Color::new(0.35, 0.75, 0.5, if enabled { 1.0 } else { 0.35 }) },
+    let edge =
+        if hover { GOLD } else { Color::new(0.35, 0.75, 0.5, if enabled { 1.0 } else { 0.3 }) };
+    crate::ui::rrect_lines(r, 10.0, 1.5, edge);
+
+    // The picture: a ball on the right, the cue coming in from the lower left
+    // with its tip touching the ball, and a few impact lines.
+    let a = if enabled { 1.0 } else { 0.35 };
+    let s = r.h.min(r.w);
+    let ball = vec2(r.x + r.w * 0.64, r.y + r.h * 0.42);
+    let br = s * 0.17;
+    let dir = vec2(1.0, -0.55).normalize();
+    let tip = ball - dir * (br + 1.5);
+    let butt = tip - dir * s * 0.62;
+    // Shaft (light), wrap (dark) and the blue tip.
+    draw_line(butt.x, butt.y, tip.x, tip.y, s * 0.075, Color::new(0.86, 0.74, 0.52, a));
+    let wrap = butt + dir * s * 0.16;
+    draw_line(butt.x, butt.y, wrap.x, wrap.y, s * 0.085, Color::new(0.20, 0.12, 0.08, a));
+    let ferrule = tip - dir * s * 0.05;
+    draw_line(ferrule.x, ferrule.y, tip.x, tip.y, s * 0.075, Color::new(0.35, 0.55, 0.9, a));
+    // Impact lines on the far side of the ball.
+    for k in [-1.0f32, 0.0, 1.0] {
+        let n = vec2(-dir.y, dir.x);
+        let from = ball + dir * (br + 3.0) + n * k * br * 0.7;
+        let to = from + dir * s * 0.12;
+        draw_line(from.x, from.y, to.x, to.y, 1.6, Color::new(1.0, 1.0, 1.0, 0.75 * a));
+    }
+    draw_circle(ball.x, ball.y + 1.5, br, Color::new(0.0, 0.0, 0.0, 0.3 * a));
+    draw_circle(ball.x, ball.y, br, Color::new(0.97, 0.96, 0.92, a));
+    draw_circle(
+        ball.x - br * 0.35,
+        ball.y - br * 0.35,
+        br * 0.32,
+        Color::new(1.0, 1.0, 1.0, 0.85 * a),
     );
-    // Cue ball icon and the label.
-    let label = t("Shoot!");
-    let size = ui.fit(20.0, label, r.w - 46.0);
-    let tw_ = ui.text_size(label, size, true).x;
-    let total = 22.0 + 8.0 + tw_;
-    let x0 = r.x + (r.w - total) / 2.0;
-    let cy = r.y + r.h / 2.0;
-    let white =
-        if enabled { Color::new(0.97, 0.96, 0.92, 1.0) } else { Color::new(0.5, 0.52, 0.5, 1.0) };
-    draw_circle(x0 + 11.0, cy, 11.0, white);
-    draw_circle(x0 + 7.5, cy - 3.5, 3.5, Color::new(1.0, 1.0, 1.0, 0.8));
-    ui.text(
-        label,
-        x0 + 30.0,
-        cy - size / 2.0 - 1.0,
-        size,
-        if enabled { WHITE } else { MUTED },
-        true,
-    );
-    enabled && hover && is_mouse_button_released(MouseButton::Left)
+    let clicked = enabled && hover && is_mouse_button_released(MouseButton::Left);
+    if hover {
+        let label = t("Shoot!");
+        let w = ui.text_size(label, 13.0, true).x + 20.0;
+        let tr = Rect::new(
+            (r.x + r.w / 2.0 - w / 2.0).min(crate::ui::vw() - w - 6.0),
+            r.y - 32.0,
+            w,
+            24.0,
+        );
+        crate::ui::rrect(tr, 12.0, Color::new(0.0, 0.0, 0.0, 0.8));
+        ui.text(label, tr.x + 10.0, tr.y + 5.0, 13.0, CREAM, true);
+    }
+    clicked
 }

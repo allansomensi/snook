@@ -51,7 +51,7 @@ The interface is available in English and Brazilian Portuguese (Settings → Gam
 | Aim | drag on the table: the cue points at the mouse | A / D, ← / → (speeds up while held) |
 | Fine aim | Shift + drag | Shift + A / D |
 | Quick aim | click a ball or any spot on the cloth | |
-| Shoot | set the power on the bar, then press the green **Shoot** button | hold **Space**, release |
+| Shoot | set the power on the bar, then press the green button with the cue and ball (bottom right) | hold **Space**, release |
 | Fine aim (mouse) | drag the dial in the cue panel, or hold ◀ ▶ | |
 | Spin | click/drag on the spin ball | ↑ / ↓ (follow/draw), Q / E (English) |
 | Cue elevation | elevation slider | W / S |
