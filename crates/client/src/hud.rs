@@ -746,8 +746,9 @@ impl Hud {
             }
             draw_pop_icon(ui, m, pop, r);
         }
-        let px0 = 24.0;
-        let px1 = bx0 - 70.0;
+        // A compact power bar, grouped with the other cue controls.
+        let px1 = bx0 - 66.0;
+        let px0 = (px1 - 300.0).max(24.0);
         let track = Rect::new(px0, bar.y + bar.h / 2.0 - 9.0, (px1 - px0).max(120.0), 18.0);
 
         // The recent game messages float just above the bar, on the left.
