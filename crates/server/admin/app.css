@@ -1,0 +1,55 @@
+:root {
+  --bg: #120d09; --panel: #1d1510; --panel2: #261b14; --line: #4a3420; --text: #f0e3cc;
+  --muted: #b2a38f; --gold: #e8bf61; --green: #3fa66a; --red: #e0745e; --blue: #7fb8f0;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+.hidden { display: none !important; }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { background: var(--panel2); border: 1px solid var(--line); border-radius: 6px; padding: 6px 12px; cursor: pointer; }
+button:hover { border-color: var(--gold); }
+button.primary { background: var(--green); border-color: #5cc489; color: #fff; }
+button.danger { background: #5a2219; border-color: var(--red); }
+button.ghost { background: transparent; }
+input, select, textarea { background: #0c0806; border: 1px solid var(--line); border-radius: 6px; padding: 7px 9px; width: 100%; }
+input:focus, select:focus, textarea:focus { outline: 1px solid var(--gold); }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 18px; }
+.login { min-height: 100vh; display: grid; place-items: center; padding: 16px; }
+.login form { width: min(360px, 100%); display: grid; gap: 12px; }
+.login h1, .brand { margin: 0; color: var(--gold); font-size: 22px; letter-spacing: .05em; }
+.login h1 span, .brand span { color: var(--muted); font-weight: 400; font-size: .7em; margin-left: 4px; }
+.error { color: var(--red); min-height: 1.2em; margin: 0; }
+header { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; padding: 10px 16px; border-bottom: 1px solid var(--line); background: var(--panel); position: sticky; top: 0; z-index: 2; }
+nav { display: flex; gap: 6px; flex-wrap: wrap; flex: 1; }
+nav button.active { border-color: var(--gold); color: var(--gold); }
+nav b { background: var(--red); color: #fff; border-radius: 9px; padding: 0 6px; font-size: 12px; }
+nav b:empty { display: none; }
+.me { display: flex; gap: 8px; align-items: center; color: var(--muted); }
+main { padding: 16px; max-width: 1200px; margin: 0 auto; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px; margin-bottom: 18px; }
+.stat .n { font-size: 26px; color: var(--gold); font-weight: 700; }
+.stat .l { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .05em; }
+h2 { margin: 18px 0 10px; font-size: 16px; color: var(--gold); }
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; }
+th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid #2f2218; white-space: nowrap; }
+th { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; }
+tr.click { cursor: pointer; }
+tr.click:hover td { background: var(--panel2); }
+.tag { display: inline-block; padding: 1px 7px; border-radius: 9px; font-size: 12px; border: 1px solid var(--line); }
+.tag.on { color: #7fe0a0; border-color: #2d6b45; }
+.tag.ban { color: var(--red); border-color: #7a3328; }
+.tag.mute { color: #f0b860; border-color: #7a5a28; }
+.tag.staff { color: var(--blue); border-color: #2c4b6b; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
+.row input { max-width: 320px; }
+.actions { display: flex; gap: 6px; flex-wrap: wrap; margin: 10px 0; }
+.muted { color: var(--muted); }
+pre { white-space: pre-wrap; background: #0c0806; border: 1px solid var(--line); border-radius: 6px; padding: 8px; margin: 6px 0; max-height: 200px; overflow: auto; }
+.modal { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: grid; place-items: center; padding: 16px; z-index: 5; }
+.modal .card { width: min(440px, 100%); display: grid; gap: 10px; }
+.toast { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); background: #000c; border: 1px solid var(--line); padding: 8px 16px; border-radius: 18px; z-index: 6; }
+.report { margin-bottom: 12px; }
+.report .head { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+@media (max-width: 640px) { header { gap: 8px; } main { padding: 10px; } }

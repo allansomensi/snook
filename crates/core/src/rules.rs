@@ -180,10 +180,16 @@ pub struct PendingShot {
 
 /// Complete state of an eight-ball game between players `0` and `1`.
 ///
-/// Serializable so the game server can send authoritative snapshots.
+/// Serializable so the game server can send authoritative snapshots. The
+/// table and the physics parameters are not part of a snapshot (they are the
+/// standard ones on every machine), which keeps snapshots small: a
+/// deserialized game always uses [`Table::default`] and
+/// [`PhysicsParams::default`].
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct EightBallGame {
+    #[serde(skip)]
     table: Table,
+    #[serde(skip)]
     params: PhysicsParams,
     balls: Vec<Ball>,
     current: usize,

@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Snook · Staff</title>
+<link rel="stylesheet" href="/admin/app.css">
+<script src="/admin/app.js" defer></script>
+</head>
+<body>
+<div id="login" class="login hidden">
+  <form id="login-form" class="card">
+    <h1>Snook <span>staff</span></h1>
+    <label>Username <input id="login-user" autocomplete="username" required></label>
+    <label>Password <input id="login-pass" type="password" autocomplete="current-password" required></label>
+    <button type="submit">Sign in</button>
+    <p id="login-error" class="error"></p>
+  </form>
+</div>
+<div id="app" class="hidden">
+  <header>
+    <div class="brand">Snook <span>staff</span></div>
+    <nav>
+      <button data-view="dashboard" class="active">Dashboard</button>
+      <button data-view="users">Players</button>
+      <button data-view="reports">Reports <b id="report-count"></b></button>
+      <button data-view="live">Live</button>
+      <button data-view="audit">Audit log</button>
+    </nav>
+    <div class="me"><span id="me"></span><button id="logout" class="ghost">Sign out</button></div>
+  </header>
+  <main id="main"></main>
+</div>
+<div id="modal" class="modal hidden"><div class="card" id="modal-body"></div></div>
+<div id="toast" class="toast hidden"></div>
+</body>
+</html>
