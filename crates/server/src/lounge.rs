@@ -105,6 +105,9 @@ pub struct Session {
     repeats: u32,
     invite_bucket: Bucket,
     last_aim: Option<Instant>,
+    /// Achievement codes (they unlock reactions).
+    achievements: Vec<String>,
+    reaction_bucket: Bucket,
 }
 
 struct Room {
@@ -366,6 +369,8 @@ impl Lounge {
                 repeats: 0,
                 invite_bucket: Bucket::new(6.0, 0.2),
                 last_aim: None,
+                achievements: Vec::new(),
+                reaction_bucket: Bucket::new(3.0, 0.5),
             },
         );
         let players: Vec<PlayerInfo> = self.sessions.keys().filter_map(|k| self.info(k)).collect();
@@ -573,6 +578,7 @@ impl Lounge {
         match msg {
             ClientMsg::Chat { text } => self.chat(&k, &text),
             ClientMsg::MatchChat { text } => self.match_chat(&k, &text),
+            ClientMsg::React { code } => self.react(&k, &code),
             ClientMsg::Invite { to, rated } => self.invite(&k, &key(&to), rated),
             ClientMsg::CancelInvite { to } => {
                 let to = key(&to);
@@ -701,6 +707,36 @@ impl Lounge {
             let blocked = self.sessions.get(&p).is_some_and(|s| s.blocked.contains(&sender));
             if !blocked {
                 self.send(&p, ServerMsg::MatchChat { line: line.clone() });
+            }
+        }
+    }
+
+    /// Records what `name` has unlocked and tells them (reactions follow).
+    pub fn set_achievements(&mut self, name: &str, codes: Vec<String>) {
+        let k = key(name);
+        let Some(s) = self.sessions.get_mut(&k) else { return };
+        s.achievements = codes.clone();
+        self.send(&k, ServerMsg::MyAchievements { codes });
+    }
+
+    /// A reaction to everyone at the table (it must be unlocked; a few a
+    /// second at most; muted players and blocked senders are not shown).
+    fn react(&mut self, k: &str, code: &str) {
+        let Some(r) = snook_proto::reaction(code) else { return };
+        let Some(s) = self.sessions.get_mut(k) else { return };
+        if !r.unlocked(&s.achievements) || !s.reaction_bucket.take() {
+            return;
+        }
+        if s.user.is_muted(now()) {
+            return;
+        }
+        let sender = s.user.id;
+        let Some(room) = self.room_of(k) else { return };
+        let seat = room.seat_of(k);
+        for p in room.keys.clone() {
+            let blocked = self.sessions.get(&p).is_some_and(|s| s.blocked.contains(&sender));
+            if !blocked {
+                self.send(&p, ServerMsg::Reaction { seat, code: r.code.to_string() });
             }
         }
     }

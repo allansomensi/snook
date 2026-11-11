@@ -127,6 +127,14 @@ pub struct Ui {
     blocks: Vec<Rect>,
     prev_blocks: Vec<Rect>,
     pub wants_keyboard: bool,
+    /// Caret position in the focused field, in characters.
+    cursor: usize,
+    /// Ctrl+A in the focused field: the next key replaces everything.
+    all_selected: bool,
+    /// The editing key being held and when it repeats next.
+    repeat: Option<(KeyCode, f64)>,
+    /// The field `cursor` belongs to (focus can also be set from outside).
+    cursor_owner: Option<u64>,
 }
 
 impl Ui {
@@ -150,6 +158,10 @@ impl Ui {
             blocks: Vec::new(),
             prev_blocks: Vec::new(),
             wants_keyboard: false,
+            cursor: 0,
+            all_selected: false,
+            repeat: None,
+            cursor_owner: None,
         }
     }
 
@@ -168,6 +180,9 @@ impl Ui {
             self.released_active = self.active.take();
         }
         self.wants_keyboard = self.focus.is_some();
+        if self.focus.is_none() {
+            self.cursor_owner = None;
+        }
     }
 
     /// Marks a rectangle as UI so clicks there don't reach the game.
@@ -389,6 +404,27 @@ impl Ui {
         self.input(id, r, value, max_len, true)
     }
 
+    /// True when `key` was pressed this frame or is held long enough to
+    /// repeat (macroquad reports only the first press).
+    fn key_fires(&mut self, key: KeyCode) -> bool {
+        let now = get_time();
+        if is_key_pressed(key) {
+            self.repeat = Some((key, now + 0.45));
+            return true;
+        }
+        match self.repeat {
+            Some((k, next)) if k == key && is_key_down(key) && now >= next => {
+                self.repeat = Some((key, now + 0.035));
+                true
+            }
+            Some((k, _)) if k == key && !is_key_down(key) => {
+                self.repeat = None;
+                false
+            }
+            _ => false,
+        }
+    }
+
     fn input(
         &mut self,
         id: u64,
@@ -399,48 +435,135 @@ impl Ui {
     ) -> bool {
         self.block(r);
         let mut submitted = false;
+        let size = (r.h * 0.5).clamp(12.0, 18.0);
+        if self.focus == Some(id) && self.cursor_owner != Some(id) {
+            self.cursor_owner = Some(id);
+            self.cursor = value.chars().count();
+            self.all_selected = false;
+        }
         if self.focus == Some(id) {
             let ctrl = is_key_down(KeyCode::LeftControl)
                 || is_key_down(KeyCode::RightControl)
                 || is_key_down(KeyCode::LeftSuper)
                 || is_key_down(KeyCode::RightSuper);
+            let mut chars: Vec<char> = value.chars().collect();
+            let mut cursor = self.cursor.min(chars.len());
+            let mut changed = false;
+            let mut typed: Vec<char> = Vec::new();
             while let Some(c) = get_char_pressed() {
-                if !c.is_control() && !ctrl && value.chars().count() < max_len {
-                    value.push(c);
+                if !c.is_control() && !ctrl {
+                    typed.push(c);
                 }
             }
             if ctrl
                 && is_key_pressed(KeyCode::V)
                 && let Some(text) = macroquad::miniquad::window::clipboard_get()
             {
-                for c in text.chars().filter(|c| !c.is_control()) {
-                    if value.chars().count() >= max_len {
-                        break;
-                    }
-                    value.push(c);
-                }
+                typed.extend(text.chars().filter(|c| !c.is_control()));
             }
-            if is_key_pressed(KeyCode::Backspace) {
-                if ctrl {
-                    value.clear();
-                } else {
-                    value.pop();
-                }
+            if ctrl && is_key_pressed(KeyCode::A) {
+                self.all_selected = !chars.is_empty();
+                cursor = chars.len();
             }
+            if ctrl && is_key_pressed(KeyCode::C) && !masked {
+                macroquad::miniquad::window::clipboard_set(value);
+            }
+            let erase_back = self.key_fires(KeyCode::Backspace);
+            let erase_fwd = self.key_fires(KeyCode::Delete);
+            if self.all_selected && (erase_back || erase_fwd || !typed.is_empty()) {
+                chars.clear();
+                cursor = 0;
+                changed = true;
+                self.all_selected = false;
+            } else if erase_back && cursor > 0 {
+                let from = if ctrl { word_start(&chars, cursor) } else { cursor - 1 };
+                chars.drain(from..cursor);
+                cursor = from;
+                changed = true;
+            } else if erase_fwd && cursor < chars.len() {
+                let to = if ctrl { word_end(&chars, cursor) } else { cursor + 1 };
+                chars.drain(cursor..to);
+                changed = true;
+            }
+            for c in typed {
+                if chars.len() >= max_len {
+                    break;
+                }
+                chars.insert(cursor, c);
+                cursor += 1;
+                changed = true;
+            }
+            let mut moved = false;
+            if self.key_fires(KeyCode::Left) {
+                cursor = if ctrl { word_start(&chars, cursor) } else { cursor.saturating_sub(1) };
+                moved = true;
+            }
+            if self.key_fires(KeyCode::Right) {
+                cursor =
+                    if ctrl { word_end(&chars, cursor) } else { (cursor + 1).min(chars.len()) };
+                moved = true;
+            }
+            if is_key_pressed(KeyCode::Home) || is_key_pressed(KeyCode::Up) {
+                cursor = 0;
+                moved = true;
+            }
+            if is_key_pressed(KeyCode::End) || is_key_pressed(KeyCode::Down) {
+                cursor = chars.len();
+                moved = true;
+            }
+            if moved {
+                self.all_selected = false;
+            }
+            if changed {
+                *value = chars.into_iter().collect();
+            }
+            self.cursor = cursor;
             if is_key_pressed(KeyCode::Enter) || is_key_pressed(KeyCode::KpEnter) {
                 submitted = true;
+                self.all_selected = false;
             }
             if is_key_pressed(KeyCode::Escape) || is_key_pressed(KeyCode::Tab) {
                 self.focus = None;
             }
+        }
+        let shown: Vec<char> =
+            if masked { vec!['•'; value.chars().count()] } else { value.chars().collect() };
+        // Scroll so the caret stays visible: as much text as fits, ending
+        // at the caret when the caret would be off the right edge.
+        let room = r.w - 20.0;
+        let caret = if self.focus == Some(id) { self.cursor.min(shown.len()) } else { shown.len() };
+        let width_of = |ui: &Ui, a: usize, b: usize| {
+            ui.text_size(&shown[a..b].iter().collect::<String>(), size, false).x
+        };
+        let mut first = 0;
+        while first < caret && width_of(self, first, caret) > room {
+            first += 1;
+        }
+        let mut last = caret;
+        while last < shown.len() && width_of(self, first, last + 1) <= room {
+            last += 1;
         }
         // Focus changes after typing is handled, so nothing typed is lost.
         if self.pressed {
             if r.contains(self.mouse) {
                 if self.focus != Some(id) {
                     while get_char_pressed().is_some() {}
+                    self.focus = Some(id);
+                    self.cursor_owner = Some(id);
+                    self.cursor = shown.len();
+                    self.all_selected = false;
+                } else {
+                    // Put the caret where the click was.
+                    let mx = self.mouse.x - (r.x + 8.0);
+                    let mut best = first;
+                    for i in first..=last {
+                        if width_of(self, first, i) <= mx + 3.0 {
+                            best = i;
+                        }
+                    }
+                    self.cursor = best;
+                    self.all_selected = false;
                 }
-                self.focus = Some(id);
             } else if self.focus == Some(id) {
                 self.focus = None;
             }
@@ -448,21 +571,22 @@ impl Ui {
         let focused = self.focus == Some(id);
         rrect(r, 5.0, Color::new(0.04, 0.03, 0.02, 1.0));
         rrect_lines(r, 5.0, if focused { 1.6 } else { 1.2 }, if focused { GOLD } else { BORDER });
-        let size = (r.h * 0.5).clamp(12.0, 18.0);
-        let shown: String =
-            if masked { "•".repeat(value.chars().count()) } else { value.clone() };
-        // Keep the end of long text visible.
-        let room = r.w - 20.0;
-        let mut visible = shown.as_str();
-        while !visible.is_empty() && self.text_size(visible, size, false).x > room {
-            let mut it = visible.chars();
-            it.next();
-            visible = it.as_str();
+        let visible: String = shown[first..last].iter().collect();
+        if focused && self.all_selected && !visible.is_empty() {
+            let w = self.text_size(&visible, size, false).x;
+            draw_rectangle(
+                r.x + 7.0,
+                r.y + 5.0,
+                w + 2.0,
+                r.h - 10.0,
+                Color::new(0.75, 0.55, 0.2, 0.45),
+            );
         }
-        self.text(visible, r.x + 8.0, r.y + (r.h - size) / 2.0, size, CREAM, false);
+        self.text(&visible, r.x + 8.0, r.y + (r.h - size) / 2.0, size, CREAM, false);
         if focused && (get_time() * 2.0) as i64 % 2 == 0 {
-            let w = self.text_size(visible, size, false).x;
-            draw_line(r.x + 10.0 + w, r.y + 6.0, r.x + 10.0 + w, r.y + r.h - 6.0, 1.5, CREAM);
+            let caret = self.cursor.min(shown.len()).clamp(first, last);
+            let w = width_of(self, first, caret);
+            draw_line(r.x + 9.0 + w, r.y + 6.0, r.x + 9.0 + w, r.y + r.h - 6.0, 1.5, CREAM);
         }
         submitted
     }
@@ -913,4 +1037,26 @@ pub fn rrect_lines(r: Rect, radius: f32, thickness: f32, color: Color) {
         let b = pts[(i + 1) % pts.len()];
         draw_line(a.x, a.y, b.x, b.y, thickness, color);
     }
+}
+
+/// Where the word before `i` starts (Ctrl+Left, Ctrl+Backspace).
+fn word_start(chars: &[char], mut i: usize) -> usize {
+    while i > 0 && chars[i - 1].is_whitespace() {
+        i -= 1;
+    }
+    while i > 0 && !chars[i - 1].is_whitespace() {
+        i -= 1;
+    }
+    i
+}
+
+/// Where the word after `i` ends (Ctrl+Right, Ctrl+Delete).
+fn word_end(chars: &[char], mut i: usize) -> usize {
+    while i < chars.len() && chars[i].is_whitespace() {
+        i += 1;
+    }
+    while i < chars.len() && !chars[i].is_whitespace() {
+        i += 1;
+    }
+    i
 }

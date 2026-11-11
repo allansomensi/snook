@@ -274,6 +274,38 @@ async fn out_of_turn_and_stale_shots_are_rejected() {
 }
 
 #[tokio::test]
+async fn reactions_need_to_be_unlocked() {
+    let url = start(Rules::default()).await;
+    let (mut alice, _) = Client::register(&url, "alice").await;
+    alice.expect("achievements", |m| matches!(m, ServerMsg::MyAchievements { .. })).await;
+    let (mut bob, _) = Client::register(&url, "bob").await;
+    start_match(&mut alice, &mut bob, "bob", "alice", false).await;
+    // The crown needs a 1900 rating: dropped. The clap is for everyone.
+    alice.send(ClientMsg::React { code: "crown".into() }).await;
+    alice.send(ClientMsg::React { code: "nonsense".into() }).await;
+    alice.send(ClientMsg::React { code: "clap".into() }).await;
+    let ServerMsg::Reaction { code, .. } =
+        bob.expect("reaction", |m| matches!(m, ServerMsg::Reaction { .. })).await
+    else {
+        unreachable!()
+    };
+    assert_eq!(code, "clap");
+    // A few a second at most.
+    for _ in 0..10 {
+        alice.send(ClientMsg::React { code: "wow".into() }).await;
+    }
+    alice.send(ClientMsg::MatchChat { text: "end".into() }).await;
+    let mut seen = 0;
+    while let ServerMsg::Reaction { .. } = bob
+        .expect("more", |m| matches!(m, ServerMsg::Reaction { .. } | ServerMsg::MatchChat { .. }))
+        .await
+    {
+        seen += 1;
+    }
+    assert!(seen <= 3, "{seen} reactions got through");
+}
+
+#[tokio::test]
 async fn login_errors_and_validation() {
     let url = start(Rules::default()).await;
     let (_alice, token) = Client::register(&url, "Alice").await;

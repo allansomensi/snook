@@ -26,6 +26,7 @@ mod paint;
 mod play;
 mod profile;
 mod ranking;
+mod reactions;
 mod scene;
 mod settings;
 mod setup;
@@ -423,8 +424,10 @@ async fn main() {
                 online = Online::new(&config);
             }
             if let Some(m) = current.as_mut() {
-                let rated = m.online.as_ref().is_some_and(|o| o.rated);
-                m.guide = if rated { config::AimGuide::Short } else { config.guide };
+                m.guide = match m.online.as_ref() {
+                    Some(o) => config.guide.online(o.rated),
+                    None => config.guide,
+                };
             }
             if let SettingsAction::Close = action {
                 settings_open = false;

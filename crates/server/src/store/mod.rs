@@ -85,6 +85,8 @@ impl User {
             tournaments_played: self.tournaments_played,
             tournaments_won: self.tournaments_won,
             account_days: ((now - self.created_at).max(0) / 86_400) as u32,
+            today: snook_proto::month_day(now),
+            joined: self.created_at,
         }
     }
 }

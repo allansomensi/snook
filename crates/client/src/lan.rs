@@ -27,11 +27,19 @@ pub struct LanScreen {
     address: String,
     error: Option<String>,
     first: usize,
+    /// The name field was filled in once (emptying it must not refill it).
+    named: bool,
 }
 
 impl LanScreen {
     pub fn new() -> LanScreen {
-        LanScreen { discovery: Discovery::new(), address: String::new(), error: None, first: 0 }
+        LanScreen {
+            discovery: Discovery::new(),
+            address: String::new(),
+            error: None,
+            first: 0,
+            named: false,
+        }
     }
 
     /// Starts hosting; returns the address to join.
@@ -73,7 +81,7 @@ impl LanScreen {
         let inner = w - 56.0;
         let mut y = r.y + 70.0;
         ui.text(t("Your name"), x, y, 13.0, MUTED, true);
-        if config.lan_name.is_empty() {
+        if !self.named && config.lan_name.is_empty() {
             config.lan_name = if config.username.is_empty() {
                 config
                     .player_name
@@ -88,6 +96,7 @@ impl LanScreen {
                 config.lan_name = format!("Player{}", crate::game::clock_seed() % 900 + 100);
             }
         }
+        self.named = true;
         ui.text_input(50, Rect::new(x, y + 18.0, inner, 34.0), &mut config.lan_name, 16);
         let name_ok = valid_username(config.lan_name.trim());
         if !name_ok {

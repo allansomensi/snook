@@ -26,6 +26,12 @@ pub struct Stats {
     pub tournaments_won: u32,
     /// Days since the account was created.
     pub account_days: u32,
+    /// Today's date as month * 100 + day, UTC (0: unknown), for events.
+    #[serde(default)]
+    pub today: u16,
+    /// When the account was created (Unix seconds; 0: unknown).
+    #[serde(default)]
+    pub joined: i64,
 }
 
 /// Which number an achievement looks at.
@@ -43,6 +49,18 @@ pub enum Stat {
     TournamentsPlayed,
     TournamentsWon,
     AccountDays,
+    /// 1 while today (month * 100 + day) is in this range, both ends
+    /// included; a range that wraps (Dec–Jan) works.
+    Season(u16, u16),
+    /// 1 if the account was created before this time (Unix seconds).
+    JoinedBefore(i64),
+}
+
+impl Stat {
+    /// Event achievements are unlocked by being there, not by numbers.
+    pub fn is_event(self) -> bool {
+        matches!(self, Stat::Season(..) | Stat::JoinedBefore(_))
+    }
 }
 
 impl Stats {
@@ -60,6 +78,12 @@ impl Stats {
             Stat::TournamentsPlayed => self.tournaments_played as i64,
             Stat::TournamentsWon => self.tournaments_won as i64,
             Stat::AccountDays => self.account_days as i64,
+            Stat::Season(from, to) => {
+                let d = self.today;
+                let inside = if from <= to { d >= from && d <= to } else { d >= from || d <= to };
+                (d != 0 && inside) as i64
+            }
+            Stat::JoinedBefore(t) => (self.joined > 0 && self.joined < t) as i64,
         }
     }
 
@@ -141,7 +165,54 @@ pub const ACHIEVEMENTS: &[Achievement] = &[
     a("tournament_win_5", "Dynasty", "Win 5 tournaments.", Stat::TournamentsWon, 5, 3),
     a("veteran_30", "Familiar face", "Have an account for 30 days.", Stat::AccountDays, 30, 0),
     a("veteran_365", "Old timer", "Have an account for a year.", Stat::AccountDays, 365, 2),
+    // Events: being online at the right time. Each one unlocks a reaction.
+    a(
+        "event_founder",
+        "Founder",
+        "Create your account before April 2027.",
+        Stat::JoinedBefore(1_806_537_600),
+        1,
+        1,
+    ),
+    a(
+        "event_halloween",
+        "Haunted table",
+        "Play online during Halloween (Oct 24 – Nov 2).",
+        Stat::Season(1024, 1102),
+        1,
+        1,
+    ),
+    a(
+        "event_winter",
+        "Winter league",
+        "Play online over the holidays (Dec 15 – Jan 6).",
+        Stat::Season(1215, 106),
+        1,
+        1,
+    ),
+    a(
+        "event_new_year",
+        "Fireworks",
+        "Play online at the turn of the year (Dec 31 – Jan 1).",
+        Stat::Season(1231, 101),
+        1,
+        2,
+    ),
 ];
+
+/// Month * 100 + day of a Unix time, in UTC.
+pub fn month_day(unix: i64) -> u16 {
+    // Civil-from-days (Howard Hinnant), enough for any date after 1970.
+    let z = unix.div_euclid(86_400) + 719_468;
+    let era = z.div_euclid(146_097);
+    let doe = z - era * 146_097;
+    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = doy - (153 * mp + 2) / 5 + 1;
+    let m = if mp < 10 { mp + 3 } else { mp - 9 };
+    (m * 100 + d) as u16
+}
 
 #[cfg(test)]
 mod tests {
@@ -157,5 +228,23 @@ mod tests {
         let earned: Vec<_> = s.earned().collect();
         assert!(earned.contains(&"games_10") && earned.contains(&"rating_1300"));
         assert!(!earned.contains(&"games_100"));
+        assert!(!earned.iter().any(|c| c.starts_with("event_")));
+    }
+
+    #[test]
+    fn events_follow_the_calendar() {
+        // 2026-10-31 and 2027-01-01, noon UTC.
+        assert_eq!(month_day(1_793_448_000), 1031);
+        assert_eq!(month_day(1_798_804_800), 101);
+        assert_eq!(month_day(0), 101);
+        let at = |today| Stats { today, ..Stats::default() };
+        let has = |s: Stats, code| s.earned().any(|c| c == code);
+        assert!(has(at(1031), "event_halloween") && !has(at(1103), "event_halloween"));
+        assert!(has(at(1220), "event_winter") && has(at(106), "event_winter"));
+        assert!(!has(at(1214), "event_winter") && !has(at(107), "event_winter"));
+        assert!(has(at(1231), "event_new_year") && !has(at(102), "event_new_year"));
+        let founder = Stats { joined: 1_790_000_000, ..Stats::default() };
+        assert!(has(founder, "event_founder"));
+        assert!(!has(Stats { joined: 1_810_000_000, ..Stats::default() }, "event_founder"));
     }
 }

@@ -42,6 +42,8 @@ pub struct Hud {
     /// Camera zoom, 0 (far) to 1 (close): set by the caller, changed by the zoom bar.
     pub zoom: f32,
     zoom_drag: bool,
+    /// The reaction picker is open.
+    reactions_open: bool,
 }
 
 /// What the player asked for through the HUD.
@@ -63,7 +65,8 @@ impl Default for Hud {
             paused: false,
             show_help: true,
             chat_input: String::new(),
-            chat_open: true,
+            // Development aid: SNOOK_CHAT_CLOSED starts with the chat folded.
+            chat_open: std::env::var_os("SNOOK_CHAT_CLOSED").is_none(),
             chat_scroll: 0,
             confirm_leave: false,
             banner_key: None,
@@ -78,6 +81,8 @@ impl Default for Hud {
             panel_key: None,
             zoom: 0.5,
             zoom_drag: false,
+            // Development aid: SNOOK_OPEN_REACTIONS opens the picker.
+            reactions_open: std::env::var_os("SNOOK_OPEN_REACTIONS").is_some(),
         }
     }
 }
@@ -263,7 +268,9 @@ impl Hud {
         let mut action = HudAction::None;
 
         if !ui.wants_keyboard {
-            if is_key_pressed(KeyCode::Escape) && !m.aim.charging {
+            if is_key_pressed(KeyCode::Escape) && self.reactions_open {
+                self.reactions_open = false;
+            } else if is_key_pressed(KeyCode::Escape) && !m.aim.charging {
                 self.paused = !self.paused;
                 self.confirm_leave = false;
             }
@@ -289,6 +296,7 @@ impl Hud {
         let x0 = ((sw - total) / 2.0).max(buttons_w).min(sw - total - 8.0);
         player_card(ui, m, 0, x0, 6.0, card_w);
         player_card(ui, m, 1, x0 + card_w + 10.0, 6.0, card_w);
+        draw_reactions(m, [x0 + 34.0, x0 + total - 34.0]);
         let mut y = TOP_BAR + 8.0;
         if let Some(status) = status_line(m) {
             let w = ui.text_size(&status, 15.0, false).x + 24.0;
@@ -320,9 +328,6 @@ impl Hud {
         // Cue panel (spin, elevation, fine aim) and the power stroke bar:
         // everything can be played with the mouse alone.
         self.draw_bottom_bar(ui, m);
-        if m.is_human_turn() && m.game.may_call_pocket() && !self.paused {
-            draw_call_panel(ui, m);
-        }
 
         // Menu, the overhead view and the replay, in the top bar.
         if !self.paused {
@@ -680,22 +685,73 @@ impl Hud {
         out
     }
 
-    /// The chat with the opponent (online matches).
+    /// The chat with the opponent (online matches), and the reactions.
     fn draw_chat(&mut self, ui: &mut Ui, m: &mut Match) {
         let sh = crate::ui::vh();
+        let dt = get_frame_time();
         let Some(o) = m.online.as_mut() else { return };
         if !self.chat_open {
+            let button = Rect::new(12.0, sh - BOTTOM_BAR - 40.0, 110.0, 32.0);
             let label = if o.unread > 0 {
                 tw("Chat ({n})", &[("n", &o.unread)])
             } else {
                 t("Chat").to_string()
             };
-            if ui.button(Rect::new(12.0, sh - BOTTOM_BAR - 40.0, 110.0, 32.0), &label, true) {
+            if ui.button(button, &label, true) {
                 self.chat_open = true;
             }
+            if o.unread > 0 {
+                // A dot that pulses while there is something new.
+                let pulse = 0.5 + 0.5 * (get_time() as f32 * 5.0).sin();
+                let c = vec2(button.x + button.w - 4.0, button.y + 4.0);
+                draw_circle(c.x, c.y, 6.0 + pulse * 1.5, Color::new(0.0, 0.0, 0.0, 0.5));
+                draw_circle(c.x, c.y, 5.0 + pulse * 1.5, GOLD);
+            }
+            // The newest message, for a few seconds, above the button.
+            if let Some((line, age)) = &mut o.preview {
+                *age += dt;
+                let alpha = (*age / 0.2).min(1.0) * ((PREVIEW_TIME - *age) / 0.6).clamp(0.0, 1.0);
+                if *age > PREVIEW_TIME {
+                    o.preview = None;
+                } else {
+                    let who = line.from.as_ref().map(|(n, _)| format!("{n}: ")).unwrap_or_default();
+                    let mut text = line.text.clone();
+                    let max_w = 300.0;
+                    let who_w = ui.text_size(&who, 13.0, true).x;
+                    while !text.is_empty() && who_w + ui.text_size(&text, 13.0, false).x > max_w {
+                        text.pop();
+                        if ui.text_size(&text, 13.0, false).x + who_w <= max_w - 12.0 {
+                            text.push('…');
+                            break;
+                        }
+                    }
+                    let w = who_w + ui.text_size(&text, 13.0, false).x + 20.0;
+                    let r = Rect::new(button.x, button.y - 32.0, w, 26.0);
+                    crate::ui::rrect(r, 13.0, Color::new(0.0, 0.0, 0.0, 0.7 * alpha));
+                    ui.text(
+                        &who,
+                        r.x + 10.0,
+                        r.y + 6.0,
+                        13.0,
+                        Color::new(GOLD.r, GOLD.g, GOLD.b, alpha),
+                        true,
+                    );
+                    ui.text(
+                        &text,
+                        r.x + 10.0 + who_w,
+                        r.y + 6.0,
+                        13.0,
+                        Color::new(CREAM.r, CREAM.g, CREAM.b, alpha),
+                        false,
+                    );
+                }
+            }
+            let rb = Rect::new(button.x + button.w + 6.0, button.y, 32.0, 32.0);
+            self.reaction_button(ui, m, rb);
             return;
         }
         o.unread = 0;
+        o.preview = None;
         let r = Rect::new(12.0, sh - BOTTOM_BAR - CHAT_H - 8.0, CHAT_W, CHAT_H);
         ui.panel(r);
         ui.text(t("Chat"), r.x + 10.0, r.y + 7.0, 14.0, GOLD, true);
@@ -724,7 +780,155 @@ impl Hud {
             self.chat_scroll = 0;
             ui.focus = None;
         }
+        self.reaction_button(ui, m, Rect::new(r.x + r.w + 6.0, r.y + r.h - 34.0, 32.0, 32.0));
     }
+
+    /// The reactions button and, when open, the picker above it.
+    fn reaction_button(&mut self, ui: &mut Ui, m: &mut Match, b: Rect) {
+        let Some(o) = m.online.as_ref() else { return };
+        ui.block(b);
+        let hover = ui.hovering(b);
+        crate::ui::rrect(
+            b,
+            7.0,
+            if self.reactions_open || hover {
+                Color::new(0.38, 0.25, 0.12, 0.95)
+            } else {
+                Color::new(0.07, 0.045, 0.03, 0.85)
+            },
+        );
+        crate::ui::rrect_lines(
+            b,
+            7.0,
+            1.2,
+            if self.reactions_open || hover { GOLD } else { BORDER },
+        );
+        crate::reactions::draw(
+            "thumbs_up",
+            vec2(b.x + b.w / 2.0, b.y + b.h / 2.0),
+            20.0,
+            crate::paint::opacity() * if hover || self.reactions_open { 1.0 } else { 0.8 },
+        );
+        if hover && !self.reactions_open {
+            ui.tooltip(t("Reactions"), b);
+        }
+        let clicked_button = hover && is_mouse_button_released(MouseButton::Left);
+        if !self.reactions_open {
+            if clicked_button {
+                self.reactions_open = true;
+            }
+            return;
+        }
+        const COLS: usize = 7;
+        const CELL: f32 = 40.0;
+        let n = snook_proto::REACTIONS.len();
+        let rows = n.div_ceil(COLS);
+        let w = COLS as f32 * CELL + 16.0;
+        let h = rows as f32 * CELL + 40.0;
+        let p = Rect::new(b.x.min(crate::ui::vw() - w - 8.0), b.y - h - 8.0, w, h);
+        ui.panel(p);
+        let open = snook_proto::REACTIONS.iter().filter(|r| r.unlocked(&o.unlocked)).count();
+        ui.text(
+            &tw("Reactions {n}/{total}", &[("n", &open), ("total", &n)]),
+            p.x + 10.0,
+            p.y + 9.0,
+            13.0,
+            GOLD,
+            true,
+        );
+        let mut chosen = None;
+        let mut tip: Option<(String, Rect)> = None;
+        for (k, r) in snook_proto::REACTIONS.iter().enumerate() {
+            let c = Rect::new(
+                p.x + 8.0 + (k % COLS) as f32 * CELL,
+                p.y + 32.0 + (k / COLS) as f32 * CELL,
+                CELL,
+                CELL,
+            );
+            let center = vec2(c.x + c.w / 2.0, c.y + c.h / 2.0);
+            let unlocked = r.unlocked(&o.unlocked);
+            let hover = ui.hovering(c);
+            if unlocked {
+                if hover {
+                    crate::ui::rrect(c, 8.0, Color::new(1.0, 1.0, 1.0, 0.10));
+                }
+                crate::reactions::draw(
+                    r.code,
+                    center,
+                    if hover { 32.0 } else { 28.0 },
+                    crate::paint::opacity(),
+                );
+                if hover && is_mouse_button_released(MouseButton::Left) {
+                    chosen = Some(r.code);
+                }
+            } else {
+                crate::reactions::draw_locked(r.code, center, 26.0);
+                crate::icons::draw(
+                    crate::icons::Icon::Lock,
+                    vec2(c.x + c.w - 10.0, c.y + c.h - 10.0),
+                    11.0,
+                    MUTED,
+                );
+                if hover {
+                    let how = r
+                        .unlock
+                        .and_then(|a| snook_proto::ACHIEVEMENTS.iter().find(|x| x.code == a))
+                        .map(|a| {
+                            tw(
+                                "{title}: {how}",
+                                &[("title", &t(a.title)), ("how", &t(a.description))],
+                            )
+                        })
+                        .unwrap_or_default();
+                    tip = Some((how, c));
+                }
+            }
+        }
+        if let Some((text, c)) = tip {
+            ui.tooltip(&text, c);
+        }
+        ui.block(p);
+        if let Some(code) = chosen {
+            m.send_reaction(code);
+            self.reactions_open = false;
+        } else if (is_mouse_button_released(MouseButton::Left)
+            && !ui.hovering(p)
+            && !clicked_button)
+            || clicked_button
+        {
+            self.reactions_open = false;
+        }
+    }
+}
+
+const PREVIEW_TIME: f32 = 5.0;
+const REACTION_TIME: f32 = 2.8;
+
+/// Reactions float down from the sender's card and fade (drawn even while
+/// the HUD fades for aiming: they are meant to be seen).
+fn draw_reactions(m: &mut Match, xs: [f32; 2]) {
+    let dt = get_frame_time();
+    let Some(o) = m.online.as_mut() else { return };
+    for (seat, code, age) in &mut o.reactions {
+        *age += dt;
+        let t = *age;
+        let pop = if t < 0.25 {
+            0.6 + 0.4 * (t / 0.25) + 0.25 * (t / 0.25 * std::f32::consts::PI).sin()
+        } else {
+            1.0
+        };
+        let alpha = (t / 0.12).min(1.0) * ((REACTION_TIME - t) / 0.7).clamp(0.0, 1.0);
+        let y = TOP_BAR + 30.0 + 14.0 * (t / REACTION_TIME).sqrt();
+        let size = 38.0 * pop;
+        macroquad::shapes::draw_circle(
+            xs[*seat],
+            y,
+            size * 0.62,
+            Color::new(0.0, 0.0, 0.0, 0.35 * alpha),
+        );
+        crate::reactions::draw(code, vec2(xs[*seat], y), size, alpha);
+    }
+    o.reactions.retain(|(.., age)| *age < REACTION_TIME);
 }
 
 const BANNER_TIME: f32 = 1.9;
@@ -1144,95 +1348,6 @@ fn draw_bar(r: Rect, top: bool) {
     draw_rectangle(r.x, r.y, r.w, r.h, Color::new(0.045, 0.03, 0.02, 0.94));
     let edge = if top { r.y + r.h - 1.0 } else { r.y };
     draw_line(r.x, edge, r.x + r.w, edge, 1.5, Color::new(0.45, 0.31, 0.16, 0.9));
-}
-
-/// Choosing the pocket for the 8-ball: a little map of the table.
-fn draw_call_panel(ui: &mut Ui, m: &mut Match) {
-    let sh = crate::ui::vh();
-    let w = 250.0;
-    let h = 214.0;
-    let r = Rect::new(12.0, (sh * 0.22).max(56.0), w, h);
-    ui.panel(r);
-    crate::ui::rrect_lines(r, 8.0, 2.0, GOLD);
-    ui.text(t("Call the pocket for the 8-ball"), r.x + 12.0, r.y + 10.0, 14.0, GOLD, true);
-    let map = Rect::new(r.x + 25.0, r.y + 42.0, w - 50.0, (w - 50.0) / 2.0);
-    crate::ui::rrect(
-        Rect::new(map.x - 8.0, map.y - 8.0, map.w + 16.0, map.h + 16.0),
-        6.0,
-        Color::new(0.42, 0.22, 0.09, 1.0),
-    );
-    draw_rectangle(map.x, map.y, map.w, map.h, Color::new(0.10, 0.45, 0.24, 1.0));
-    // The 8-ball's position on the map.
-    let spec = m.game.table().spec;
-    let to_map = |p: ::glam::DVec2| {
-        vec2(
-            map.x + ((p.x / spec.length + 0.5) as f32) * map.w,
-            map.y + ((0.5 - p.y / spec.width) as f32) * map.h,
-        )
-    };
-    let eight = to_map(m.game.ball(BallId::EIGHT).xy());
-    draw_circle(eight.x, eight.y, 5.0, BLACK);
-    draw_circle_lines(eight.x, eight.y, 5.0, 1.0, Color::new(1.0, 1.0, 1.0, 0.6));
-    let mut chosen = None;
-    for id in snook_core::PocketId::ALL {
-        let c = to_map(m.game.table().pocket(id).mouth_center);
-        let hover = ui.mouse().distance(c) < 13.0;
-        let selected = m.called_pocket == Some(id);
-        draw_circle(
-            c.x,
-            c.y,
-            11.0,
-            if selected { GOLD } else { Color::new(0.03, 0.03, 0.03, 1.0) },
-        );
-        draw_circle_lines(
-            c.x,
-            c.y,
-            11.0,
-            2.0,
-            if hover || selected { GOLD } else { Color::new(0.5, 0.4, 0.3, 1.0) },
-        );
-        if hover && is_mouse_button_released(MouseButton::Left) {
-            chosen = Some(id);
-        }
-    }
-    ui.block(map);
-    if let Some(id) = chosen {
-        m.called_pocket = Some(id);
-        let name = m.names[m.game.current_player()].clone();
-        m.notify(
-            tw(
-                "{name} calls the 8-ball in the {pocket} pocket.",
-                &[("name", &name), ("pocket", &crate::i18n::pocket(id))],
-            ),
-            false,
-        );
-    }
-    let y = map.y + map.h + 16.0;
-    match m.called_pocket {
-        Some(id) => ui.text(
-            &tw("Called: {pocket}", &[("pocket", &crate::i18n::pocket(id))]),
-            r.x + 12.0,
-            y,
-            13.0,
-            CREAM,
-            true,
-        ),
-        None => ui.text(
-            t("Click a pocket on the table, or pick one here:"),
-            r.x + 12.0,
-            y,
-            12.0,
-            MUTED,
-            false,
-        ),
-    }
-    for (k, line) in ui
-        .wrap(t("Sinking the 8 in any other pocket loses the game."), w - 24.0, 12.0)
-        .iter()
-        .enumerate()
-    {
-        ui.text(line, r.x + 12.0, y + 20.0 + k as f32 * 15.0, 12.0, ALERT, false);
-    }
 }
 
 const TOP_BAR: f32 = 54.0;

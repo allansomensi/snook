@@ -116,7 +116,7 @@ impl Setup {
             config.guide = AimGuide::ALL[i];
         }
         let hint = match config.guide {
-            AimGuide::Full => t("Shows where the object ball and the cue ball go."),
+            AimGuide::Full => t("Shows where the object ball and the cue ball go (not online)."),
             AimGuide::Standard => t("Shows the contact point; judging the cut is up to you."),
             AimGuide::Short => t("A short line, as in rated online games."),
         };

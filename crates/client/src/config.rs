@@ -51,6 +51,17 @@ pub enum AimGuide {
 }
 
 impl AimGuide {
+    /// The guide used against a person over the network: never the full
+    /// guide (it would play the cut for you), and only the short line in
+    /// rated games.
+    pub fn online(self, rated: bool) -> AimGuide {
+        match self {
+            _ if rated => AimGuide::Short,
+            AimGuide::Full => AimGuide::Standard,
+            g => g,
+        }
+    }
+
     pub const ALL: [AimGuide; 3] = [AimGuide::Full, AimGuide::Standard, AimGuide::Short];
 
     pub fn name(self) -> &'static str {
@@ -70,8 +81,12 @@ impl AimGuide {
 /// when building.
 pub const DEFAULT_SERVER: &str = match option_env!("SNOOK_SERVER") {
     Some(s) => s,
-    None => "ws://localhost:7878/ws",
+    None => "wss://snook-server.onrender.com/ws",
 };
+
+/// What earlier builds saved as the default; read as "the default" so they
+/// move to the public server (a local test server is `ws://127.0.0.1:7878/ws`).
+const OLD_DEFAULT_SERVER: &str = "ws://localhost:7878/ws";
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Config {
@@ -209,7 +224,7 @@ impl Config {
                 "volume" => {
                     c.volume = v.parse::<f32>().map(|x| x.clamp(0.0, 1.0)).unwrap_or(c.volume)
                 }
-                "server" if !v.is_empty() => c.server = v.to_string(),
+                "server" if !v.is_empty() && v != OLD_DEFAULT_SERVER => c.server = v.to_string(),
                 "username" => c.username = v.to_string(),
                 "token" => c.token = v.to_string(),
                 "difficulty" => c.difficulty = v.parse::<u8>().map(|d| d.min(2)).unwrap_or(1),

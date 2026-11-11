@@ -62,6 +62,11 @@ shooter                     server                         opponent
   (both players; not in tournaments) or `leave_match`.
 - Reconnecting within the grace period resumes the match with a fresh
   `match_started`.
+- `react { code }` sends a reaction to the table (`reaction { seat, code }`
+  to both players). Codes and what unlocks each are in
+  `crates/proto/src/reactions.rs`; the server drops locked ones and allows a
+  few a second. After signing in (and whenever one is unlocked) the server
+  sends `my_achievements { codes }`, which the game uses to offer them.
 
 ## Tournaments
 

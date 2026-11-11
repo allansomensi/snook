@@ -36,6 +36,16 @@ What was reviewed in the game before the release, what changed and why.
 - **Chat**: online, what happens in the game (pocketed balls, fouls, ball in
   hand…) appears in the same chat, smaller, dimmer and without a name, with
   fouls in a muted red: easy to tell from what people write.
+- **Calling the 8**: clicking a pocket on the table calls it (the pockets
+  glow and the status line says so). The panel that used to cover the left
+  of the table is gone. The call is binding for the rest of the game.
+- **Folded chat**: a pulsing dot on the Chat button and the newest message
+  for five seconds above it, so nothing is missed without opening it.
+- **Reactions**: a small button by the chat opens a grid of pictures (locked
+  ones in grey, with what unlocks them). A reaction pops up by the sender's
+  card for under three seconds and stays visible while aiming.
+- **Aiming guide online**: never the full guide against a person (it plays
+  the cut for you); at most the standard one, the short line when rated.
 - **Shot clock** offline too (optional), on the player cards.
 - The deciding shot is always shown before the result.
 
@@ -44,6 +54,12 @@ What was reviewed in the game before the release, what changed and why.
 - Your own shot starts the instant you press the button (no round trip); the
   opponent's starts as soon as the server announces it; the opponent's cue
   glides instead of jumping 10 times a second.
+
+## Text fields
+
+Every field has a caret: arrows, Home/End, Delete, Ctrl+arrows (by word),
+Ctrl+Backspace, Ctrl+A, Ctrl+C/V, and a click places the caret. Held keys
+repeat. The LAN name field no longer refills itself when emptied.
 
 ## Accessibility and polish
 

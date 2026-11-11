@@ -1,0 +1,7 @@
+The reaction pictures (reactions.png) are Twemoji graphics:
+
+Copyright 2019 Twitter, Inc and other contributors
+Copyright 2024 jdecked and other contributors
+https://github.com/jdecked/twemoji
+
+Licensed under CC-BY 4.0: https://creativecommons.org/licenses/by/4.0/

@@ -76,6 +76,8 @@ pub struct FriendsData {
 
 pub struct Online {
     conn: Option<Connection>,
+    /// This account's achievements (for the reactions they unlock).
+    achievements: Vec<String>,
     pub stage: Stage,
     pub server: String,
     /// A LAN game (guest name, nothing saved).
@@ -187,6 +189,7 @@ impl Online {
             friend_input: String::new(),
             profile: None,
             unread_friend_requests: false,
+            achievements: Vec::new(),
             rtt: None,
             ping_sent: None,
             ping_timer: 0.0,
@@ -510,6 +513,10 @@ impl Online {
                 if let Ok(text) = std::env::var("SNOOK_AUTOCHAT") {
                     self.send(ClientMsg::MatchChat { text });
                 }
+                // SNOOK_AUTOREACT="code" sends that reaction.
+                if let Ok(code) = std::env::var("SNOOK_AUTOREACT") {
+                    self.send(ClientMsg::React { code });
+                }
                 let next = Match::online(
                     match_id,
                     seat,
@@ -529,6 +536,9 @@ impl Online {
                     }
                     _ => *current = Some(next),
                 }
+                if let Some(o) = current.as_mut().and_then(|m| m.online.as_mut()) {
+                    o.unlocked = self.achievements.clone();
+                }
                 // A message sent just before the match (e.g. "this game is casual").
                 if let (Some((text, ..)), Some(m)) = (self.toasts.pop_back(), current.as_mut()) {
                     m.notify(text, true);
@@ -538,6 +548,12 @@ impl Online {
                 Some(m) if m.is_online() => m.handle_server(ServerMsg::Error { message }),
                 _ => self.toast(crate::i18n::server_text(&message), false),
             },
+            ServerMsg::MyAchievements { codes } => {
+                if let Some(o) = current.as_mut().and_then(|m| m.online.as_mut()) {
+                    o.unlocked = codes.clone();
+                }
+                self.achievements = codes;
+            }
             ServerMsg::Pong => {
                 if let Some(sent) = self.ping_sent.take() {
                     self.rtt = Some(sent.elapsed());

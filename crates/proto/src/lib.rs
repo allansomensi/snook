@@ -10,16 +10,18 @@
 
 mod achievements;
 mod countries;
+mod reactions;
 
-pub use achievements::{ACHIEVEMENTS, Achievement, Stat, Stats};
+pub use achievements::{ACHIEVEMENTS, Achievement, Stat, Stats, month_day};
 pub use countries::{COUNTRIES, FLAG_COLUMNS, FLAG_H, FLAG_W};
+pub use reactions::{REACTIONS, Reaction, reaction};
 
 use glam::DVec2;
 use serde::{Deserialize, Serialize};
 use snook_core::{EightBallGame, GameOverReason, PocketId, Shot, ShotReport};
 
 /// Bumped whenever messages change incompatibly.
-pub const PROTOCOL_VERSION: u32 = 6;
+pub const PROTOCOL_VERSION: u32 = 7;
 
 /// Username rules: 3–16 characters, letters, digits and underscores.
 pub fn valid_username(name: &str) -> bool {
@@ -426,6 +428,10 @@ pub enum ClientMsg {
     MatchChat {
         text: String,
     },
+    /// A reaction (see [`REACTIONS`]) during a match.
+    React {
+        code: String,
+    },
     Invite {
         to: String,
         rated: bool,
@@ -658,6 +664,16 @@ pub enum ServerMsg {
     },
     MatchChat {
         line: ChatLine,
+    },
+    /// A player at the table sent a reaction.
+    Reaction {
+        seat: usize,
+        code: String,
+    },
+    /// Every achievement this account has (after signing in and whenever
+    /// one is unlocked): the game uses it to offer the reactions they grant.
+    MyAchievements {
+        codes: Vec<String>,
     },
     /// The opponent lost (or regained) their connection.
     OpponentConnection {

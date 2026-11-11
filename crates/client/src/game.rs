@@ -142,6 +142,13 @@ pub struct OnlineMatch {
     pub feed: Vec<FeedLine>,
     /// Chat lines the player has not looked at.
     pub unread: usize,
+    /// The newest unread line and how long ago it came (a preview by the
+    /// closed chat for a few seconds).
+    pub preview: Option<(FeedLine, f32)>,
+    /// Achievements of this player (they unlock reactions).
+    pub unlocked: Vec<String>,
+    /// Reactions on screen: who sent which, and for how long it has shown.
+    pub reactions: Vec<(usize, &'static str, f32)>,
     /// The opponent has sent their aim this turn (until then their cue is hidden).
     pub remote_aimed: bool,
     /// The opponent's latest aim; the cue glides towards it.
@@ -250,8 +257,8 @@ impl Match {
             notices: Vec::new(),
             log: Vec::new(),
             last_report: None,
-            // Rated games only show a short aiming line.
-            guide: if rated { AimGuide::Short } else { guide },
+            // No full guide against people; rated games only a short line.
+            guide: guide.online(rated),
             games_played: 0,
             wins: [0, 0],
             sounds: Vec::new(),
@@ -271,6 +278,9 @@ impl Match {
                 rematch_requested: false,
                 feed: Vec::new(),
                 unread: 0,
+                preview: None,
+                unlocked: Vec::new(),
+                reactions: Vec::new(),
                 remote_aimed: false,
                 remote_target: None,
                 sim_turn: None,
@@ -1200,13 +1210,33 @@ impl Match {
                 }
             }
             ServerMsg::MatchChat { line } => {
-                o.unread += 1;
-                o.push_feed(FeedLine::chat(&line));
+                let feed = FeedLine::chat(&line);
+                if !line.from.eq_ignore_ascii_case(&self.names[o.seat]) {
+                    o.unread += 1;
+                    o.preview = Some((feed.clone(), 0.0));
+                }
+                o.push_feed(feed);
+            }
+            ServerMsg::Reaction { seat, code } => {
+                if let Some(r) = snook_proto::reaction(&code)
+                    && seat < 2
+                {
+                    // One at a time per player: a new one replaces the last.
+                    o.reactions.retain(|(s, ..)| *s != seat);
+                    o.reactions.push((seat, r.code, 0.0));
+                }
             }
             ServerMsg::Error { message } => {
                 self.notify(crate::i18n::server_text(&message), true);
             }
             _ => {}
+        }
+    }
+
+    /// Sends a reaction to the table.
+    pub fn send_reaction(&mut self, code: &str) {
+        if let Some(o) = self.online.as_mut() {
+            o.outbox.push(ClientMsg::React { code: code.to_string() });
         }
     }
 

@@ -107,9 +107,10 @@ With PostgreSQL instead (what production uses):
 DATABASE_URL=postgres://user:pass@localhost/snook cargo run --release -p snook_server
 ```
 
-The game connects to `ws://localhost:7878/ws` by default. To build a release that
-points at your public server, set `SNOOK_SERVER` at build time (players can also
-change it in Settings):
+The game connects to the public server (`wss://snook-server.onrender.com/ws`) by
+default; for a local server, enter `ws://127.0.0.1:7878/ws` under Settings → Game
+server. To build a release that points at another server, set `SNOOK_SERVER` at
+build time:
 
 ```bash
 SNOOK_SERVER=wss://snook.example.com/ws cargo build --release -p snook
@@ -185,3 +186,6 @@ Flags: [flag-icons](https://github.com/lipis/flag-icons) (MIT, see
 `crates/client/assets/flag-icons-LICENSE.txt`). Country names: ISO 3166 data
 and translations from the Debian [iso-codes](https://salsa.debian.org/iso-codes-team/iso-codes)
 project (via pycountry, LGPL-2.1).
+
+Reactions: [Twemoji](https://github.com/jdecked/twemoji) graphics (CC-BY 4.0, see
+`crates/client/assets/twemoji-LICENSE.txt`).

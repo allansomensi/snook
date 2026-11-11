@@ -208,6 +208,25 @@ fn portuguese(en: &str) -> Option<&'static str> {
         }
         "On the 8-ball: {pocket} pocket" => "Na bola 8: caçapa {pocket}",
         "Show ping (online)" => "Mostrar ping (online)",
+        "Reactions" => "Reações",
+        "Reactions {n}/{total}" => "Reações {n}/{total}",
+        "Founder" => "Fundador",
+        "Create your account before April 2027." => "Crie sua conta antes de abril de 2027.",
+        "Haunted table" => "Mesa assombrada",
+        "Play online during Halloween (Oct 24 – Nov 2)." => {
+            "Jogue online no Halloween (24/out – 2/nov)."
+        }
+        "Winter league" => "Liga de fim de ano",
+        "Play online over the holidays (Dec 15 – Jan 6)." => {
+            "Jogue online nas festas de fim de ano (15/dez – 6/jan)."
+        }
+        "Fireworks" => "Fogos de artifício",
+        "Play online at the turn of the year (Dec 31 – Jan 1)." => {
+            "Jogue online na virada do ano (31/dez – 1/jan)."
+        }
+        "Shows where the object ball and the cue ball go (not online)." => {
+            "Mostra para onde vão a bola da vez e a branca (fora do online)."
+        }
         "{n} online · ping {ms} ms" => "{n} online · ping {ms} ms",
         "Right-drag · Wheel · C" => "Arraste com o botão direito · Roda · C",
         "Win %" => "% vit.",

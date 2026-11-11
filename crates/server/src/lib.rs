@@ -253,10 +253,13 @@ impl Server {
         let earned: Vec<&str> = stats.earned().collect();
         match self.store.add_achievements(user.id, &earned, now()).await {
             Ok(new) => {
+                let all = self.store.achievements(user.id).await.unwrap_or_default();
+                let codes: Vec<String> = all.into_iter().map(|(code, _)| code).collect();
                 self.with(|l| {
                     for code in new {
                         l.notify(&user.username, ServerMsg::AchievementUnlocked { code });
                     }
+                    l.set_achievements(&user.username, codes);
                 });
             }
             Err(e) => tracing::error!("achievements for {}: {e}", user.username),
