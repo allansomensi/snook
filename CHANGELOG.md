@@ -14,6 +14,8 @@
   and while the game loads.
 
 ### Fixes
+- The bottom and right cushions were darker than the others: their faces
+  were wound the other way, so the light hit them from behind.
 - Hover hints (tooltips, achievement cards, "Shoot!", the power hint) are
   drawn after everything else, so panels, buttons, chat and toasts drawn
   later no longer cover them ("Find an opponent…" used to hide under the

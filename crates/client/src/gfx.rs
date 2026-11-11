@@ -507,6 +507,11 @@ impl MeshBuilder {
     /// Extrudes a 2D profile (in the plane spanned by `out` and +Y) along the
     /// segment `a -> b`. Used for cushions.
     pub fn extrude(&mut self, a: Vec3, b: Vec3, out: Vec3, profile: &[Vec2], color: Color) {
+        // The faces' normals come from the winding, which depends on the
+        // direction of `a -> b` relative to `out`: run it the way that makes
+        // them face outwards (otherwise half the cushions are lit from
+        // behind and look dark).
+        let (a, b) = if (b - a).dot(out.cross(Vec3::Y)) < 0.0 { (b, a) } else { (a, b) };
         let n = profile.len();
         let point = |base: Vec3, p: Vec2| base + out * p.x + Vec3::Y * p.y;
         let len = (b - a).length();
