@@ -58,8 +58,12 @@ impl LanScreen {
         let r = Rect::new((sw - w) / 2.0, (sh - h) / 2.0, w, h);
         ui.panel(r);
         let mut action = LanAction::None;
-        if ui.icon_button(Rect::new(r.x + 14.0, r.y + 14.0, 34.0, 34.0), Icon::Back, t("Back"), true)
-            || (is_key_pressed(KeyCode::Escape) && ui.focus.is_none())
+        if ui.icon_button(
+            Rect::new(r.x + 14.0, r.y + 14.0, 34.0, 34.0),
+            Icon::Back,
+            t("Back"),
+            true,
+        ) || (is_key_pressed(KeyCode::Escape) && ui.focus.is_none())
         {
             action = LanAction::Back;
         }
@@ -71,7 +75,12 @@ impl LanScreen {
         ui.text(t("Your name"), x, y, 13.0, MUTED, true);
         if config.lan_name.is_empty() {
             config.lan_name = if config.username.is_empty() {
-                config.player_name.chars().filter(|c| c.is_ascii_alphanumeric() || *c == '_').take(16).collect()
+                config
+                    .player_name
+                    .chars()
+                    .filter(|c| c.is_ascii_alphanumeric() || *c == '_')
+                    .take(16)
+                    .collect()
             } else {
                 config.username.clone()
             };
@@ -103,7 +112,14 @@ impl LanScreen {
         y += 54.0;
         if let Some(port) = hosting {
             let ip = local_ip().unwrap_or_else(|| "?".into());
-            ui.text(&tw("Others can join at {ip}:{port}", &[("ip", &ip), ("port", &port)]), x, y, 13.0, CREAM, false);
+            ui.text(
+                &tw("Others can join at {ip}:{port}", &[("ip", &ip), ("port", &port)]),
+                x,
+                y,
+                13.0,
+                CREAM,
+                false,
+            );
             y += 22.0;
         }
 
@@ -121,18 +137,41 @@ impl LanScreen {
                 t("Can't listen for games here: join by address below.")
             };
             let dots = ".".repeat(((get_time() * 2.0) as usize) % 4);
-            ui.text(&format!("{text}{}", if self.discovery.listening() { dots } else { String::new() }), list.x + 12.0, list.y + 12.0, 14.0, MUTED, false);
+            ui.text(
+                &format!("{text}{}", if self.discovery.listening() { dots } else { String::new() }),
+                list.x + 12.0,
+                list.y + 12.0,
+                14.0,
+                MUTED,
+                false,
+            );
         }
         let row_h = 42.0;
         let visible = (list.h / row_h).floor().max(1.0) as usize;
         self.first = ui.scroll_list(list, self.first, games.len(), visible);
         for (k, g) in games.iter().skip(self.first).take(visible).enumerate() {
-            let row = Rect::new(list.x + 6.0, list.y + 6.0 + k as f32 * row_h, list.w - 20.0, row_h - 6.0);
+            let row = Rect::new(
+                list.x + 6.0,
+                list.y + 6.0 + k as f32 * row_h,
+                list.w - 20.0,
+                row_h - 6.0,
+            );
             rrect(row, 6.0, Color::new(1.0, 1.0, 1.0, 0.05));
             crate::icons::draw(Icon::Table, vec2(row.x + 20.0, row.y + row.h / 2.0), 20.0, CREAM);
-            ui.text(&tw("{host}'s game", &[("host", &g.host)]), row.x + 40.0, row.y + 4.0, 15.0, CREAM, true);
+            ui.text(
+                &tw("{host}'s game", &[("host", &g.host)]),
+                row.x + 40.0,
+                row.y + 4.0,
+                15.0,
+                CREAM,
+                true,
+            );
             ui.text(&g.address.to_string(), row.x + 40.0, row.y + 21.0, 11.0, MUTED, false);
-            if ui.button(Rect::new(row.x + row.w - 90.0, row.y + 5.0, 84.0, row.h - 10.0), t("Join"), name_ok) {
+            if ui.button(
+                Rect::new(row.x + row.w - 90.0, row.y + 5.0, 84.0, row.h - 10.0),
+                t("Join"),
+                name_ok,
+            ) {
                 action = LanAction::Join(g.url(), config.lan_name.trim().to_string());
             }
         }
@@ -146,14 +185,24 @@ impl LanScreen {
             ui.text("192.168.0.10", input.x + 9.0, input.y + 10.0, 14.0, MUTED, false);
         }
         let can = name_ok && !self.address.trim().is_empty();
-        if (ui.button(Rect::new(x + inner - 100.0, y + 18.0, 100.0, 34.0), t("Join"), can) || enter) && can {
-            action = LanAction::Join(address_url(&self.address), config.lan_name.trim().to_string());
+        if (ui.button(Rect::new(x + inner - 100.0, y + 18.0, 100.0, 34.0), t("Join"), can) || enter)
+            && can
+        {
+            action =
+                LanAction::Join(address_url(&self.address), config.lan_name.trim().to_string());
         }
         y += 60.0;
         if let Some(e) = &self.error {
             ui.text(e, x, y, 12.0, ALERT, false);
         } else {
-            ui.text(t("The first time, allow Snook through the firewall when asked."), x, y, 12.0, MUTED, false);
+            ui.text(
+                t("The first time, allow Snook through the firewall when asked."),
+                x,
+                y,
+                12.0,
+                MUTED,
+                false,
+            );
         }
         action
     }

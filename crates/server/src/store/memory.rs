@@ -252,7 +252,7 @@ impl MemoryStore {
                 out.push((u.clone(), state));
             }
         }
-        out.sort_by(|x, y| x.0.username.to_lowercase().cmp(&y.0.username.to_lowercase()));
+        out.sort_by_key(|x| x.0.username.to_lowercase());
         Ok(out)
     }
 
@@ -381,7 +381,12 @@ impl MemoryStore {
         })
     }
 
-    pub fn set_ban(&self, user_id: i64, until: Option<i64>, reason: Option<&str>) -> StoreResult<()> {
+    pub fn set_ban(
+        &self,
+        user_id: i64,
+        until: Option<i64>,
+        reason: Option<&str>,
+    ) -> StoreResult<()> {
         if let Some(u) = self.lock().users.get_mut(&user_id) {
             u.banned_until = until;
             u.ban_reason = reason.map(str::to_string);
@@ -480,4 +485,3 @@ impl MemoryStore {
         Ok(self.lock().audit.iter().rev().take(limit as usize).cloned().collect())
     }
 }
-

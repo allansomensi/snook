@@ -105,10 +105,11 @@ impl PgStore {
     }
 
     pub async fn user_by_name(&self, name: &str) -> StoreResult<Option<User>> {
-        let row = query(&format!("SELECT {USER_COLUMNS} FROM users WHERE lower(username) = lower($1)"))
-            .bind(name)
-            .fetch_optional(&self.pool)
-            .await?;
+        let row =
+            query(&format!("SELECT {USER_COLUMNS} FROM users WHERE lower(username) = lower($1)"))
+                .bind(name)
+                .fetch_optional(&self.pool)
+                .await?;
         Ok(row.map(|r| user(&r)).transpose()?)
     }
 
@@ -305,7 +306,8 @@ impl PgStore {
         rows.iter()
             .map(|r| {
                 let seat: i32 = r.try_get("seat")?;
-                let pick = |a: &'static str, b: &'static str| if seat == 0 { (a, b) } else { (b, a) };
+                let pick =
+                    |a: &'static str, b: &'static str| if seat == 0 { (a, b) } else { (b, a) };
                 let (my_delta, _) = pick("delta0", "delta1");
                 let (my_rating, opp_rating) = pick("rating0", "rating1");
                 let winner: i16 = r.try_get("winner_seat")?;
@@ -386,7 +388,7 @@ impl PgStore {
             };
             out.push((user(r)?, state));
         }
-        out.sort_by(|a, b| a.0.username.to_lowercase().cmp(&b.0.username.to_lowercase()));
+        out.sort_by_key(|a| a.0.username.to_lowercase());
         Ok(out)
     }
 
@@ -409,11 +411,13 @@ impl PgStore {
         let outcome = match (mine, theirs) {
             (Some(true), _) => FriendOutcome::AlreadyFriends,
             (_, Some(false)) => {
-                query("UPDATE friendships SET accepted = TRUE WHERE user_id = $1 AND friend_id = $2")
-                    .bind(to)
-                    .bind(from)
-                    .execute(&mut *tx)
-                    .await?;
+                query(
+                    "UPDATE friendships SET accepted = TRUE WHERE user_id = $1 AND friend_id = $2",
+                )
+                .bind(to)
+                .bind(from)
+                .execute(&mut *tx)
+                .await?;
                 query(
                     "INSERT INTO friendships (user_id, friend_id, accepted, created_at) VALUES ($1, $2, TRUE, $3)
                      ON CONFLICT (user_id, friend_id) DO UPDATE SET accepted = TRUE",
@@ -671,7 +675,8 @@ impl PgStore {
         })
     }
 
-    const REPORT_SELECT: &str = "SELECT r.id, a.username AS reporter, t.username AS target, r.reason, r.details,
+    const REPORT_SELECT: &str =
+        "SELECT r.id, a.username AS reporter, t.username AS target, r.reason, r.details,
             r.context, r.status, r.created_at, s.username AS resolver, r.resolution
          FROM reports r JOIN users a ON a.id = r.reporter_id JOIN users t ON t.id = r.target_id
          LEFT JOIN users s ON s.id = r.resolved_by";

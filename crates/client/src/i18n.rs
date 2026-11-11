@@ -101,7 +101,10 @@ pub fn server_text(text: &str) -> String {
         );
     }
     if let Some(rest) = text.strip_prefix("This account is banned. Reason: ") {
-        return tw("This account is banned. Reason: {reason}.", &[("reason", &rest.trim_end_matches('.'))]);
+        return tw(
+            "This account is banned. Reason: {reason}.",
+            &[("reason", &rest.trim_end_matches('.'))],
+        );
     }
     for (en, key) in [
         ("You were muted for ", "You were muted: {r}"),
@@ -191,7 +194,9 @@ fn portuguese(en: &str) -> Option<&'static str> {
     Some(match en {
         "#{n} in the world" => "#{n} no mundo",
         "3–16 letters, digits or underscores." => "3 a 16 letras, números ou sublinhados.",
-        "A short line, as in rated online games." => "Uma linha curta, como nas partidas online valendo rating.",
+        "A short line, as in rated online games." => {
+            "Uma linha curta, como nas partidas online valendo rating."
+        }
         "A solid club player." => "Um jogador de clube sólido.",
         "Accept friend" => "Aceitar amizade",
         "Achievement unlocked: {title}" => "Conquista desbloqueada: {title}",
@@ -202,14 +207,18 @@ fn portuguese(en: &str) -> Option<&'static str> {
         "Against the computer" => "Contra o computador",
         "All tournaments" => "Todos os torneios",
         "Amateur" => "Amador",
-        "At least 8 characters. Use a password you don't use elsewhere." => "Pelo menos 8 caracteres. Use uma senha que você não usa em outro lugar.",
+        "At least 8 characters. Use a password you don't use elsewhere." => {
+            "Pelo menos 8 caracteres. Use uma senha que você não usa em outro lugar."
+        }
         "At least two players are needed." => "São necessários pelo menos dois jogadores.",
         "Back" => "Voltar",
         "Black ball" => "Bola preta",
         "Block" => "Bloquear",
         "Break and run" => "Saída e limpeza",
         "Break and run 10 times." => "Faça 10 vezes a saída e limpe a mesa.",
-        "Can't listen for games here: join by address below." => "Não dá para procurar partidas aqui: entre pelo endereço abaixo.",
+        "Can't listen for games here: join by address below." => {
+            "Não dá para procurar partidas aqui: entre pelo endereço abaixo."
+        }
         "Cancel request" => "Cancelar pedido",
         "Cancel tournament" => "Cancelar torneio",
         "Casual" => "Amistoso",
@@ -244,11 +253,17 @@ fn portuguese(en: &str) -> Option<&'static str> {
         "Friends" => "Amigos",
         "Games" => "Partidas",
         "Games on your network" => "Partidas na sua rede",
-        "Give the tournament a name (at least 3 characters)." => "Dê um nome ao torneio (pelo menos 3 caracteres).",
+        "Give the tournament a name (at least 3 characters)." => {
+            "Dê um nome ao torneio (pelo menos 3 caracteres)."
+        }
         "Good company" => "Boa companhia",
         "Grandmaster" => "Grão-mestre",
-        "Guests can only join LAN games. Create an account." => "Convidados só podem jogar na rede local. Crie uma conta.",
-        "Guests can't play rated tournaments." => "Convidados não podem jogar torneios valendo rating.",
+        "Guests can only join LAN games. Create an account." => {
+            "Convidados só podem jogar na rede local. Crie uma conta."
+        }
+        "Guests can't play rated tournaments." => {
+            "Convidados não podem jogar torneios valendo rating."
+        }
         "Guests don't have this." => "Convidados não têm isso.",
         "Harassment" => "Assédio",
         "Hat trick" => "Trinca",
@@ -256,7 +271,9 @@ fn portuguese(en: &str) -> Option<&'static str> {
         "Have an account for 30 days." => "Tenha uma conta há 30 dias.",
         "Have an account for a year." => "Tenha uma conta há um ano.",
         "Host a game on this computer" => "Hospedar uma partida neste computador",
-        "Host {host} · {n}/{size} players · {kind}" => "Anfitrião {host} · {n}/{size} jogadores · {kind}",
+        "Host {host} · {n}/{size} players · {kind}" => {
+            "Anfitrião {host} · {n}/{size} jogadores · {kind}"
+        }
         "Hot hand" => "Mão quente",
         "Hustler" => "Malandro da sinuca",
         "Invalid shot." => "Tacada inválida.",
@@ -277,14 +294,22 @@ fn portuguese(en: &str) -> Option<&'static str> {
         "Master" => "Mestre",
         "Misses now and then: good for learning." => "Erra de vez em quando: bom para aprender.",
         "Name" => "Nome",
-        "Names have 3–16 letters, digits or underscores." => "Nomes têm de 3 a 16 letras, números ou sublinhados.",
+        "Names have 3–16 letters, digits or underscores." => {
+            "Nomes têm de 3 a 16 letras, números ou sublinhados."
+        }
         "New account" => "Nova conta",
-        "New here? Choose “New account”: it takes ten seconds." => "Novo por aqui? Escolha “Nova conta”: leva dez segundos.",
+        "New here? Choose “New account”: it takes ten seconds." => {
+            "Novo por aqui? Escolha “Nova conta”: leva dez segundos."
+        }
         "New tournament" => "Novo torneio",
-        "No friends yet. Add someone you played with!" => "Nenhum amigo ainda. Adicione alguém com quem você jogou!",
+        "No friends yet. Add someone you played with!" => {
+            "Nenhum amigo ainda. Adicione alguém com quem você jogou!"
+        }
         "No games yet." => "Nenhuma partida ainda.",
         "No limit" => "Sem limite",
-        "No open tables. Open one and others can sit down." => "Nenhuma mesa aberta. Abra uma e outros podem sentar.",
+        "No open tables. Open one and others can sit down." => {
+            "Nenhuma mesa aberta. Abra uma e outros podem sentar."
+        }
         "No such player." => "Jogador não encontrado.",
         "No tournaments right now. Create one!" => "Nenhum torneio agora. Crie um!",
         "Offensive name" => "Nome ofensivo",
@@ -293,12 +318,16 @@ fn portuguese(en: &str) -> Option<&'static str> {
         "On fire" => "Pegando fogo",
         "Only the host can start the tournament." => "Só o anfitrião pode iniciar o torneio.",
         "Open a table" => "Abrir uma mesa",
-        "Open a table and wait, or invite a friend!" => "Abra uma mesa e aguarde, ou convide um amigo!",
+        "Open a table and wait, or invite a friend!" => {
+            "Abra uma mesa e aguarde, ou convide um amigo!"
+        }
         "Opponent" => "Adversário",
         "Or join by address" => "Ou entre pelo endereço",
         "Other" => "Outro",
         "Others can join at {ip}:{port}" => "Outros podem entrar em {ip}:{port}",
-        "Passwords need at least 8 characters (not only digits)." => "A senha precisa de pelo menos 8 caracteres (não só números).",
+        "Passwords need at least 8 characters (not only digits)." => {
+            "A senha precisa de pelo menos 8 caracteres (não só números)."
+        }
         "Plans position and plays safeties." => "Planeja a posição e joga defensivo.",
         "Play 1,000 rated games." => "Jogue 1.000 partidas valendo rating.",
         "Play 10 rated games." => "Jogue 10 partidas valendo rating.",
@@ -311,7 +340,9 @@ fn portuguese(en: &str) -> Option<&'static str> {
         "Play your first rated game." => "Jogue sua primeira partida valendo rating.",
         "Player 1" => "Jogador 1",
         "Players" => "Jogadores",
-        "Players in a tournament can't start other games." => "Jogadores de um torneio não podem começar outras partidas.",
+        "Players in a tournament can't start other games." => {
+            "Jogadores de um torneio não podem começar outras partidas."
+        }
         "Please don't repeat the same message." => "Por favor, não repita a mesma mensagem.",
         "Pool hall legend" => "Lenda do salão",
         "Popular" => "Popular",
@@ -320,7 +351,9 @@ fn portuguese(en: &str) -> Option<&'static str> {
         "R: watch the last shot again" => "R: rever a última tacada",
         "REPLAY" => "REPLAY",
         "Rated" => "Valendo rating",
-        "Rated games, tables, tournaments and friends" => "Partidas valendo rating, mesas, torneios e amigos",
+        "Rated games, tables, tournaments and friends" => {
+            "Partidas valendo rating, mesas, torneios e amigos"
+        }
         "Reach a rating of 1300." => "Alcance 1300 de rating.",
         "Reach a rating of 1500." => "Alcance 1500 de rating.",
         "Reach a rating of 1700." => "Alcance 1700 de rating.",
@@ -340,8 +373,12 @@ fn portuguese(en: &str) -> Option<&'static str> {
         "Semi-finals" => "Semifinais",
         "Send report" => "Enviar denúncia",
         "Shark" => "Tubarão",
-        "Shows the contact point; judging the cut is up to you." => "Mostra o ponto de contato; o corte fica por sua conta.",
-        "Shows where the object ball and the cue ball go." => "Mostra para onde vão a bola da vez e a branca.",
+        "Shows the contact point; judging the cut is up to you." => {
+            "Mostra o ponto de contato; o corte fica por sua conta."
+        }
+        "Shows where the object ball and the cue ball go." => {
+            "Mostra para onde vão a bola da vez e a branca."
+        }
         "Shutout" => "Zerado",
         "Sign in" => "Entrar",
         "Sign in or create an account" => "Entre ou crie uma conta",
@@ -362,22 +399,40 @@ fn portuguese(en: &str) -> Option<&'static str> {
         "That tournament has already started." => "Esse torneio já começou.",
         "That tournament is full." => "Esse torneio está cheio.",
         "That tournament no longer exists." => "Esse torneio não existe mais.",
-        "The first connection of the day can take up to a minute while the server wakes up." => "A primeira conexão do dia pode levar até um minuto enquanto o servidor acorda.",
-        "The first time, allow Snook through the firewall when asked." => "Na primeira vez, permita o Snook no firewall quando for perguntado.",
+        "The first connection of the day can take up to a minute while the server wakes up." => {
+            "A primeira conexão do dia pode levar até um minuto enquanto o servidor acorda."
+        }
+        "The first time, allow Snook through the firewall when asked." => {
+            "Na primeira vez, permita o Snook no firewall quando for perguntado."
+        }
         "The server could not play that shot." => "O servidor não conseguiu jogar essa tacada.",
-        "The server is busy. Try again in a moment." => "O servidor está ocupado. Tente de novo em instantes.",
-        "The tournament starts when it is full (the host can start it earlier)." => "O torneio começa quando lotar (o anfitrião pode começar antes).",
-        "There are too many tournaments right now. Join one!" => "Há torneios demais agora. Entre em um!",
-        "This is a LAN server: join as a guest." => "Este é um servidor de rede local: entre como convidado.",
+        "The server is busy. Try again in a moment." => {
+            "O servidor está ocupado. Tente de novo em instantes."
+        }
+        "The tournament starts when it is full (the host can start it earlier)." => {
+            "O torneio começa quando lotar (o anfitrião pode começar antes)."
+        }
+        "There are too many tournaments right now. Join one!" => {
+            "Há torneios demais agora. Entre em um!"
+        }
+        "This is a LAN server: join as a guest." => {
+            "Este é um servidor de rede local: entre como convidado."
+        }
         "Three levels, from relaxed to ruthless" => "Três níveis, do tranquilo ao implacável",
         "Tier" => "Nível",
         "Time per shot" => "Tempo por tacada",
-        "Too many failed attempts. Wait a few minutes and try again." => "Muitas tentativas erradas. Espere alguns minutos e tente de novo.",
+        "Too many failed attempts. Wait a few minutes and try again." => {
+            "Muitas tentativas erradas. Espere alguns minutos e tente de novo."
+        }
         "Too many messages." => "Mensagens demais.",
-        "Too many new accounts from this network. Try again later." => "Muitas contas novas desta rede. Tente mais tarde.",
+        "Too many new accounts from this network. Try again later." => {
+            "Muitas contas novas desta rede. Tente mais tarde."
+        }
         "Top 100 · rated games" => "Top 100 · partidas valendo rating",
         "Top view (C)" => "Visão de cima (C)",
-        "Tournament game: the next round starts from the lounge." => "Partida de torneio: a próxima rodada começa pelo salão.",
+        "Tournament game: the next round starts from the lounge." => {
+            "Partida de torneio: a próxima rodada começa pelo salão."
+        }
         "Tournament games have no rematch." => "Partidas de torneio não têm revanche.",
         "Tournaments" => "Torneios",
         "Tournaments have 4, 8 or 16 players." => "Torneios têm 4, 8 ou 16 jogadores.",
@@ -388,7 +443,9 @@ fn portuguese(en: &str) -> Option<&'static str> {
         "W" => "V",
         "Watch the last shot again (R)" => "Rever a última tacada (R)",
         "What happened? (optional)" => "O que aconteceu? (opcional)",
-        "When time runs out, the opponent gets ball in hand." => "Quando o tempo acaba, o adversário ganha bola na mão.",
+        "When time runs out, the opponent gets ball in hand." => {
+            "Quando o tempo acaba, o adversário ganha bola na mão."
+        }
         "Whitewash" => "Atropelo",
         "Win 10 games by sinking the 8-ball." => "Vença 10 partidas encaçapando a bola 8.",
         "Win 10 rated games in a row." => "Vença 10 partidas valendo rating seguidas.",
@@ -405,8 +462,12 @@ fn portuguese(en: &str) -> Option<&'static str> {
         "Win 500 rated games." => "Vença 500 partidas valendo rating.",
         "Win a rated game." => "Vença uma partida valendo rating.",
         "Win a tournament." => "Vença um torneio.",
-        "Win before your opponent sinks a ball of their group." => "Vença antes de o adversário encaçapar uma bola do grupo dele.",
-        "Win from the break without your opponent getting a shot." => "Vença desde a saída sem o adversário dar uma tacada.",
+        "Win before your opponent sinks a ball of their group." => {
+            "Vença antes de o adversário encaçapar uma bola do grupo dele."
+        }
+        "Win from the break without your opponent getting a shot." => {
+            "Vença desde a saída sem o adversário dar uma tacada."
+        }
         "Withdraw" => "Desistir do torneio",
         "World ranking" => "Ranking mundial",
         "Wrong table password." => "Senha da mesa incorreta.",
@@ -417,9 +478,13 @@ fn portuguese(en: &str) -> Option<&'static str> {
         "You signed in from another place." => "Você entrou de outro lugar.",
         "You're sending invitations too quickly." => "Você está enviando convites rápido demais.",
         "You're sending messages too quickly." => "Você está enviando mensagens rápido demais.",
-        "You've sent many reports. Please wait before sending more." => "Você enviou muitas denúncias. Espere antes de enviar mais.",
+        "You've sent many reports. Please wait before sending more." => {
+            "Você enviou muitas denúncias. Espere antes de enviar mais."
+        }
         "Your friend list is full." => "Sua lista de amigos está cheia.",
-        "Your next match starts by itself when both players are free." => "Sua próxima partida começa sozinha quando os dois jogadores estiverem livres.",
+        "Your next match starts by itself when both players are free." => {
+            "Sua próxima partida começa sozinha quando os dois jogadores estiverem livres."
+        }
         "Your profile" => "Seu perfil",
         "Your table is open" => "Sua mesa está aberta",
         "Zoom in" => "Aproximar",
@@ -465,7 +530,9 @@ fn portuguese(en: &str) -> Option<&'static str> {
         "the opponent sank the 8-ball" => "o adversário encaçapou a bola 8",
         "the opponent sank the 8 too early" => "o adversário encaçapou a 8 antes da hora",
         "sank the 8 too early" => "encaçapou a 8 antes da hora",
-        "the opponent sank the 8 in the wrong pocket" => "o adversário encaçapou a 8 na caçapa errada",
+        "the opponent sank the 8 in the wrong pocket" => {
+            "o adversário encaçapou a 8 na caçapa errada"
+        }
         "sank the 8 in the wrong pocket" => "encaçapou a 8 na caçapa errada",
         "the opponent fouled on the 8" => "o adversário cometeu falta na 8",
         "fouled on the 8" => "cometeu falta na 8",
@@ -476,12 +543,16 @@ fn portuguese(en: &str) -> Option<&'static str> {
         "the opponent left" => "o adversário saiu",
         "left the game" => "saiu da partida",
         "You are muted for {n} more minutes." => "Você está silenciado por mais {n} minutos.",
-        "This account is suspended for {n} more day(s). Reason: {reason}." => "Esta conta está suspensa por mais {n} dia(s). Motivo: {reason}.",
+        "This account is suspended for {n} more day(s). Reason: {reason}." => {
+            "Esta conta está suspensa por mais {n} dia(s). Motivo: {reason}."
+        }
         "This account is banned. Reason: {reason}." => "Esta conta está banida. Motivo: {reason}.",
         "You were muted: {r}" => "Você foi silenciado: {r}",
         "Your account was suspended: {r}" => "Sua conta foi suspensa: {r}",
         "Your account was banned: {r}" => "Sua conta foi banida: {r}",
-        "You were disconnected by a moderator: {r}" => "Você foi desconectado por um moderador: {r}",
+        "You were disconnected by a moderator: {r}" => {
+            "Você foi desconectado por um moderador: {r}"
+        }
         "You were disconnected by a moderator." => "Você foi desconectado por um moderador.",
         "Please sign in again." => "Por favor, entre novamente.",
         "Your password was changed. Sign in again." => "Sua senha foi alterada. Entre novamente.",

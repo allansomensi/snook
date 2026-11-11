@@ -29,7 +29,13 @@ pub fn draw(code: &str, x: f32, y: f32, h: f32) -> bool {
     let src = Rect::new((col * FLAG_W) as f32, (row * FLAG_H) as f32, FLAG_W as f32, FLAG_H as f32);
     let w = h * 4.0 / 3.0;
     let a = crate::paint::opacity();
-    crate::paint::draw_rectangle(x - 0.5, y - 0.5, w + 1.0, h + 1.0, Color::new(0.0, 0.0, 0.0, 0.5));
+    crate::paint::draw_rectangle(
+        x - 0.5,
+        y - 0.5,
+        w + 1.0,
+        h + 1.0,
+        Color::new(0.0, 0.0, 0.0, 0.5),
+    );
     draw_texture_ex(
         &tex,
         x,

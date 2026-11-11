@@ -71,10 +71,7 @@ async fn security_headers(req: Request, next: Next) -> Response {
         h.insert(header::X_CONTENT_TYPE_OPTIONS, HeaderValue::from_static("nosniff"));
         h.insert(header::REFERRER_POLICY, HeaderValue::from_static("no-referrer"));
         h.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
-        h.insert(
-            header::STRICT_TRANSPORT_SECURITY,
-            HeaderValue::from_static("max-age=31536000"),
-        );
+        h.insert(header::STRICT_TRANSPORT_SECURITY, HeaderValue::from_static("max-age=31536000"));
     }
     res
 }
@@ -260,9 +257,8 @@ async fn users(
     let per_page = 50;
     let (list, total) =
         server.store.search_users(q.q.trim(), q.page.min(10_000) * per_page, per_page).await?;
-    let rows: Vec<Value> = server.with(|l| {
-        list.iter().map(|u| user_json(u, l.is_online(&u.username))).collect()
-    });
+    let rows: Vec<Value> =
+        server.with(|l| list.iter().map(|u| user_json(u, l.is_online(&u.username))).collect());
     Ok(Json(json!({ "users": rows, "total": total, "page": q.page, "per_page": per_page })))
 }
 

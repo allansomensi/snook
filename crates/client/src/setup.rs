@@ -72,7 +72,11 @@ impl Setup {
                     crate::i18n::difficulty(Difficulty::Medium),
                     crate::i18n::difficulty(Difficulty::Hard),
                 ];
-                if let Some(i) = ui.segmented(Rect::new(x, y + 18.0, inner, 34.0), &levels, config.difficulty as usize) {
+                if let Some(i) = ui.segmented(
+                    Rect::new(x, y + 18.0, inner, 34.0),
+                    &levels,
+                    config.difficulty as usize,
+                ) {
                     config.difficulty = i as u8;
                 }
                 let hint = match config.difficulty {
@@ -91,7 +95,12 @@ impl Setup {
                     ui.text(t("Player"), x + 9.0, y + 27.0, 15.0, MUTED, false);
                 }
                 ui.text(t("Player 2"), x + half + 12.0, y, 13.0, MUTED, true);
-                ui.text_input(11, Rect::new(x + half + 12.0, y + 18.0, half, 34.0), &mut config.second_player_name, 20);
+                ui.text_input(
+                    11,
+                    Rect::new(x + half + 12.0, y + 18.0, half, 34.0),
+                    &mut config.second_player_name,
+                    20,
+                );
                 if config.second_player_name.is_empty() && ui.focus != Some(11) {
                     ui.text(t("Player 2"), x + half + 21.0, y + 27.0, 15.0, MUTED, false);
                 }
@@ -125,7 +134,14 @@ impl Setup {
         if let Some(i) = ui.segmented(Rect::new(x, y + 18.0, inner, 34.0), &clocks, sel) {
             config.shot_clock = [0, 30, 60][i];
         }
-        ui.text(t("When time runs out, the opponent gets ball in hand."), x, y + 58.0, 12.0, MUTED, false);
+        ui.text(
+            t("When time runs out, the opponent gets ball in hand."),
+            x,
+            y + 58.0,
+            12.0,
+            MUTED,
+            false,
+        );
 
         let by = r.y + h - 62.0;
         let mut action = SetupAction::None;

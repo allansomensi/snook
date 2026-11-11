@@ -35,7 +35,10 @@ pub enum Stage {
     Authenticating,
     Lounge,
     /// The connection dropped while signed in; trying again.
-    Reconnecting { attempt: u32, wait: f32 },
+    Reconnecting {
+        attempt: u32,
+        wait: f32,
+    },
 }
 
 /// What the online screens ask of the rest of the game.
@@ -563,23 +566,29 @@ impl Online {
             ui.panel(r);
             rrect_lines(r, 8.0, 2.0, GOLD);
             let kind = if *rated { t("a rated game") } else { t("a casual game") };
-            let color = self
-                .players
-                .iter()
-                .find(|p| &p.username == from)
-                .map(name_color)
-                .unwrap_or(CREAM);
+            let color =
+                self.players.iter().find(|p| &p.username == from).map(name_color).unwrap_or(CREAM);
             let country = self
                 .players
                 .iter()
                 .find(|p| &p.username == from)
                 .map(|p| p.country.clone())
                 .unwrap_or_default();
-            let used = ui.name_with_flag(from, &country, color, r.x + 14.0, r.y + 10.0, 16.0, w - 240.0);
-            ui.text(&tw("invites you to {kind}", &[("kind", &kind)]), r.x + 20.0 + used, r.y + 11.0, 14.0, CREAM, false);
+            let used =
+                ui.name_with_flag(from, &country, color, r.x + 14.0, r.y + 10.0, 16.0, w - 240.0);
+            ui.text(
+                &tw("invites you to {kind}", &[("kind", &kind)]),
+                r.x + 20.0 + used,
+                r.y + 11.0,
+                14.0,
+                CREAM,
+                false,
+            );
             if in_match {
                 ui.text(t("Finish this match first."), r.x + 14.0, r.y + 38.0, 13.0, MUTED, false);
-            } else if ui.primary_button(Rect::new(r.x + w - 214.0, r.y + 30.0, 96.0, 26.0), t("Accept")) {
+            } else if ui
+                .primary_button(Rect::new(r.x + w - 214.0, r.y + 30.0, 96.0, 26.0), t("Accept"))
+            {
                 answer = Some((from.clone(), true));
             }
             if ui.button(Rect::new(r.x + w - 110.0, r.y + 30.0, 96.0, 26.0), t("Decline"), true) {
@@ -634,7 +643,12 @@ impl Online {
         for k in 0..10 {
             let a = k as f32 / 10.0 * std::f32::consts::TAU + time * 4.0;
             let alpha = 0.15 + 0.85 * ((k as f32 / 10.0 + time * 0.0).fract());
-            draw_circle(c.x + a.cos() * 14.0, c.y + a.sin() * 14.0, 2.6, Color::new(GOLD.r, GOLD.g, GOLD.b, alpha));
+            draw_circle(
+                c.x + a.cos() * 14.0,
+                c.y + a.sin() * 14.0,
+                2.6,
+                Color::new(GOLD.r, GOLD.g, GOLD.b, alpha),
+            );
         }
         if let Some(h) = hint {
             for (k, line) in ui.wrap(h, r.w - 40.0, 12.0).iter().take(2).enumerate() {
@@ -681,7 +695,8 @@ impl Online {
         submit |= ui.text_input(20, Rect::new(x, y + 18.0, inner, 34.0), &mut self.username, 16);
         y += 62.0;
         ui.text(t("Password"), x, y, 13.0, MUTED, true);
-        submit |= ui.password_input(21, Rect::new(x, y + 18.0, inner, 34.0), &mut self.password, 72);
+        submit |=
+            ui.password_input(21, Rect::new(x, y + 18.0, inner, 34.0), &mut self.password, 72);
         y += 62.0;
         if self.register {
             ui.text(t("Country"), x, y, 13.0, MUTED, true);
@@ -695,7 +710,14 @@ impl Online {
                 crate::countries::open();
             }
             y += 62.0;
-            ui.text(t("At least 8 characters. Use a password you don't use elsewhere."), x, y - 6.0, 12.0, MUTED, false);
+            ui.text(
+                t("At least 8 characters. Use a password you don't use elsewhere."),
+                x,
+                y - 6.0,
+                12.0,
+                MUTED,
+                false,
+            );
             y += 10.0;
         }
 
@@ -703,14 +725,16 @@ impl Online {
         let pass_ok = valid_password(&self.password);
         let connected = self.conn.is_some();
         let label = if self.register { t("Create account") } else { t("Sign in") };
-        if ui.primary_button(Rect::new(x, y, inner, 42.0), label) || (submit && name_ok && pass_ok) {
+        if ui.primary_button(Rect::new(x, y, inner, 42.0), label) || (submit && name_ok && pass_ok)
+        {
             if !connected {
                 self.connect();
                 self.error = None;
             } else if !name_ok {
                 self.error = Some(t("Usernames have 3–16 letters, digits or underscores.").into());
             } else if !pass_ok {
-                self.error = Some(t("Passwords need at least 8 characters (not only digits).").into());
+                self.error =
+                    Some(t("Passwords need at least 8 characters (not only digits).").into());
             } else {
                 let username = self.username.trim().to_string();
                 let password = self.password.clone();
@@ -744,7 +768,13 @@ impl Online {
         if let Some(code) = crate::countries::draw_picker(ui) {
             self.country = code;
         }
-        if !connected && ui.button(Rect::new(x + inner - 110.0, r.y + r.h - 44.0, 110.0, 30.0), t("Retry"), true) {
+        if !connected
+            && ui.button(
+                Rect::new(x + inner - 110.0, r.y + r.h - 44.0, 110.0, 30.0),
+                t("Retry"),
+                true,
+            )
+        {
             self.server = config.server.clone();
             self.connect();
             self.error = None;
@@ -766,7 +796,12 @@ impl Online {
         // Header.
         let header = Rect::new(margin, margin, sw - margin * 2.0, 52.0);
         ui.panel(header);
-        if ui.icon_button(Rect::new(header.x + 10.0, header.y + 9.0, 34.0, 34.0), Icon::Back, t("Main menu"), true) {
+        if ui.icon_button(
+            Rect::new(header.x + 10.0, header.y + 9.0, 34.0, 34.0),
+            Icon::Back,
+            t("Main menu"),
+            true,
+        ) {
             action = OnlineAction::Leave;
         }
         ui.text("SNOOK", header.x + 56.0, header.y + 12.0, 24.0, GOLD, true);
@@ -777,12 +812,22 @@ impl Online {
         let mut right = header.x + header.w - 10.0;
         if !self.lan {
             right -= 34.0;
-            if ui.icon_button(Rect::new(right, header.y + 9.0, 34.0, 34.0), Icon::Power, t("Sign out"), true) {
+            if ui.icon_button(
+                Rect::new(right, header.y + 9.0, 34.0, 34.0),
+                Icon::Power,
+                t("Sign out"),
+                true,
+            ) {
                 self.logout(config);
                 return OnlineAction::Leave;
             }
             right -= 40.0;
-            if ui.icon_button(Rect::new(right, header.y + 9.0, 34.0, 34.0), Icon::Trophy, t("World ranking"), true) {
+            if ui.icon_button(
+                Rect::new(right, header.y + 9.0, 34.0, 34.0),
+                Icon::Trophy,
+                t("World ranking"),
+                true,
+            ) {
                 action = OnlineAction::Ranking;
             }
         }
@@ -895,7 +940,14 @@ impl Online {
             let mr = Rect::new(right_panel.x + 12.0, log_top, right_panel.w - 24.0, mh);
             rrect(mr, 6.0, Color::new(0.91, 0.75, 0.38, 0.08));
             for (k, l) in lines.iter().take(2).enumerate() {
-                ui.text(l, mr.x + 10.0, mr.y + 6.0 + k as f32 * 16.0, 13.0, Color::new(1.0, 0.9, 0.7, 0.9), false);
+                ui.text(
+                    l,
+                    mr.x + 10.0,
+                    mr.y + 6.0 + k as f32 * 16.0,
+                    13.0,
+                    Color::new(1.0, 0.9, 0.7, 0.9),
+                    false,
+                );
             }
             log_top += mh + 8.0;
         }
@@ -917,7 +969,14 @@ impl Online {
         );
         let sent = ui.text_input(30, input, &mut self.chat_input, MAX_CHAT_LEN);
         if self.chat_input.is_empty() && ui.focus != Some(30) {
-            ui.text(t("Say hello… (Enter to send)"), input.x + 10.0, input.y + 10.0, 15.0, MUTED, false);
+            ui.text(
+                t("Say hello… (Enter to send)"),
+                input.x + 10.0,
+                input.y + 10.0,
+                15.0,
+                MUTED,
+                false,
+            );
         }
         let send_r = Rect::new(input.x + input.w + 8.0, input.y, 40.0, input_h);
         let can_send = !self.chat_input.trim().is_empty();
@@ -980,7 +1039,14 @@ impl Online {
         let list = Rect::new(area.x, area.y + 42.0, area.w, area.h - 42.0);
         if players.is_empty() {
             ui.text(t("Nobody else is here right now."), list.x, list.y + 10.0, 15.0, MUTED, false);
-            ui.text(t("Open a table and wait, or invite a friend!"), list.x, list.y + 32.0, 14.0, MUTED, false);
+            ui.text(
+                t("Open a table and wait, or invite a friend!"),
+                list.x,
+                list.y + 32.0,
+                14.0,
+                MUTED,
+                false,
+            );
             return None;
         }
         let row_h = 46.0;
@@ -1000,7 +1066,8 @@ impl Online {
                 open = Some(p.username.clone());
             }
             let can = p.status == PlayerStatus::Available && self.outgoing.is_none();
-            if ui.button(Rect::new(r.x + r.w - 96.0, r.y + 7.0, 88.0, r.h - 14.0), t("Invite"), can) {
+            if ui.button(Rect::new(r.x + r.w - 96.0, r.y + 7.0, 88.0, r.h - 14.0), t("Invite"), can)
+            {
                 invite = Some(p.username.clone());
             }
         }
@@ -1020,7 +1087,12 @@ impl Online {
                 rrect(r, 8.0, Color::new(0.10, 0.30, 0.18, 0.55));
                 rrect_lines(r, 8.0, 1.5, Color::new(0.35, 0.8, 0.5, 0.8));
                 let pulse = 0.5 + 0.5 * (get_time() as f32 * 3.0).sin();
-                draw_circle(r.x + 18.0, r.y + 22.0, 5.0, Color::new(0.35, 0.95, 0.5, 0.4 + 0.6 * pulse));
+                draw_circle(
+                    r.x + 18.0,
+                    r.y + 22.0,
+                    5.0,
+                    Color::new(0.35, 0.95, 0.5, 0.4 + 0.6 * pulse),
+                );
                 ui.text(t("Your table is open"), r.x + 32.0, r.y + 12.0, 16.0, CREAM, true);
                 let kind = match (table.rated, table.private) {
                     (true, true) => t("rated · private"),
@@ -1028,8 +1100,19 @@ impl Online {
                     (false, true) => t("casual · private"),
                     (false, false) => t("casual · public"),
                 };
-                ui.text(&format!("{kind} — {}", t("waiting for an opponent…")), r.x + 32.0, r.y + 36.0, 13.0, MUTED, false);
-                if ui.button(Rect::new(r.x + r.w - 110.0, r.y + 22.0, 100.0, 30.0), t("Close"), true) {
+                ui.text(
+                    &format!("{kind} — {}", t("waiting for an opponent…")),
+                    r.x + 32.0,
+                    r.y + 36.0,
+                    13.0,
+                    MUTED,
+                    false,
+                );
+                if ui.button(
+                    Rect::new(r.x + r.w - 110.0, r.y + 22.0, 100.0, 30.0),
+                    t("Close"),
+                    true,
+                ) {
                     self.send(ClientMsg::CloseTable);
                 }
                 y += 86.0;
@@ -1041,13 +1124,21 @@ impl Online {
                 y += 40.0;
                 if self.table_private {
                     ui.text(t("Password"), area.x, y + 9.0, 13.0, MUTED, true);
-                    ui.text_input(31, Rect::new(area.x + 80.0, y, area.w - 80.0, 32.0), &mut self.table_password, 32);
+                    ui.text_input(
+                        31,
+                        Rect::new(area.x + 80.0, y, area.w - 80.0, 32.0),
+                        &mut self.table_password,
+                        32,
+                    );
                     y += 40.0;
                 }
                 let can = !self.table_private || !self.table_password.trim().is_empty();
                 if ui.button(Rect::new(area.x, y, area.w, 36.0), t("Open a table"), can) {
                     let password = self.table_private.then(|| self.table_password.clone());
-                    self.send(ClientMsg::OpenTable { rated: self.rated_games && !self.lan, password });
+                    self.send(ClientMsg::OpenTable {
+                        rated: self.rated_games && !self.lan,
+                        password,
+                    });
                 }
                 y += 48.0;
             }
@@ -1058,7 +1149,14 @@ impl Online {
             self.tables.iter().filter(|t| t.host.username != me).cloned().collect();
         let list = Rect::new(area.x, y, area.w, area.y + area.h - y);
         if others.is_empty() {
-            ui.text(t("No open tables. Open one and others can sit down."), list.x, list.y + 8.0, 14.0, MUTED, false);
+            ui.text(
+                t("No open tables. Open one and others can sit down."),
+                list.x,
+                list.y + 8.0,
+                14.0,
+                MUTED,
+                false,
+            );
             return;
         }
         let row_h = 50.0;
@@ -1079,10 +1177,21 @@ impl Online {
             px += ui.pill(label, px, r.y + 24.0, color) + 6.0;
             ui.text(&table.host.rating.to_string(), px, r.y + 25.0, 12.0, MUTED, false);
             if table.private {
-                crate::icons::draw(Icon::Lock, vec2(r.x + r.w - 118.0, r.y + r.h / 2.0), 16.0, MUTED);
+                crate::icons::draw(
+                    Icon::Lock,
+                    vec2(r.x + r.w - 118.0, r.y + r.h / 2.0),
+                    16.0,
+                    MUTED,
+                );
             }
             let joining = self.joining.as_ref().is_some_and(|(id, _)| *id == table.id);
-            if !joining && ui.button(Rect::new(r.x + r.w - 96.0, r.y + 8.0, 88.0, r.h - 16.0), t("Sit down"), true) {
+            if !joining
+                && ui.button(
+                    Rect::new(r.x + r.w - 96.0, r.y + 8.0, 88.0, r.h - 16.0),
+                    t("Sit down"),
+                    true,
+                )
+            {
                 if table.private {
                     self.joining = Some((table.id, String::new()));
                 } else {
@@ -1097,8 +1206,10 @@ impl Online {
                     ui.text(t("password"), ir.x + 8.0, ir.y + 9.0, 13.0, MUTED, false);
                 }
                 let pw = pw.clone();
-                if ui.primary_button(Rect::new(r.x + r.w - 96.0, r.y + 8.0, 88.0, r.h - 16.0), t("Join"))
-                    || enter
+                if ui.primary_button(
+                    Rect::new(r.x + r.w - 96.0, r.y + 8.0, 88.0, r.h - 16.0),
+                    t("Join"),
+                ) || enter
                 {
                     join = Some((table.id, Some(pw)));
                     self.joining = None;
@@ -1116,7 +1227,12 @@ impl Online {
             ui.text(t("New tournament"), area.x, y, 17.0, GOLD, true);
             y += 32.0;
             ui.text(t("Name"), area.x, y + 9.0, 13.0, MUTED, true);
-            ui.text_input(33, Rect::new(area.x + 90.0, y, area.w - 90.0, 32.0), &mut form.name, snook_proto::MAX_NAME_LEN);
+            ui.text_input(
+                33,
+                Rect::new(area.x + 90.0, y, area.w - 90.0, 32.0),
+                &mut form.name,
+                snook_proto::MAX_NAME_LEN,
+            );
             y += 44.0;
             ui.text(t("Players"), area.x, y + 8.0, 13.0, MUTED, true);
             let sizes = [4u32, 8, 16];
@@ -1129,20 +1245,37 @@ impl Online {
             if !self.lan {
                 ui.text(t("Games"), area.x, y + 8.0, 13.0, MUTED, true);
                 let opts = [t("Rated"), t("Casual")];
-                if let Some(i) = ui.segmented(Rect::new(area.x + 90.0, y, 180.0, 30.0), &opts, if form.rated { 0 } else { 1 }) {
+                if let Some(i) = ui.segmented(
+                    Rect::new(area.x + 90.0, y, 180.0, 30.0),
+                    &opts,
+                    if form.rated { 0 } else { 1 },
+                ) {
                     form.rated = i == 0;
                 }
                 y += 42.0;
             }
             ui.text(t("Password"), area.x, y + 9.0, 13.0, MUTED, true);
-            ui.text_input(34, Rect::new(area.x + 90.0, y, area.w - 90.0, 32.0), &mut form.password, 32);
+            ui.text_input(
+                34,
+                Rect::new(area.x + 90.0, y, area.w - 90.0, 32.0),
+                &mut form.password,
+                32,
+            );
             if form.password.is_empty() && ui.focus != Some(34) {
-                ui.text(t("optional: only friends with it can join"), area.x + 98.0, y + 9.0, 13.0, MUTED, false);
+                ui.text(
+                    t("optional: only friends with it can join"),
+                    area.x + 98.0,
+                    y + 9.0,
+                    13.0,
+                    MUTED,
+                    false,
+                );
             }
             y += 50.0;
             let ok = form.name.trim().chars().count() >= 3;
             let mut create = None;
-            if ui.primary_button(Rect::new(area.x, y, area.w / 2.0 - 5.0, 38.0), t("Create")) && ok {
+            if ui.primary_button(Rect::new(area.x, y, area.w / 2.0 - 5.0, 38.0), t("Create")) && ok
+            {
                 create = Some(ClientMsg::CreateTournament {
                     name: form.name.clone(),
                     size: form.size,
@@ -1150,9 +1283,20 @@ impl Online {
                     password: (!form.password.trim().is_empty()).then(|| form.password.clone()),
                 });
             }
-            let cancel = ui.button(Rect::new(area.x + area.w / 2.0 + 5.0, y, area.w / 2.0 - 5.0, 38.0), t("Cancel"), true);
+            let cancel = ui.button(
+                Rect::new(area.x + area.w / 2.0 + 5.0, y, area.w / 2.0 - 5.0, 38.0),
+                t("Cancel"),
+                true,
+            );
             y += 50.0;
-            ui.text(t("The tournament starts when it is full (the host can start it earlier)."), area.x, y, 12.0, MUTED, false);
+            ui.text(
+                t("The tournament starts when it is full (the host can start it earlier)."),
+                area.x,
+                y,
+                12.0,
+                MUTED,
+                false,
+            );
             if let Some(msg) = create {
                 self.send(msg);
                 self.tournament_form = None;
@@ -1168,17 +1312,27 @@ impl Online {
             }
         }
         if ui.button(Rect::new(area.x, area.y, area.w, 36.0), t("Create a tournament"), true) {
-            self.tournament_form = Some(TournamentForm { size: 8, rated: !self.lan, ..Default::default() });
+            self.tournament_form =
+                Some(TournamentForm { size: 8, rated: !self.lan, ..Default::default() });
         }
         let list = Rect::new(area.x, area.y + 48.0, area.w, area.h - 48.0);
         if self.tournaments.is_empty() {
-            ui.text(t("No tournaments right now. Create one!"), list.x, list.y + 8.0, 14.0, MUTED, false);
+            ui.text(
+                t("No tournaments right now. Create one!"),
+                list.x,
+                list.y + 8.0,
+                14.0,
+                MUTED,
+                false,
+            );
             return;
         }
         let row_h = 54.0;
         let visible = (list.h / row_h).floor().max(1.0) as usize;
         let mut order: Vec<&TournamentInfo> = self.tournaments.iter().collect();
-        order.sort_by_key(|t| (t.state != TournamentState::Registering, t.state == TournamentState::Finished, t.id));
+        order.sort_by_key(|t| {
+            (t.state != TournamentState::Registering, t.state == TournamentState::Finished, t.id)
+        });
         self.list_first = ui.scroll_list(list, self.list_first, order.len(), visible);
         let mut open = None;
         for (k, tour) in order.iter().skip(self.list_first).take(visible).enumerate() {
@@ -1216,7 +1370,12 @@ impl Online {
 
     fn draw_tournament(&mut self, ui: &mut Ui, area: Rect, tour: &TournamentInfo) {
         let me = self.me.as_ref().map(|m| m.username.clone()).unwrap_or_default();
-        if ui.icon_button(Rect::new(area.x, area.y, 30.0, 30.0), Icon::Back, t("All tournaments"), true) {
+        if ui.icon_button(
+            Rect::new(area.x, area.y, 30.0, 30.0),
+            Icon::Back,
+            t("All tournaments"),
+            true,
+        ) {
             self.selected_tournament = None;
             return;
         }
@@ -1230,7 +1389,12 @@ impl Online {
         ui.text(
             &tw(
                 "Host {host} · {n}/{size} players · {kind}",
-                &[("host", &tour.host), ("n", &tour.players.len()), ("size", &tour.size), ("kind", &kind)],
+                &[
+                    ("host", &tour.host),
+                    ("n", &tour.players.len()),
+                    ("size", &tour.size),
+                    ("kind", &kind),
+                ],
             ),
             area.x,
             y,
@@ -1244,7 +1408,11 @@ impl Online {
         if tour.state == TournamentState::Registering {
             let bw = (area.w - 10.0) / 2.0;
             if joined {
-                if ui.button(Rect::new(area.x, y, bw, 34.0), if is_host { t("Cancel tournament") } else { t("Leave") }, true) {
+                if ui.button(
+                    Rect::new(area.x, y, bw, 34.0),
+                    if is_host { t("Cancel tournament") } else { t("Leave") },
+                    true,
+                ) {
                     self.send(ClientMsg::LeaveTournament { id: tour.id });
                 }
                 if is_host
@@ -1256,12 +1424,21 @@ impl Online {
             } else {
                 let full = tour.players.len() >= tour.size as usize;
                 if tour.private {
-                    ui.password_input(35, Rect::new(area.x, y, bw, 34.0), &mut self.tournament_password, 32);
+                    ui.password_input(
+                        35,
+                        Rect::new(area.x, y, bw, 34.0),
+                        &mut self.tournament_password,
+                        32,
+                    );
                     if self.tournament_password.is_empty() && ui.focus != Some(35) {
                         ui.text(t("password"), area.x + 8.0, y + 10.0, 13.0, MUTED, false);
                     }
                 }
-                let jr = if tour.private { Rect::new(area.x + bw + 10.0, y, bw, 34.0) } else { Rect::new(area.x, y, area.w, 34.0) };
+                let jr = if tour.private {
+                    Rect::new(area.x + bw + 10.0, y, bw, 34.0)
+                } else {
+                    Rect::new(area.x, y, area.w, 34.0)
+                };
                 if !full && ui.primary_button(jr, t("Join")) {
                     let password = tour.private.then(|| self.tournament_password.clone());
                     self.send(ClientMsg::JoinTournament { id: tour.id, password });
@@ -1276,7 +1453,14 @@ impl Online {
                     m.winner.is_some_and(|w| m.players[1 - w].as_deref() == Some(me.as_str()))
                 });
             if alive {
-                ui.text(t("Your next match starts by itself when both players are free."), area.x, y, 13.0, GOLD, false);
+                ui.text(
+                    t("Your next match starts by itself when both players are free."),
+                    area.x,
+                    y,
+                    13.0,
+                    GOLD,
+                    false,
+                );
                 y += 20.0;
                 if ui.button(Rect::new(area.x, y, 140.0, 28.0), t("Withdraw"), true) {
                     self.send(ClientMsg::LeaveTournament { id: tour.id });
@@ -1288,7 +1472,14 @@ impl Online {
             let r = Rect::new(area.x, y, area.w, 40.0);
             rrect(r, 8.0, Color::new(0.91, 0.75, 0.38, 0.14));
             crate::icons::draw(Icon::Trophy, vec2(r.x + 22.0, r.y + 20.0), 22.0, GOLD);
-            ui.text(&tw("Champion: {name}", &[("name", champion)]), r.x + 42.0, r.y + 11.0, 16.0, GOLD, true);
+            ui.text(
+                &tw("Champion: {name}", &[("name", champion)]),
+                r.x + 42.0,
+                r.y + 11.0,
+                16.0,
+                GOLD,
+                true,
+            );
             y += 50.0;
         }
         let rest = Rect::new(area.x, y, area.w, area.y + area.h - y);
@@ -1301,7 +1492,14 @@ impl Online {
                 }
                 ui.text(&format!("{}.", k + 1), rest.x, ry + 2.0, 13.0, MUTED, false);
                 ui.player_name(p, rest.x + 28.0, ry, 15.0, rest.w - 100.0);
-                ui.text(&p.rating.to_string(), rest.x + rest.w - 50.0, ry + 2.0, 13.0, MUTED, false);
+                ui.text(
+                    &p.rating.to_string(),
+                    rest.x + rest.w - 50.0,
+                    ry + 2.0,
+                    13.0,
+                    MUTED,
+                    false,
+                );
             }
         } else {
             draw_bracket(ui, rest, tour, &me);
@@ -1313,10 +1511,19 @@ impl Online {
         let input = Rect::new(area.x, y, area.w - 110.0, 32.0);
         let enter = ui.text_input(36, input, &mut self.friend_input, 16);
         if self.friend_input.is_empty() && ui.focus != Some(36) {
-            ui.text(t("Add a friend by username"), input.x + 9.0, input.y + 9.0, 14.0, MUTED, false);
+            ui.text(
+                t("Add a friend by username"),
+                input.x + 9.0,
+                input.y + 9.0,
+                14.0,
+                MUTED,
+                false,
+            );
         }
         let ok = valid_username(self.friend_input.trim());
-        if (ui.button(Rect::new(area.x + area.w - 100.0, y, 100.0, 32.0), t("Add"), ok) || enter) && ok {
+        if (ui.button(Rect::new(area.x + area.w - 100.0, y, 100.0, 32.0), t("Add"), ok) || enter)
+            && ok
+        {
             self.send(ClientMsg::FriendRequest { username: self.friend_input.trim().to_string() });
             self.friend_input.clear();
         }
@@ -1326,7 +1533,14 @@ impl Online {
         for from in self.friends.incoming.clone() {
             let r = Rect::new(area.x, y, area.w, 40.0);
             rrect(r, 7.0, Color::new(0.91, 0.75, 0.38, 0.12));
-            ui.text(&tw("{name} wants to be friends", &[("name", &from)]), r.x + 12.0, r.y + 12.0, 14.0, CREAM, false);
+            ui.text(
+                &tw("{name} wants to be friends", &[("name", &from)]),
+                r.x + 12.0,
+                r.y + 12.0,
+                14.0,
+                CREAM,
+                false,
+            );
             if ui.primary_button(Rect::new(r.x + r.w - 180.0, r.y + 6.0, 84.0, 28.0), t("Accept")) {
                 answer = Some((from.clone(), true));
             }
@@ -1341,7 +1555,14 @@ impl Online {
         let list = Rect::new(area.x, y, area.w, area.y + area.h - y);
         let total = self.friends.friends.len() + self.friends.outgoing.len();
         if total == 0 {
-            ui.text(t("No friends yet. Add someone you played with!"), list.x, list.y + 8.0, 14.0, MUTED, false);
+            ui.text(
+                t("No friends yet. Add someone you played with!"),
+                list.x,
+                list.y + 8.0,
+                14.0,
+                MUTED,
+                false,
+            );
         }
         let row_h = 44.0;
         let visible = (list.h / row_h).floor().max(1.0) as usize;
@@ -1359,20 +1580,41 @@ impl Online {
                     if f.online {
                         Self::status_dot(&f.player, r.x + 12.0, r.y + r.h / 2.0);
                     } else {
-                        draw_circle(r.x + 12.0, r.y + r.h / 2.0, 4.5, Color::new(0.4, 0.4, 0.4, 1.0));
+                        draw_circle(
+                            r.x + 12.0,
+                            r.y + r.h / 2.0,
+                            4.5,
+                            Color::new(0.4, 0.4, 0.4, 1.0),
+                        );
                     }
                     let name_r = Rect::new(r.x + 24.0, r.y, r.w - 170.0, r.h);
                     ui.player_name(&f.player, name_r.x, r.y + 4.0, 15.0, name_r.w);
-                    let sub = if f.online { Self::status_text(&f.player) } else { t("offline").to_string() };
+                    let sub = if f.online {
+                        Self::status_text(&f.player)
+                    } else {
+                        t("offline").to_string()
+                    };
                     ui.text(&sub, name_r.x, r.y + 22.0, 12.0, MUTED, false);
                     if ui.clicked(name_r) {
                         action = Some(OnlineAction::Profile(f.player.username.clone()));
                     }
-                    let can = f.online && f.player.status == PlayerStatus::Available && self.outgoing.is_none();
-                    if ui.button(Rect::new(r.x + r.w - 136.0, r.y + 6.0, 88.0, r.h - 12.0), t("Invite"), can) {
+                    let can = f.online
+                        && f.player.status == PlayerStatus::Available
+                        && self.outgoing.is_none();
+                    if ui.button(
+                        Rect::new(r.x + r.w - 136.0, r.y + 6.0, 88.0, r.h - 12.0),
+                        t("Invite"),
+                        can,
+                    ) {
                         invite = Some(f.player.username.clone());
                     }
-                    if ui.icon_button_ex(Rect::new(r.x + r.w - 40.0, r.y + 6.0, 32.0, r.h - 12.0), Icon::Close, t("Remove friend"), true, true) {
+                    if ui.icon_button_ex(
+                        Rect::new(r.x + r.w - 40.0, r.y + 6.0, 32.0, r.h - 12.0),
+                        Icon::Close,
+                        t("Remove friend"),
+                        true,
+                        true,
+                    ) {
                         remove = Some(f.player.username.clone());
                     }
                 }
@@ -1380,7 +1622,13 @@ impl Online {
                     let name = &outgoing[i - friends.len()];
                     ui.text(name, r.x + 24.0, r.y + 5.0, 15.0, MUTED, true);
                     ui.text(t("request sent"), r.x + 24.0, r.y + 22.0, 12.0, MUTED, false);
-                    if ui.icon_button_ex(Rect::new(r.x + r.w - 40.0, r.y + 6.0, 32.0, r.h - 12.0), Icon::Close, t("Cancel request"), true, true) {
+                    if ui.icon_button_ex(
+                        Rect::new(r.x + r.w - 40.0, r.y + 6.0, 32.0, r.h - 12.0),
+                        Icon::Close,
+                        t("Cancel request"),
+                        true,
+                        true,
+                    ) {
                         remove = Some(name.clone());
                     }
                 }
@@ -1430,7 +1678,12 @@ fn draw_bracket(ui: &mut Ui, area: Rect, tour: &TournamentInfo, me: &str) {
             let card = Rect::new(x + 4.0, cy - card_h / 2.0, col_w - 14.0, card_h);
             let involved = m.players.iter().any(|p| p.as_deref() == Some(me));
             rrect(card, 5.0, Color::new(0.0, 0.0, 0.0, if involved { 0.45 } else { 0.3 }));
-            rrect_lines(card, 5.0, 1.0, if m.live { Color::new(1.0, 0.7, 0.3, 0.9) } else { BORDER });
+            rrect_lines(
+                card,
+                5.0,
+                1.0,
+                if m.live { Color::new(1.0, 0.7, 0.3, 0.9) } else { BORDER },
+            );
             for seat in 0..2 {
                 let y = card.y + 2.0 + seat as f32 * 18.0;
                 let won = m.winner == Some(seat);
@@ -1443,7 +1696,15 @@ fn draw_bracket(ui: &mut Ui, area: Rect, tour: &TournamentInfo, me: &str) {
                             _ => CREAM,
                         };
                         let country = profile(name).map(|p| p.country.clone()).unwrap_or_default();
-                        ui.name_with_flag(name, &country, color, card.x + 6.0, y, 12.0, card.w - 24.0);
+                        ui.name_with_flag(
+                            name,
+                            &country,
+                            color,
+                            card.x + 6.0,
+                            y,
+                            12.0,
+                            card.w - 24.0,
+                        );
                         if won {
                             draw_circle(card.x + card.w - 9.0, y + 8.0, 3.5, GOLD);
                         }
@@ -1453,12 +1714,24 @@ fn draw_bracket(ui: &mut Ui, area: Rect, tour: &TournamentInfo, me: &str) {
             }
             if m.live {
                 let pulse = 0.5 + 0.5 * (get_time() as f32 * 4.0).sin();
-                draw_circle(card.x + card.w - 9.0, card.y + card_h / 2.0, 3.0, Color::new(1.0, 0.7, 0.3, pulse));
+                draw_circle(
+                    card.x + card.w - 9.0,
+                    card.y + card_h / 2.0,
+                    3.0,
+                    Color::new(1.0, 0.7, 0.3, pulse),
+                );
             }
             // Connector to the next round.
             if r + 1 < rounds {
                 let nx = x + col_w + 4.0;
-                draw_line(card.x + card.w, cy, nx - 2.0, cy, 1.0, Color::new(0.45, 0.31, 0.16, 0.6));
+                draw_line(
+                    card.x + card.w,
+                    cy,
+                    nx - 2.0,
+                    cy,
+                    1.0,
+                    Color::new(0.45, 0.31, 0.16, 0.6),
+                );
             }
         }
     }

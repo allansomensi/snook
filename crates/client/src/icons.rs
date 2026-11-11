@@ -105,7 +105,12 @@ pub fn draw(icon: Icon, c: Vec2, s: f32, color: Color) {
         Icon::Replay => {
             arc(c, 0.62 * h, -2.6, 2.2, w, color);
             let tip = c + Vec2::from_angle(-2.6) * 0.62 * h;
-            draw_triangle(tip + vec2(-0.35, -0.05) * h, tip + vec2(0.25, -0.2) * h, tip + vec2(0.05, 0.38) * h, color);
+            draw_triangle(
+                tip + vec2(-0.35, -0.05) * h,
+                tip + vec2(0.25, -0.2) * h,
+                tip + vec2(0.05, 0.38) * h,
+                color,
+            );
             draw_triangle(p(-0.12, -0.25), p(-0.12, 0.25), p(0.28, 0.0), color);
         }
         Icon::Plus => {
@@ -123,7 +128,14 @@ pub fn draw(icon: Icon, c: Vec2, s: f32, color: Color) {
             line(p(-0.65, 0.0), p(-0.1, 0.55), w * 1.2, color);
         }
         Icon::Lock => {
-            arc(p(0.0, -0.25), 0.38 * h, 3.14, 6.28, w * 1.1, color);
+            arc(
+                p(0.0, -0.25),
+                0.38 * h,
+                std::f32::consts::PI,
+                std::f32::consts::TAU,
+                w * 1.1,
+                color,
+            );
             line(p(-0.38, -0.25), p(-0.38, 0.05), w * 1.1, color);
             line(p(0.38, -0.25), p(0.38, 0.05), w * 1.1, color);
             crate::ui::rrect(Rect::new(c.x - 0.6 * h, c.y, 1.2 * h, 0.85 * h), 0.15 * h, color);
@@ -135,16 +147,28 @@ pub fn draw(icon: Icon, c: Vec2, s: f32, color: Color) {
             arc(c - vec2(0.9 * h, 0.0), 1.2 * h, -0.71, 0.71, w * 0.8, color);
         }
         Icon::Network => {
-            crate::ui::rrect(Rect::new(c.x - 0.3 * h, c.y - 0.85 * h, 0.6 * h, 0.45 * h), 0.08 * h, color);
+            crate::ui::rrect(
+                Rect::new(c.x - 0.3 * h, c.y - 0.85 * h, 0.6 * h, 0.45 * h),
+                0.08 * h,
+                color,
+            );
             for x in [-0.6f32, 0.0, 0.6] {
-                crate::ui::rrect(Rect::new(c.x + (x - 0.25) * h, c.y + 0.4 * h, 0.5 * h, 0.42 * h), 0.08 * h, color);
+                crate::ui::rrect(
+                    Rect::new(c.x + (x - 0.25) * h, c.y + 0.4 * h, 0.5 * h, 0.42 * h),
+                    0.08 * h,
+                    color,
+                );
                 line(p(x, 0.4), p(x, 0.05), w * 0.9, color);
             }
             line(p(-0.6, 0.05), p(0.6, 0.05), w * 0.9, color);
             line(p(0.0, -0.4), p(0.0, 0.05), w * 0.9, color);
         }
         Icon::Robot => {
-            crate::ui::rrect(Rect::new(c.x - 0.7 * h, c.y - 0.45 * h, 1.4 * h, 1.1 * h), 0.25 * h, color);
+            crate::ui::rrect(
+                Rect::new(c.x - 0.7 * h, c.y - 0.45 * h, 1.4 * h, 1.1 * h),
+                0.25 * h,
+                color,
+            );
             let hole = Color::new(0.0, 0.0, 0.0, 0.6);
             draw_circle(c.x - 0.3 * h, c.y + 0.0, 0.16 * h, hole);
             draw_circle(c.x + 0.3 * h, c.y + 0.0, 0.16 * h, hole);
@@ -155,13 +179,22 @@ pub fn draw(icon: Icon, c: Vec2, s: f32, color: Color) {
             draw_triangle(p(-0.45, -0.95), p(-0.05, -0.95), p(0.0, -0.1), color);
             draw_triangle(p(0.45, -0.95), p(0.05, -0.95), p(0.0, -0.1), color);
             draw_circle(c.x, c.y + 0.35 * h, 0.5 * h, color);
-            draw_circle_lines(c.x, c.y + 0.35 * h, 0.3 * h, w * 0.7, Color::new(0.0, 0.0, 0.0, 0.35));
+            draw_circle_lines(
+                c.x,
+                c.y + 0.35 * h,
+                0.3 * h,
+                w * 0.7,
+                Color::new(0.0, 0.0, 0.0, 0.35),
+            );
         }
         Icon::Star => {
             let pts: Vec<Vec2> = (0..10)
                 .map(|k| {
                     let r = if k % 2 == 0 { 0.95 } else { 0.42 };
-                    c + Vec2::from_angle(-std::f32::consts::FRAC_PI_2 + k as f32 * std::f32::consts::PI / 5.0) * r * h
+                    c + Vec2::from_angle(
+                        -std::f32::consts::FRAC_PI_2 + k as f32 * std::f32::consts::PI / 5.0,
+                    ) * r
+                        * h
                 })
                 .collect();
             for k in 0..10 {
@@ -171,12 +204,34 @@ pub fn draw(icon: Icon, c: Vec2, s: f32, color: Color) {
         Icon::Refresh => {
             arc(c, 0.62 * h, -0.4, 4.6, w, color);
             let tip = c + Vec2::from_angle(-0.4) * 0.62 * h;
-            draw_triangle(tip + vec2(-0.3, -0.25) * h, tip + vec2(0.32, -0.08) * h, tip + vec2(0.02, 0.35) * h, color);
+            draw_triangle(
+                tip + vec2(-0.3, -0.25) * h,
+                tip + vec2(0.32, -0.08) * h,
+                tip + vec2(0.02, 0.35) * h,
+                color,
+            );
         }
         Icon::Table => {
-            crate::ui::rrect(Rect::new(c.x - 0.9 * h, c.y - 0.55 * h, 1.8 * h, 1.1 * h), 0.18 * h, color);
-            draw_rectangle(c.x - 0.7 * h, c.y - 0.35 * h, 1.4 * h, 0.7 * h, Color::new(0.1, 0.45, 0.25, color.a));
-            for (x, y) in [(-0.7f32, -0.35f32), (0.0, -0.35), (0.7, -0.35), (-0.7, 0.35), (0.0, 0.35), (0.7, 0.35)] {
+            crate::ui::rrect(
+                Rect::new(c.x - 0.9 * h, c.y - 0.55 * h, 1.8 * h, 1.1 * h),
+                0.18 * h,
+                color,
+            );
+            draw_rectangle(
+                c.x - 0.7 * h,
+                c.y - 0.35 * h,
+                1.4 * h,
+                0.7 * h,
+                Color::new(0.1, 0.45, 0.25, color.a),
+            );
+            for (x, y) in [
+                (-0.7f32, -0.35f32),
+                (0.0, -0.35),
+                (0.7, -0.35),
+                (-0.7, 0.35),
+                (0.0, 0.35),
+                (0.7, 0.35),
+            ] {
                 draw_circle(c.x + x * h, c.y + y * h, 0.1 * h, Color::new(0.0, 0.0, 0.0, color.a));
             }
         }

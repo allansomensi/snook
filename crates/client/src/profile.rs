@@ -10,7 +10,9 @@ use crate::paint::{draw_circle, draw_line, draw_rectangle};
 use crate::i18n::{t, tw};
 use crate::icons::Icon;
 use crate::online::Online;
-use crate::ui::{ALERT, BORDER, CREAM, GOLD, MUTED, Ui, name_color, rrect, rrect_lines, tier_color};
+use crate::ui::{
+    ALERT, BORDER, CREAM, GOLD, MUTED, Ui, name_color, rrect, rrect_lines, tier_color,
+};
 
 pub enum ProfileAction {
     None,
@@ -88,17 +90,33 @@ impl ProfileScreen {
         let r = Rect::new((sw - w) / 2.0, (sh - h) / 2.0, w, h);
         ui.panel(r);
         let mut action = ProfileAction::None;
-        if ui.icon_button(Rect::new(r.x + 14.0, r.y + 14.0, 34.0, 34.0), Icon::Back, t("Back"), true)
-            || (is_key_pressed(KeyCode::Escape) && ui.focus.is_none() && !crate::countries::is_open())
+        if ui.icon_button(
+            Rect::new(r.x + 14.0, r.y + 14.0, 34.0, 34.0),
+            Icon::Back,
+            t("Back"),
+            true,
+        ) || (is_key_pressed(KeyCode::Escape)
+            && ui.focus.is_none()
+            && !crate::countries::is_open())
         {
             action = ProfileAction::Back;
         }
-        let Some(mut p) = online.profile.clone().filter(|p| p.player.username.eq_ignore_ascii_case(&self.name)) else {
-            ui.text_centered(t("Loading the profile…"), sw / 2.0, r.y + r.h / 2.0 - 10.0, 16.0, MUTED, false);
+        let Some(mut p) =
+            online.profile.clone().filter(|p| p.player.username.eq_ignore_ascii_case(&self.name))
+        else {
+            ui.text_centered(
+                t("Loading the profile…"),
+                sw / 2.0,
+                r.y + r.h / 2.0 - 10.0,
+                16.0,
+                MUTED,
+                false,
+            );
             return action;
         };
         // Asked before signing in: the server didn't know who was looking.
-        if online.me.as_ref().is_some_and(|me| me.username.eq_ignore_ascii_case(&p.player.username)) {
+        if online.me.as_ref().is_some_and(|me| me.username.eq_ignore_ascii_case(&p.player.username))
+        {
             p.relation = Relation::Me;
         }
         self.header(ui, online, &p, r);
@@ -258,7 +276,12 @@ impl ProfileScreen {
         let mut tip = None;
         for (k, a) in ACHIEVEMENTS.iter().enumerate() {
             let (col, row) = (k % cols, k / cols);
-            let c = Rect::new(area.x + col as f32 * (cell + 6.0), area.y + 28.0 + row as f32 * (cell + 6.0), cell, cell);
+            let c = Rect::new(
+                area.x + col as f32 * (cell + 6.0),
+                area.y + 28.0 + row as f32 * (cell + 6.0),
+                cell,
+                cell,
+            );
             if c.y + c.h > area.y + area.h {
                 break;
             }
@@ -267,11 +290,21 @@ impl ProfileScreen {
             rrect(c, 8.0, Color::new(1.0, 1.0, 1.0, if unlocked.is_some() { 0.07 } else { 0.025 }));
             if unlocked.is_some() {
                 rrect_lines(c, 8.0, 1.2, Color::new(color.r, color.g, color.b, 0.6));
-                crate::icons::draw(Icon::Medal, vec2(c.x + cell / 2.0, c.y + cell / 2.0), cell * 0.62, color);
+                crate::icons::draw(
+                    Icon::Medal,
+                    vec2(c.x + cell / 2.0, c.y + cell / 2.0),
+                    cell * 0.62,
+                    color,
+                );
             } else {
                 // A faint medal: the colour hints at how hard it is.
                 let ghost = Color::new(color.r * 0.5, color.g * 0.5, color.b * 0.5, 0.35);
-                crate::icons::draw(Icon::Medal, vec2(c.x + cell / 2.0, c.y + cell / 2.0), cell * 0.55, ghost);
+                crate::icons::draw(
+                    Icon::Medal,
+                    vec2(c.x + cell / 2.0, c.y + cell / 2.0),
+                    cell * 0.55,
+                    ghost,
+                );
             }
             ui.block(c);
             if ui.hovering(c) {
@@ -281,9 +314,21 @@ impl ProfileScreen {
         if let Some((a, at, c)) = tip {
             let title = t(a.title);
             let desc = t(a.description);
-            let when = at.map(|at| tw("Unlocked {date}", &[("date", &date(at))])).unwrap_or_else(|| t("Locked").to_string());
-            let w = ui.text_size(title, 14.0, true).x.max(ui.text_size(desc, 13.0, false).x).max(ui.text_size(&when, 12.0, false).x) + 24.0;
-            let tr = Rect::new((c.x + c.w / 2.0 - w / 2.0).clamp(4.0, crate::ui::vw() - w - 4.0), c.y + c.h + 6.0, w, 64.0);
+            let when = at
+                .map(|at| tw("Unlocked {date}", &[("date", &date(at))]))
+                .unwrap_or_else(|| t("Locked").to_string());
+            let w = ui
+                .text_size(title, 14.0, true)
+                .x
+                .max(ui.text_size(desc, 13.0, false).x)
+                .max(ui.text_size(&when, 12.0, false).x)
+                + 24.0;
+            let tr = Rect::new(
+                (c.x + c.w / 2.0 - w / 2.0).clamp(4.0, crate::ui::vw() - w - 4.0),
+                c.y + c.h + 6.0,
+                w,
+                64.0,
+            );
             rrect(tr, 8.0, Color::new(0.0, 0.0, 0.0, 0.9));
             rrect_lines(tr, 8.0, 1.0, medal_color(a.level));
             ui.text(title, tr.x + 12.0, tr.y + 8.0, 14.0, medal_color(a.level), true);
@@ -305,17 +350,30 @@ impl ProfileScreen {
         for (k, h) in p.history.iter().skip(self.history_first).take(visible).enumerate() {
             let r = Rect::new(list.x, list.y + k as f32 * row_h, list.w - 8.0, row_h - 5.0);
             rrect(r, 6.0, Color::new(1.0, 1.0, 1.0, 0.035));
-            let (mark, color) = if h.won {
-                (t("W"), Color::new(0.45, 0.95, 0.55, 1.0))
-            } else {
-                (t("L"), ALERT)
-            };
-            rrect(Rect::new(r.x + 6.0, r.y + 7.0, 24.0, 24.0), 5.0, Color::new(color.r, color.g, color.b, 0.18));
+            let (mark, color) =
+                if h.won { (t("W"), Color::new(0.45, 0.95, 0.55, 1.0)) } else { (t("L"), ALERT) };
+            rrect(
+                Rect::new(r.x + 6.0, r.y + 7.0, 24.0, 24.0),
+                5.0,
+                Color::new(color.r, color.g, color.b, 0.18),
+            );
             ui.text_centered(mark, r.x + 18.0, r.y + 11.0, 14.0, color, true);
             let opp_color = tier_color(snook_proto::Tier::of(h.opponent_rating));
-            ui.name_with_flag(&h.opponent, &h.opponent_country, opp_color, r.x + 40.0, r.y + 4.0, 14.0, r.w - 150.0);
+            ui.name_with_flag(
+                &h.opponent,
+                &h.opponent_country,
+                opp_color,
+                r.x + 40.0,
+                r.y + 4.0,
+                14.0,
+                r.w - 150.0,
+            );
             let how = crate::i18n::history_reason(h.reason, h.won);
-            let sub = if h.tournament { format!("{how} · {}", t("tournament")) } else { how.to_string() };
+            let sub = if h.tournament {
+                format!("{how} · {}", t("tournament"))
+            } else {
+                how.to_string()
+            };
             let sub = ui.ellipsize(&sub, r.w - 150.0, 12.0);
             ui.text(&sub, r.x + 40.0, r.y + 22.0, 12.0, MUTED, false);
             let delta = if h.rated {
@@ -347,7 +405,14 @@ impl ProfileScreen {
         let r = Rect::new((sw - w) / 2.0, sh / 2.0 - 160.0, w, 320.0);
         ui.panel(r);
         ui.block(Rect::new(0.0, 0.0, sw, sh));
-        ui.text(&tw("Report {name}", &[("name", &p.player.username)]), r.x + 18.0, r.y + 16.0, 18.0, GOLD, true);
+        ui.text(
+            &tw("Report {name}", &[("name", &p.player.username)]),
+            r.x + 18.0,
+            r.y + 16.0,
+            18.0,
+            GOLD,
+            true,
+        );
         let mut y = r.y + 50.0;
         for (k, rr) in ReportReason::ALL.iter().enumerate() {
             if ui.radio(r.x + 20.0, y, t(rr.name()), *reason == k) {

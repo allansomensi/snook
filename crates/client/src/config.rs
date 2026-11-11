@@ -210,7 +210,8 @@ impl Config {
                 "token" => c.token = v.to_string(),
                 "difficulty" => c.difficulty = v.parse::<u8>().map(|d| d.min(2)).unwrap_or(1),
                 "shot_clock" => {
-                    c.shot_clock = v.parse::<u32>().ok().filter(|s| [0, 30, 60].contains(s)).unwrap_or(0)
+                    c.shot_clock =
+                        v.parse::<u32>().ok().filter(|s| [0, 30, 60].contains(s)).unwrap_or(0)
                 }
                 "lan_name" => c.lan_name = v.chars().take(16).collect(),
                 _ => {}

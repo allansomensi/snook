@@ -82,10 +82,13 @@ pub fn draw_picker(ui: &mut Ui) -> Option<String> {
         let mut list: Vec<(&str, &str)> = COUNTRIES
             .iter()
             .map(|(c, en, pt)| (*c, if lang_pt { *pt } else { *en }))
-            .filter(|(c, name)| q.is_empty() || name.to_lowercase().contains(&q) || c.to_lowercase() == q)
+            .filter(|(c, name)| {
+                q.is_empty() || name.to_lowercase().contains(&q) || c.to_lowercase() == q
+            })
             .collect();
         list.sort_by_key(|(_, name)| name.to_lowercase());
-        let area = Rect::new(r.x + 10.0, input.y + 42.0, r.w - 20.0, r.y + r.h - input.y - 52.0 - 44.0);
+        let area =
+            Rect::new(r.x + 10.0, input.y + 42.0, r.w - 20.0, r.y + r.h - input.y - 52.0 - 44.0);
         let row_h = 28.0;
         let visible = (area.h / row_h).floor().max(1.0) as usize;
         p.first = ui.scroll_list(area, p.first, list.len(), visible);

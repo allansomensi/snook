@@ -145,9 +145,11 @@ impl Bracket {
             return false;
         }
         // Eliminated players lost a decided slot.
-        !self.rounds.iter().flatten().any(|s| {
-            s.winner.is_some_and(|w| s.players[1 - w].as_deref() == Some(player))
-        })
+        !self
+            .rounds
+            .iter()
+            .flatten()
+            .any(|s| s.winner.is_some_and(|w| s.players[1 - w].as_deref() == Some(player)))
     }
 
     /// (round, index) of every slot ready to be played.

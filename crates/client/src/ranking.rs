@@ -36,15 +36,24 @@ impl Ranking {
         let r = Rect::new((sw - w) / 2.0, 20.0, w, h);
         ui.panel(r);
         let mut action = RankingAction::None;
-        if ui.icon_button(Rect::new(r.x + 14.0, r.y + 14.0, 34.0, 34.0), Icon::Back, t("Back"), true)
-            || (is_key_pressed(KeyCode::Escape) && ui.focus.is_none())
+        if ui.icon_button(
+            Rect::new(r.x + 14.0, r.y + 14.0, 34.0, 34.0),
+            Icon::Back,
+            t("Back"),
+            true,
+        ) || (is_key_pressed(KeyCode::Escape) && ui.focus.is_none())
         {
             action = RankingAction::Back;
         }
         crate::icons::draw(Icon::Trophy, vec2(r.x + 74.0, r.y + 31.0), 26.0, GOLD);
         ui.text(t("World ranking"), r.x + 96.0, r.y + 16.0, 24.0, GOLD, true);
         ui.text(t("Top 100 · rated games"), r.x + 96.0, r.y + 44.0, 12.0, MUTED, false);
-        if ui.icon_button(Rect::new(r.x + r.w - 48.0, r.y + 14.0, 34.0, 34.0), Icon::Refresh, t("Refresh"), true) {
+        if ui.icon_button(
+            Rect::new(r.x + r.w - 48.0, r.y + 14.0, 34.0, 34.0),
+            Icon::Refresh,
+            t("Refresh"),
+            true,
+        ) {
             online.request_leaderboard();
         }
         let cols = [
@@ -100,13 +109,28 @@ impl Ranking {
             match medal {
                 Some(c) => {
                     draw_circle(r.x + 30.0, y + row_h / 2.0 - 1.0, 11.0, c);
-                    ui.text_centered(&e.rank.to_string(), r.x + 30.0, ty, 13.0, Color::new(0.1, 0.07, 0.04, 1.0), true);
+                    ui.text_centered(
+                        &e.rank.to_string(),
+                        r.x + 30.0,
+                        ty,
+                        13.0,
+                        Color::new(0.1, 0.07, 0.04, 1.0),
+                        true,
+                    );
                 }
                 None => ui.text(&e.rank.to_string(), r.x + 24.0, ty, 14.0, MUTED, true),
             }
             let tier = snook_proto::Tier::of(e.rating);
             let color = if mine { GOLD } else { tier_color(tier) };
-            ui.name_with_flag(&e.username, &e.country, color, r.x + 70.0, ty - 1.0, 15.0, r.w - 400.0);
+            ui.name_with_flag(
+                &e.username,
+                &e.country,
+                color,
+                r.x + 70.0,
+                ty - 1.0,
+                15.0,
+                r.w - 400.0,
+            );
             ui.text(&e.rating.to_string(), r.x + r.w - 300.0, ty, 15.0, CREAM, true);
             ui.text(t(tier.name()), r.x + r.w - 210.0, ty + 1.0, 13.0, tier_color(tier), false);
             ui.text(&e.games.to_string(), r.x + r.w - 110.0, ty + 1.0, 13.0, MUTED, false);

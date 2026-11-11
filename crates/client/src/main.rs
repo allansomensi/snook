@@ -495,7 +495,11 @@ async fn main() {
                             }
                             MenuAction::Lan => {
                                 lan_screen.get_or_insert_with(LanScreen::new);
-                                next = Some(if lan.is_some() { Screen::LanLounge } else { Screen::Lan });
+                                next = Some(if lan.is_some() {
+                                    Screen::LanLounge
+                                } else {
+                                    Screen::Lan
+                                });
                             }
                             MenuAction::Ranking => {
                                 ranking.open(&mut online);
@@ -546,18 +550,25 @@ async fn main() {
                         },
                         Screen::Lan => {
                             let ls = lan_screen.get_or_insert_with(LanScreen::new);
-                            let hosting = lan.as_ref().and_then(|l| l.host.as_ref()).map(|h| h.port);
+                            let hosting =
+                                lan.as_ref().and_then(|l| l.host.as_ref()).map(|h| h.port);
                             match ls.draw(&mut ui, &mut config, hosting) {
                                 LanAction::Back => next = Some(Screen::Menu),
                                 LanAction::Host(name) => {
                                     if let Some((host, url)) = ls.host(&name) {
-                                        lan = Some(LanSession { host: Some(host), net: Online::lan(&url, &name) });
+                                        lan = Some(LanSession {
+                                            host: Some(host),
+                                            net: Online::lan(&url, &name),
+                                        });
                                         config.save();
                                         next = Some(Screen::LanLounge);
                                     }
                                 }
                                 LanAction::Join(url, name) => {
-                                    lan = Some(LanSession { host: None, net: Online::lan(&url, &name) });
+                                    lan = Some(LanSession {
+                                        host: None,
+                                        net: Online::lan(&url, &name),
+                                    });
                                     config.save();
                                     next = Some(Screen::LanLounge);
                                 }
@@ -580,7 +591,8 @@ async fn main() {
                         },
                         Screen::Ranking => match ranking.draw(&mut ui, &mut online) {
                             RankingAction::Back => {
-                                next = Some(if back_to_lounge { Screen::Online } else { Screen::Menu })
+                                next =
+                                    Some(if back_to_lounge { Screen::Online } else { Screen::Menu })
                             }
                             RankingAction::Profile(name) => {
                                 profile.open(&name, &mut online);

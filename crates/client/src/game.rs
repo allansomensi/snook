@@ -58,7 +58,10 @@ pub struct ComputerTurn {
 
 pub enum Phase {
     /// The current player is lining up a shot.
-    Turn { placing_cue_ball: bool, computer: Option<ComputerTurn> },
+    Turn {
+        placing_cue_ball: bool,
+        computer: Option<ComputerTurn>,
+    },
     /// Balls are rolling.
     Simulating(Box<PendingShot>),
     /// Online: the animation is over and the server's verdict is on its way
@@ -184,9 +187,7 @@ impl Match {
                 [settings.names[0].clone(), level_name(d)],
                 [Controller::Human, Controller::Computer(d)],
             ),
-            MatchMode::HotSeat => {
-                (settings.names.clone(), [Controller::Human, Controller::Human])
-            }
+            MatchMode::HotSeat => (settings.names.clone(), [Controller::Human, Controller::Human]),
             MatchMode::Demo => (
                 [level_name(Difficulty::Hard), level_name(Difficulty::Medium)],
                 [Controller::Computer(Difficulty::Hard), Controller::Computer(Difficulty::Medium)],
@@ -403,7 +404,8 @@ impl Match {
         let Some(last) = &self.last_shot else { return };
         if let Ok(pending) = last.start.prepare_shot(&last.shot, last.called) {
             self.sounds.push(ImpactSound { kind: ImpactKind::Cue, speed: last.shot.speed as f32 });
-            self.replay = Some(Replay { simulation: pending.simulation, done: 0.0, events_seen: 0 });
+            self.replay =
+                Some(Replay { simulation: pending.simulation, done: 0.0, events_seen: 0 });
         }
     }
 
@@ -510,11 +512,8 @@ impl Match {
     }
 
     fn start_animation(&mut self, pending: PendingShot, shot: Shot) {
-        self.last_shot = Some(ReplayShot {
-            start: self.game.clone(),
-            shot,
-            called: pending.called_pocket,
-        });
+        self.last_shot =
+            Some(ReplayShot { start: self.game.clone(), shot, called: pending.called_pocket });
         self.replay = None;
         self.sounds.push(ImpactSound { kind: ImpactKind::Cue, speed: shot.speed as f32 });
         self.events_seen = 0;
@@ -1219,7 +1218,9 @@ impl FeedLine {
             ChatKind::Announcement => {
                 FeedLine { from: None, text: line.text.clone(), kind: FeedKind::Announcement }
             }
-            ChatKind::System => FeedLine { from: None, text: line.text.clone(), kind: FeedKind::Event },
+            ChatKind::System => {
+                FeedLine { from: None, text: line.text.clone(), kind: FeedKind::Event }
+            }
         }
     }
 
@@ -1324,7 +1325,12 @@ mod tests {
         let report = server.play_shot(&shot, None).unwrap();
         finish_animation(&mut m);
         assert!(matches!(m.phase, Phase::Settling(_)), "waits for the verdict");
-        m.handle_server(ServerMsg::ShotResult { turn, end: server.clone(), report, clock_left: 30.0 });
+        m.handle_server(ServerMsg::ShotResult {
+            turn,
+            end: server.clone(),
+            report,
+            clock_left: 30.0,
+        });
         assert_eq!(m.game, server);
     }
 

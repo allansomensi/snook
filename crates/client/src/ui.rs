@@ -13,6 +13,9 @@ pub const BORDER: Color = Color::new(0.45, 0.31, 0.16, 1.0);
 pub const ALERT: Color = Color::new(1.0, 0.56, 0.44, 1.0);
 pub const GREEN: Color = Color::new(0.12, 0.45, 0.25, 1.0);
 
+/// A wrapped chat row: the coloured prefix (on its first row), the text, the kind.
+type Row = (Option<(String, Color)>, String, FeedKind);
+
 /// One line of a chat panel.
 #[derive(Debug, Clone, PartialEq)]
 pub struct FeedLine {
@@ -580,7 +583,13 @@ impl Ui {
     /// A scrollable chat log (newest at the bottom) mixing player messages
     /// and what happened in the game. `scroll` counts lines up from the
     /// bottom; the new value is returned.
-    pub fn chat_log(&mut self, r: Rect, lines: &[FeedLine], me: Option<&str>, scroll: usize) -> usize {
+    pub fn chat_log(
+        &mut self,
+        r: Rect,
+        lines: &[FeedLine],
+        me: Option<&str>,
+        scroll: usize,
+    ) -> usize {
         self.block(r);
         let size = 14.0;
         let line_h = 19.0;
@@ -588,7 +597,7 @@ impl Ui {
         // Wrap only the newest messages that can be shown (measuring text is
         // the expensive part with a long history).
         let needed = visible + scroll + 1;
-        let mut rows: Vec<(Option<(String, Color)>, String, FeedKind)> = Vec::new();
+        let mut rows: Vec<Row> = Vec::new();
         for l in lines.iter().rev() {
             let (prefix, color) = match (&l.from, l.kind) {
                 (Some((name, rating)), FeedKind::Player) => {
@@ -606,7 +615,7 @@ impl Ui {
             let bold = l.kind == FeedKind::Player;
             let name_w = prefix.as_ref().map(|p| self.text_size(p, size, bold).x).unwrap_or(0.0);
             let wrapped = self.wrap(&l.text, (r.w - 16.0 - name_w).max(60.0), size);
-            let mut block: Vec<(Option<(String, Color)>, String, FeedKind)> = wrapped
+            let mut block: Vec<Row> = wrapped
                 .into_iter()
                 .enumerate()
                 .map(|(k, w)| {
@@ -646,8 +655,16 @@ impl Ui {
                 FeedKind::Alert => Color::new(0.88, 0.58, 0.48, 0.95),
                 FeedKind::Event => Color::new(0.70, 0.64, 0.56, 0.85),
             };
-            let text_size = if matches!(kind, FeedKind::Event | FeedKind::Alert) { 13.0 } else { size };
-            self.text(text, r.x + 8.0 + indent, y + (size - text_size) * 0.5, text_size, color, false);
+            let text_size =
+                if matches!(kind, FeedKind::Event | FeedKind::Alert) { 13.0 } else { size };
+            self.text(
+                text,
+                r.x + 8.0 + indent,
+                y + (size - text_size) * 0.5,
+                text_size,
+                color,
+                false,
+            );
         }
         if scroll > 0 {
             let label = crate::i18n::t("▼ newer messages");
@@ -668,7 +685,13 @@ impl Ui {
     }
 
     /// A square button with an icon; `tip` is shown while hovering.
-    pub fn icon_button(&mut self, r: Rect, icon: crate::icons::Icon, tip: &str, enabled: bool) -> bool {
+    pub fn icon_button(
+        &mut self,
+        r: Rect,
+        icon: crate::icons::Icon,
+        tip: &str,
+        enabled: bool,
+    ) -> bool {
         self.icon_button_ex(r, icon, tip, enabled, false)
     }
 
@@ -722,7 +745,14 @@ impl Ui {
     }
 
     /// A flag (if any) and a player name in their tier colour. Returns the width used.
-    pub fn player_name(&self, p: &snook_proto::PlayerInfo, x: f32, y: f32, size: f32, max_w: f32) -> f32 {
+    pub fn player_name(
+        &self,
+        p: &snook_proto::PlayerInfo,
+        x: f32,
+        y: f32,
+        size: f32,
+        max_w: f32,
+    ) -> f32 {
         self.name_with_flag(&p.username, &p.country, name_color(p), x, y, size, max_w)
     }
 
@@ -801,13 +831,28 @@ impl Ui {
             let cell = Rect::new(r.x + i as f32 * w, r.y, w, r.h);
             let hover = cell.contains(self.mouse);
             if i == selected {
-                rrect(Rect::new(cell.x + 2.0, cell.y + 2.0, cell.w - 4.0, cell.h - 4.0), 6.0, Color::new(0.38, 0.25, 0.12, 1.0));
+                rrect(
+                    Rect::new(cell.x + 2.0, cell.y + 2.0, cell.w - 4.0, cell.h - 4.0),
+                    6.0,
+                    Color::new(0.38, 0.25, 0.12, 1.0),
+                );
             } else if hover {
-                rrect(Rect::new(cell.x + 2.0, cell.y + 2.0, cell.w - 4.0, cell.h - 4.0), 6.0, Color::new(0.22, 0.15, 0.09, 1.0));
+                rrect(
+                    Rect::new(cell.x + 2.0, cell.y + 2.0, cell.w - 4.0, cell.h - 4.0),
+                    6.0,
+                    Color::new(0.22, 0.15, 0.09, 1.0),
+                );
             }
             let size = self.fit((r.h * 0.42).clamp(12.0, 16.0), label, w - 10.0);
             let color = if i == selected { GOLD } else { CREAM };
-            self.text_centered(label, cell.x + w / 2.0, cell.y + (r.h - size) / 2.0, size, color, true);
+            self.text_centered(
+                label,
+                cell.x + w / 2.0,
+                cell.y + (r.h - size) / 2.0,
+                size,
+                color,
+                true,
+            );
             if hover && self.released && i != selected {
                 clicked = Some(i);
             }

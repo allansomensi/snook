@@ -213,7 +213,8 @@ pub struct TournamentRecord {
     pub finished_at: i64,
 }
 
-/// The storage back end.
+/// The storage back end (one per server, so the size difference doesn't matter).
+#[allow(clippy::large_enum_variant)]
 pub enum Store {
     Memory(MemoryStore),
     #[cfg(feature = "postgres")]

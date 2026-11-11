@@ -11,7 +11,14 @@ use snook_server::store::{
 };
 
 fn new_user<'a>(name: &'a str) -> NewUser<'a> {
-    NewUser { username: name, password_hash: "h", country: "BR", rating: 1200, role: Role::Player, ip: "1.2.3.4" }
+    NewUser {
+        username: name,
+        password_hash: "h",
+        country: "BR",
+        rating: 1200,
+        role: Role::Player,
+        ip: "1.2.3.4",
+    }
 }
 
 async fn exercise(store: Store) {

@@ -202,9 +202,10 @@ async fn full_rated_match_updates_ratings_profile_and_leaderboard() {
     // The winner unlocks "first win".
     let winner_is_alice = result.winner == sa;
     let w = if winner_is_alice { &mut alice } else { &mut bob };
-    w.expect("achievement", |m| {
-        matches!(m, ServerMsg::AchievementUnlocked { code } if code == "wins_1")
-    })
+    w.expect(
+        "achievement",
+        |m| matches!(m, ServerMsg::AchievementUnlocked { code } if code == "wins_1"),
+    )
     .await;
 
     alice.send(ClientMsg::Leaderboard).await;
@@ -261,7 +262,12 @@ async fn out_of_turn_and_stale_shots_are_rejected() {
     shooter.ws.send(Message::Text(text.into())).await.unwrap();
     let m = shooter
         .expect("bad", |m| {
-            matches!(m, ServerMsg::ShotRejected { .. } | ServerMsg::Error { .. } | ServerMsg::ShotTaken { .. })
+            matches!(
+                m,
+                ServerMsg::ShotRejected { .. }
+                    | ServerMsg::Error { .. }
+                    | ServerMsg::ShotTaken { .. }
+            )
         })
         .await;
     assert!(!matches!(m, ServerMsg::ShotTaken { .. }), "infinite shot accepted");
@@ -403,12 +409,16 @@ async fn friends_blocks_and_reports() {
     bob.expect("request", |m| matches!(m, ServerMsg::FriendRequestReceived { .. })).await;
     bob.send(ClientMsg::FriendAnswer { username: "alice".into(), accept: true }).await;
     alice
-        .expect("friend achievement", |m| {
-            matches!(m, ServerMsg::AchievementUnlocked { code } if code == "friend_1")
-        })
+        .expect(
+            "friend achievement",
+            |m| matches!(m, ServerMsg::AchievementUnlocked { code } if code == "friend_1"),
+        )
         .await;
     let ServerMsg::Friends { friends, .. } = alice
-        .expect("friends", |m| matches!(m, ServerMsg::Friends { friends, .. } if !friends.is_empty()))
+        .expect(
+            "friends",
+            |m| matches!(m, ServerMsg::Friends { friends, .. } if !friends.is_empty()),
+        )
         .await
     else {
         unreachable!()
@@ -418,16 +428,20 @@ async fn friends_blocks_and_reports() {
 
     // Bob blocks Alice: her invitations are refused and the friendship ends.
     bob.send(ClientMsg::Block { username: "alice".into() }).await;
-    bob.expect("blocked", |m| matches!(m, ServerMsg::Friends { blocked, .. } if !blocked.is_empty()))
-        .await;
+    bob.expect(
+        "blocked",
+        |m| matches!(m, ServerMsg::Friends { blocked, .. } if !blocked.is_empty()),
+    )
+    .await;
     alice.send(ClientMsg::Invite { to: "bob".into(), rated: false }).await;
     alice.expect("refused", |m| matches!(m, ServerMsg::InviteFailed { .. })).await;
-    alice.send(ClientMsg::Report {
-        username: "bob".into(),
-        reason: ReportReason::Spam,
-        details: "test".into(),
-    })
-    .await;
+    alice
+        .send(ClientMsg::Report {
+            username: "bob".into(),
+            reason: ReportReason::Spam,
+            details: "test".into(),
+        })
+        .await;
     alice.expect("report", |m| matches!(m, ServerMsg::Notice { .. })).await;
 }
 
@@ -438,17 +452,17 @@ async fn tournament_runs_to_a_champion() {
     for name in ["ana", "ben", "cid", "dan"] {
         clients.push((name, Client::register(&url, name).await.0));
     }
-    clients[0].1.send(ClientMsg::CreateTournament {
-        name: "Friday cup".into(),
-        size: 4,
-        rated: false,
-        password: None,
-    })
-    .await;
-    let ServerMsg::TournamentUpdated { tournament } = clients[1]
+    clients[0]
         .1
-        .expect("created", |m| matches!(m, ServerMsg::TournamentUpdated { .. }))
-        .await
+        .send(ClientMsg::CreateTournament {
+            name: "Friday cup".into(),
+            size: 4,
+            rated: false,
+            password: None,
+        })
+        .await;
+    let ServerMsg::TournamentUpdated { tournament } =
+        clients[1].1.expect("created", |m| matches!(m, ServerMsg::TournamentUpdated { .. })).await
     else {
         unreachable!()
     };
@@ -459,8 +473,7 @@ async fn tournament_runs_to_a_champion() {
     let mut champion = None;
     for _round in 0..2 {
         let mut games = Vec::new();
-        for i in 0..clients.len() {
-            let c = &mut clients[i].1;
+        for (i, (_, c)) in clients.iter_mut().enumerate() {
             let started = tokio::time::timeout(
                 Duration::from_secs(3),
                 c.expect("match", |m| matches!(m, ServerMsg::MatchStarted { .. })),
@@ -519,8 +532,12 @@ async fn lan_guests_play_casual_games() {
     let rules = Rules { lan: true, ..Rules::default() };
     let url = start(rules).await;
     let mut a = Client::connect(&url).await;
-    a.send(ClientMsg::Register { username: "x_y".into(), password: PASSWORD.into(), country: String::new() })
-        .await;
+    a.send(ClientMsg::Register {
+        username: "x_y".into(),
+        password: PASSWORD.into(),
+        country: String::new(),
+    })
+    .await;
     a.expect("no accounts", |m| matches!(m, ServerMsg::AuthError { .. })).await;
     a.send(ClientMsg::Guest { name: "host".into() }).await;
     let ServerMsg::AuthOk { player, .. } =
@@ -550,10 +567,20 @@ async fn admin_panel_requires_staff() {
     let (_eve, _) = Client::register(&url, "eve").await;
     let host = http.trim_start_matches("http://").to_string();
     // A minimal HTTP client over a raw socket (no extra dependencies).
-    async fn request(host: &str, method: &str, path: &str, token: &str, body: &str) -> (u16, String) {
+    async fn request(
+        host: &str,
+        method: &str,
+        path: &str,
+        token: &str,
+        body: &str,
+    ) -> (u16, String) {
         use tokio::io::{AsyncReadExt, AsyncWriteExt};
         let mut s = TcpStream::connect(host).await.unwrap();
-        let auth = if token.is_empty() { String::new() } else { format!("Authorization: Bearer {token}\r\n") };
+        let auth = if token.is_empty() {
+            String::new()
+        } else {
+            format!("Authorization: Bearer {token}\r\n")
+        };
         let req = format!(
             "{method} {path} HTTP/1.1\r\nHost: {host}\r\n{auth}Content-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
             body.len()
@@ -585,16 +612,25 @@ async fn admin_panel_requires_staff() {
     )
     .await;
     assert_eq!(code, 200, "{body}");
-    let v: serde_json::Value = serde_json::from_str(body.trim_end_matches(|c: char| c.is_control() || c == '0')).unwrap_or_else(|_| {
-        // Chunked encoding: take the JSON object between the first '{' and the last '}'.
-        let start = body.find('{').unwrap();
-        let end = body.rfind('}').unwrap();
-        serde_json::from_str(&body[start..=end]).unwrap()
-    });
+    let v: serde_json::Value =
+        serde_json::from_str(body.trim_end_matches(|c: char| c.is_control() || c == '0'))
+            .unwrap_or_else(|_| {
+                // Chunked encoding: take the JSON object between the first '{' and the last '}'.
+                let start = body.find('{').unwrap();
+                let end = body.rfind('}').unwrap();
+                serde_json::from_str(&body[start..=end]).unwrap()
+            });
     let token = v["token"].as_str().unwrap().to_string();
     let (code, _) = request(&host, "GET", "/admin/api/overview", &token, "").await;
     assert_eq!(code, 200);
-    let (code, _) = request(&host, "POST", "/admin/api/users/eve/ban", &token, r#"{"hours":2,"reason":"spam"}"#).await;
+    let (code, _) = request(
+        &host,
+        "POST",
+        "/admin/api/users/eve/ban",
+        &token,
+        r#"{"hours":2,"reason":"spam"}"#,
+    )
+    .await;
     assert_eq!(code, 200);
     // Eve can't sign in while banned.
     let mut c = Client::connect(&url).await;

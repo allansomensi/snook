@@ -75,7 +75,10 @@ pub enum Effect {
         called: Option<PocketId>,
     },
     /// Store a finished match (players are notified of achievements).
-    RecordMatch { record: MatchRecord, keys: [String; 2] },
+    RecordMatch {
+        record: MatchRecord,
+        keys: [String; 2],
+    },
     RecordTournament(TournamentRecord),
 }
 
@@ -219,7 +222,13 @@ pub struct LiveSnapshot {
 
 impl Lounge {
     pub fn new(rules: Rules, effects: UnboundedSender<Effect>) -> Self {
-        Lounge { rules, next_id: 1, effects: Some(effects), next_guest_id: -1, ..Default::default() }
+        Lounge {
+            rules,
+            next_id: 1,
+            effects: Some(effects),
+            next_guest_id: -1,
+            ..Default::default()
+        }
     }
 
     fn effect(&self, e: Effect) {
@@ -338,7 +347,8 @@ impl Lounge {
             if room.is_some() { PlayerStatus::Playing } else { PlayerStatus::Available },
         );
         let _ = tx.try_send(ServerMsg::AuthOk { player: info, token });
-        let _ = tx.try_send(ServerMsg::Welcome { motd: self.rules.motd.clone(), lan: self.rules.lan });
+        let _ =
+            tx.try_send(ServerMsg::Welcome { motd: self.rules.motd.clone(), lan: self.rules.lan });
         self.sessions.insert(
             k.clone(),
             Session {
@@ -471,8 +481,13 @@ impl Lounge {
         if text.is_empty() {
             return;
         }
-        let line =
-            ChatLine { from: "Snook".into(), text, at: now(), kind: ChatKind::Announcement, rating: 0 };
+        let line = ChatLine {
+            from: "Snook".into(),
+            text,
+            at: now(),
+            kind: ChatKind::Announcement,
+            rating: 0,
+        };
         self.push_chat(line.clone());
         self.broadcast(&ServerMsg::Chat { line });
     }
@@ -500,7 +515,8 @@ impl Lounge {
             .map(|l| format!("[lounge] {}: {}", l.from, l.text))
             .collect();
         lines.reverse();
-        if let Some(room) = self.rooms.values().find(|room| room.keys.contains(&r) && room.keys.contains(&t))
+        if let Some(room) =
+            self.rooms.values().find(|room| room.keys.contains(&r) && room.keys.contains(&t))
         {
             lines.extend(room.chat.iter().map(|l| format!("[match] {}: {}", l.from, l.text)));
         }
@@ -510,7 +526,7 @@ impl Lounge {
     pub fn live(&self) -> LiveSnapshot {
         let mut players: Vec<PlayerInfo> =
             self.sessions.keys().filter_map(|k| self.info(k)).collect();
-        players.sort_by(|a, b| a.username.to_lowercase().cmp(&b.username.to_lowercase()));
+        players.sort_by_key(|p| p.username.to_lowercase());
         let mut rooms: Vec<LiveRoom> = self
             .rooms
             .values()
@@ -1067,7 +1083,8 @@ impl Lounge {
         room.busy = Some(turn);
         room.shot_at = Instant::now();
         room.last_aim = None;
-        let msg = ServerMsg::ShotTaken { seat, turn, shot, called_pocket: called, cue_ball, timeout };
+        let msg =
+            ServerMsg::ShotTaken { seat, turn, shot, called_pocket: called, cue_ball, timeout };
         let game = Box::new(room.game.clone());
         for p in room.keys.clone() {
             self.send(&p, msg.clone());
@@ -1190,7 +1207,8 @@ impl Lounge {
         let mut new_ratings = [users[0].rating, users[1].rating];
         if rated {
             let (w, l) = (over.winner, 1 - over.winner);
-            let change = rating::apply_result(&EloConfig::default(), users[w].rating(), users[l].rating());
+            let change =
+                rating::apply_result(&EloConfig::default(), users[w].rating(), users[l].rating());
             let (rw, rl): (Rating, Rating) = (change.winner, change.loser);
             delta[w] = change.winner_delta;
             delta[l] = change.loser_delta;
@@ -1218,8 +1236,13 @@ impl Lounge {
         let keys = room.keys.clone();
         let guests = room.guests;
         let tournament = room.tournament;
-        let result =
-            MatchResult { winner: over.winner, reason: over.reason, rated, rating_delta: delta, new_ratings };
+        let result = MatchResult {
+            winner: over.winner,
+            reason: over.reason,
+            rated,
+            rating_delta: delta,
+            new_ratings,
+        };
         let room = self.rooms.get_mut(&id).expect("room");
         room.finished = true;
         room.rematch = [false, false];
@@ -1243,7 +1266,11 @@ impl Lounge {
         tracing::info!(room = id, "match finished: {:?}", over);
         if let Some((tid, round, index)) = tournament {
             if let Some(b) = self.tournaments.get_mut(&tid).and_then(|t| t.bracket.as_mut()) {
-                b.set_winner(round, index, over.winner_seat_in(&keys, &b.rounds[round][index].players));
+                b.set_winner(
+                    round,
+                    index,
+                    over.winner_seat_in(&keys, &b.rounds[round][index].players),
+                );
             }
             self.tournament_progress(tid);
         }
@@ -1278,7 +1305,8 @@ impl Lounge {
             let users =
                 [self.sessions[&keys[0]].user.clone(), self.sessions[&keys[1]].user.clone()];
             let mut rated = rated;
-            if rated && self.rated_today(users[0].id, users[1].id) >= self.rules.max_daily_rated_pair
+            if rated
+                && self.rated_today(users[0].id, users[1].id) >= self.rules.max_daily_rated_pair
             {
                 rated = false;
                 for k in &keys {
@@ -1369,11 +1397,8 @@ impl Lounge {
         if self.in_tournament(k).is_some() {
             return self.error(k, "You are already in a tournament.");
         }
-        let open = self
-            .tournaments
-            .values()
-            .filter(|t| t.state != TournamentState::Finished)
-            .count();
+        let open =
+            self.tournaments.values().filter(|t| t.state != TournamentState::Finished).count();
         if open >= self.rules.max_open_tournaments {
             return self.error(k, "There are too many tournaments right now. Join one!");
         }
@@ -1454,7 +1479,8 @@ impl Lounge {
                 for (r, round) in b.rounds.clone().iter().enumerate() {
                     for (i, slot) in round.iter().enumerate() {
                         if slot.winner.is_none()
-                            && let Some(seat) = slot.players.iter().position(|p| p.as_deref() == Some(k))
+                            && let Some(seat) =
+                                slot.players.iter().position(|p| p.as_deref() == Some(k))
                         {
                             match slot.room {
                                 Some(rid) => room = Some(rid),
@@ -1540,10 +1566,8 @@ impl Lounge {
                 slot.players[0].clone().expect("playable"),
                 slot.players[1].clone().expect("playable"),
             ];
-            let online = [
-                self.sessions.contains_key(&players[0]),
-                self.sessions.contains_key(&players[1]),
-            ];
+            let online =
+                [self.sessions.contains_key(&players[0]), self.sessions.contains_key(&players[1])];
             if online[0] && online[1] {
                 if self.available(&players[0]) && self.available(&players[1]) {
                     starts.push((r, i, players));
@@ -1709,7 +1733,12 @@ impl Room {
         if self.keys[0] == k { 0 } else { 1 }
     }
 
-    fn started_msg(&self, seat: usize, sessions: &HashMap<String, Session>, clock: u32) -> ServerMsg {
+    fn started_msg(
+        &self,
+        seat: usize,
+        sessions: &HashMap<String, Session>,
+        clock: u32,
+    ) -> ServerMsg {
         let player = |s: usize| match sessions.get(&self.keys[s]) {
             Some(x) => player_info(&x.user, x.guest, PlayerStatus::Playing),
             None => player_info(&self.users[s], self.guests[s], PlayerStatus::Playing),

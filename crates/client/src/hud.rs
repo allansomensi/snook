@@ -130,7 +130,15 @@ fn player_card(ui: &mut Ui, m: &Match, seat: usize, x: f32, y: f32, w: f32) {
     match &m.online {
         Some(o) => {
             let color = crate::ui::tier_color(snook_proto::Tier::of(o.ratings[seat]));
-            ui.name_with_flag(&m.names[seat], &o.countries[seat], color, x + 10.0, y + 4.0, 15.0, w - reserve);
+            ui.name_with_flag(
+                &m.names[seat],
+                &o.countries[seat],
+                color,
+                x + 10.0,
+                y + 4.0,
+                15.0,
+                w - reserve,
+            );
         }
         None => {
             let name = ui.ellipsize(&m.names[seat], w - reserve, 15.0);
@@ -145,20 +153,18 @@ fn player_card(ui: &mut Ui, m: &Match, seat: usize, x: f32, y: f32, w: f32) {
         let rw = ui.text_size(&rating, 12.0, false).x;
         ui.text(&rating, x + w - ww - rw - 20.0, y + 7.0, 12.0, MUTED, false);
     }
-    if let Some((left, total)) = m.shot_clock() {
-        if active && matches!(m.phase, Phase::Turn { .. }) && m.replay.is_none() {
-            // Shot clock along the bottom of the card.
-            let frac = (left / total.max(1.0)).clamp(0.0, 1.0);
-            let color = if left < 10.0 { ALERT } else { GOLD };
-            crate::ui::rrect(
-                Rect::new(x + 6.0, y + CARD_H - 4.0, (w - 12.0) * frac, 2.5),
-                1.2,
-                color,
-            );
-            let secs = format!("{:.0}s", left.ceil());
-            let sw_ = ui.text_size(&secs, 13.0, true).x;
-            ui.text(&secs, x + w - sw_ - 10.0, y + 24.0, 13.0, color, true);
-        }
+    if let Some((left, total)) = m.shot_clock()
+        && active
+        && matches!(m.phase, Phase::Turn { .. })
+        && m.replay.is_none()
+    {
+        // Shot clock along the bottom of the card.
+        let frac = (left / total.max(1.0)).clamp(0.0, 1.0);
+        let color = if left < 10.0 { ALERT } else { GOLD };
+        crate::ui::rrect(Rect::new(x + 6.0, y + CARD_H - 4.0, (w - 12.0) * frac, 2.5), 1.2, color);
+        let secs = format!("{:.0}s", left.ceil());
+        let sw_ = ui.text_size(&secs, 13.0, true).x;
+        ui.text(&secs, x + w - sw_ - 10.0, y + 24.0, 13.0, color, true);
     }
     let ry = y + 23.0;
     match m.game.group_of(seat) {
@@ -299,13 +305,28 @@ impl Hud {
                 self.paused = true;
             }
             let mut x = 10.0 + w + 8.0;
-            if ui.icon_button(Rect::new(x, 12.0, 30.0, 30.0), Icon::Target, t("Top view (C)"), !self.top_view) {
+            if ui.icon_button(
+                Rect::new(x, 12.0, 30.0, 30.0),
+                Icon::Target,
+                t("Top view (C)"),
+                !self.top_view,
+            ) {
                 action = HudAction::ResetCamera;
             }
             x += 36.0;
             let can_replay = m.last_shot.is_some() && !m.shot_in_progress();
-            let tip = if m.replay.is_some() { t("Stop the replay (R)") } else { t("Watch the last shot again (R)") };
-            if ui.icon_button_ex(Rect::new(x, 12.0, 30.0, 30.0), Icon::Replay, tip, can_replay || m.replay.is_some(), true) {
+            let tip = if m.replay.is_some() {
+                t("Stop the replay (R)")
+            } else {
+                t("Watch the last shot again (R)")
+            };
+            if ui.icon_button_ex(
+                Rect::new(x, 12.0, 30.0, 30.0),
+                Icon::Replay,
+                tip,
+                can_replay || m.replay.is_some(),
+                true,
+            ) {
                 if m.replay.is_some() {
                     m.stop_replay();
                 } else {
@@ -587,8 +608,18 @@ impl Hud {
                 out = Some((self.zoom - 0.12).max(0.0));
             }
         } else {
-            crate::icons::draw(Icon::Plus, vec2(plus.x + 12.0, plus.y + 12.0), 10.0, Color::new(1.0, 1.0, 1.0, 0.3));
-            crate::icons::draw(Icon::Minus, vec2(minus.x + 12.0, minus.y + 12.0), 10.0, Color::new(1.0, 1.0, 1.0, 0.3));
+            crate::icons::draw(
+                Icon::Plus,
+                vec2(plus.x + 12.0, plus.y + 12.0),
+                10.0,
+                Color::new(1.0, 1.0, 1.0, 0.3),
+            );
+            crate::icons::draw(
+                Icon::Minus,
+                vec2(minus.x + 12.0, minus.y + 12.0),
+                10.0,
+                Color::new(1.0, 1.0, 1.0, 0.3),
+            );
         }
         let drag = ui.drag_area(95, Rect::new(track.x - 10.0, track.y, 26.0, h));
         self.zoom_drag = matches!(drag, crate::ui::Drag::Held(_));
@@ -603,7 +634,12 @@ impl Hud {
             Color::new(GOLD.r, GOLD.g, GOLD.b, 0.55 * alpha),
         );
         let ky = track.y + h - fill;
-        draw_circle(track.x + 3.0, ky, if near { 8.0 } else { 5.5 }, Color::new(0.93, 0.9, 0.84, alpha));
+        draw_circle(
+            track.x + 3.0,
+            ky,
+            if near { 8.0 } else { 5.5 },
+            Color::new(0.93, 0.9, 0.84, alpha),
+        );
         if let Some(z) = out {
             self.zoom = z;
         }

@@ -1,5 +1,5 @@
-use std::time::Instant;
 use snook_core::{EightBallGame, Shot};
+use std::time::Instant;
 fn main() {
     let g = EightBallGame::new(5, 0);
     let json = serde_json::to_string(&g).unwrap();

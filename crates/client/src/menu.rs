@@ -91,7 +91,11 @@ impl Menu {
             } else {
                 Color::new(0.10 + 0.12 * a, 0.065 + 0.08 * a, 0.04 + 0.04 * a, 0.9)
             };
-            rrect(Rect::new(shifted.x, shifted.y + 3.0, shifted.w, shifted.h), 10.0, Color::new(0.0, 0.0, 0.0, 0.35));
+            rrect(
+                Rect::new(shifted.x, shifted.y + 3.0, shifted.w, shifted.h),
+                10.0,
+                Color::new(0.0, 0.0, 0.0, 0.35),
+            );
             rrect(shifted, 10.0, bg);
             rrect(
                 Rect::new(shifted.x + 1.0, shifted.y + 1.0, shifted.w - 2.0, shifted.h * 0.45),
@@ -106,9 +110,28 @@ impl Menu {
                 BORDER
             };
             rrect_lines(shifted, 10.0, 1.4, edge);
-            crate::icons::draw(icon, vec2(shifted.x + 36.0, shifted.y + h / 2.0), 28.0, if hover { GOLD } else { CREAM });
-            ui.text(title, shifted.x + 70.0, shifted.y + 13.0, 20.0, if primary { WHITE } else { CREAM }, true);
-            ui.text(sub, shifted.x + 70.0, shifted.y + 39.0, 13.0, Color::new(0.85, 0.8, 0.72, 0.85), false);
+            crate::icons::draw(
+                icon,
+                vec2(shifted.x + 36.0, shifted.y + h / 2.0),
+                28.0,
+                if hover { GOLD } else { CREAM },
+            );
+            ui.text(
+                title,
+                shifted.x + 70.0,
+                shifted.y + 13.0,
+                20.0,
+                if primary { WHITE } else { CREAM },
+                true,
+            );
+            ui.text(
+                sub,
+                shifted.x + 70.0,
+                shifted.y + 39.0,
+                13.0,
+                Color::new(0.85, 0.8, 0.72, 0.85),
+                false,
+            );
             if hover && ui.clicked(r) {
                 action = match k {
                     0 => MenuAction::Online,
@@ -155,7 +178,12 @@ impl Menu {
         ui.block(r);
         match &online.me {
             Some(me) => {
-                crate::icons::draw(Icon::Person, vec2(r.x + 30.0, r.y + 32.0), 28.0, crate::ui::name_color(me));
+                crate::icons::draw(
+                    Icon::Person,
+                    vec2(r.x + 30.0, r.y + 32.0),
+                    28.0,
+                    crate::ui::name_color(me),
+                );
                 ui.player_name(me, r.x + 56.0, r.y + 12.0, 17.0, r.w - 70.0);
                 let line = format!("{} · {}", me.rating, t(me.tier().name()));
                 ui.text(&line, r.x + 56.0, r.y + 36.0, 13.0, MUTED, false);
@@ -181,7 +209,11 @@ impl Menu {
             *action = if online.me.is_some() { MenuAction::Profile } else { MenuAction::Online };
         }
         if hover {
-            let tip = if online.me.is_some() { t("Your profile") } else { t("Sign in or create an account") };
+            let tip = if online.me.is_some() {
+                t("Your profile")
+            } else {
+                t("Sign in or create an account")
+            };
             ui.tooltip(tip, r);
         }
     }

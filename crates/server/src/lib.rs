@@ -199,7 +199,8 @@ impl Server {
     }
 
     pub async fn leaderboard(&self) -> Vec<LeaderboardEntry> {
-        if let Some((at, list)) = self.leaderboard.lock().unwrap_or_else(|e| e.into_inner()).as_ref()
+        if let Some((at, list)) =
+            self.leaderboard.lock().unwrap_or_else(|e| e.into_inner()).as_ref()
             && at.elapsed() < Duration::from_secs(15)
         {
             return list.clone();
@@ -351,18 +352,16 @@ async fn run_effect(server: &Arc<Server>, effect: Effect) {
                 server.with(|l| l.commit_shot(room, turn, outcome));
             });
         }
-        Effect::RecordMatch { record, keys } => {
-            match server.store.record_match(&record).await {
-                Ok(users) => {
-                    server.invalidate_leaderboard();
-                    for user in users.into_iter().flatten() {
-                        server.with(|l| l.refresh_user(user.clone()));
-                        server.check_achievements(&user).await;
-                    }
+        Effect::RecordMatch { record, keys } => match server.store.record_match(&record).await {
+            Ok(users) => {
+                server.invalidate_leaderboard();
+                for user in users.into_iter().flatten() {
+                    server.with(|l| l.refresh_user(user.clone()));
+                    server.check_achievements(&user).await;
                 }
-                Err(e) => tracing::error!("could not record the match {keys:?}: {e}"),
             }
-        }
+            Err(e) => tracing::error!("could not record the match {keys:?}: {e}"),
+        },
         Effect::RecordTournament(t) => {
             if let Err(e) = server.store.record_tournament(&t).await {
                 tracing::error!("could not record the tournament {}: {e}", t.name);
@@ -395,12 +394,12 @@ async fn ws_handler(
         *n += 1;
     }
     let guard = ConnGuard { server: server.clone(), ip };
-    ws.max_message_size(MAX_MESSAGE_BYTES)
-        .max_frame_size(MAX_MESSAGE_BYTES)
-        .on_upgrade(move |socket| async move {
+    ws.max_message_size(MAX_MESSAGE_BYTES).max_frame_size(MAX_MESSAGE_BYTES).on_upgrade(
+        move |socket| async move {
             handle_socket(server, socket, ip).await;
             drop(guard);
-        })
+        },
+    )
 }
 
 /// Counts open connections per address.
@@ -437,7 +436,7 @@ pub fn token_hash(token: &str) -> String {
 }
 
 enum Auth {
-    Ok { user: User, token: String, guest: bool },
+    Ok { user: Box<User>, token: String, guest: bool },
     Failed(String),
 }
 
@@ -471,11 +470,12 @@ async fn new_session(server: &Server, user: &User) -> Option<String> {
 
 /// Makes configured administrators admins (bootstrap for a new server).
 async fn promote_if_admin(server: &Server, mut user: User) -> User {
-    if server.is_admin_name(&user.username) && user.role != Role::Admin {
-        if server.store.set_role(user.id, Role::Admin).await.is_ok() {
-            user.role = Role::Admin;
-            tracing::info!("{} is now an administrator", user.username);
-        }
+    if server.is_admin_name(&user.username)
+        && user.role != Role::Admin
+        && server.store.set_role(user.id, Role::Admin).await.is_ok()
+    {
+        user.role = Role::Admin;
+        tracing::info!("{} is now an administrator", user.username);
     }
     user
 }
@@ -521,7 +521,7 @@ async fn authenticate(server: &Arc<Server>, msg: ClientMsg, ip: &str) -> Auth {
                     server.auth().registered(ip);
                     tracing::info!("new account: {}", user.username);
                     match new_session(server, &user).await {
-                        Some(token) => Auth::Ok { user, token, guest: false },
+                        Some(token) => Auth::Ok { user: Box::new(user), token, guest: false },
                         None => fail("Could not create the account."),
                     }
                 }
@@ -565,7 +565,7 @@ async fn authenticate(server: &Arc<Server>, msg: ClientMsg, ip: &str) -> Auth {
                     }
                     let user = promote_if_admin(server, user).await;
                     match new_session(server, &user).await {
-                        Some(token) => Auth::Ok { user, token, guest: false },
+                        Some(token) => Auth::Ok { user: Box::new(user), token, guest: false },
                         None => fail("The server is busy. Try again in a moment."),
                     }
                 }
@@ -591,9 +591,9 @@ async fn authenticate(server: &Arc<Server>, msg: ClientMsg, ip: &str) -> Auth {
                         && let Some(fresh) = new_session(server, &user).await
                     {
                         let _ = server.store.delete_session(&hash).await;
-                        return Auth::Ok { user, token: fresh, guest: false };
+                        return Auth::Ok { user: Box::new(user), token: fresh, guest: false };
                     }
-                    Auth::Ok { user, token, guest: false }
+                    Auth::Ok { user: Box::new(user), token, guest: false }
                 }
                 Ok(None) => fail("Your session expired. Please log in again."),
                 Err(e) => {
@@ -640,7 +640,7 @@ async fn authenticate(server: &Arc<Server>, msg: ClientMsg, ip: &str) -> Auth {
                 ban_reason: None,
                 muted_until: None,
             };
-            Auth::Ok { user, token: String::new(), guest: true }
+            Auth::Ok { user: Box::new(user), token: String::new(), guest: true }
         }
         _ => fail("Please log in first."),
     }
@@ -719,6 +719,7 @@ async fn handle_socket(server: Arc<Server>, socket: WebSocket, ip: IpAddr) {
                 | ClientMsg::Resume { .. }
                 | ClientMsg::Guest { .. }) => match authenticate(&server, msg, &ip_text).await {
                     Auth::Ok { user: row, token, guest } => {
+                        let row = *row;
                         let blocked: HashSet<i64> = if guest {
                             HashSet::new()
                         } else {
@@ -800,7 +801,8 @@ async fn handle_socket(server: Arc<Server>, socket: WebSocket, ip: IpAddr) {
             }
             ClientMsg::SetCountry { country } => {
                 let country = country.trim().to_uppercase();
-                if valid_country(&country) && server.store.set_country(me.id, &country).await.is_ok()
+                if valid_country(&country)
+                    && server.store.set_country(me.id, &country).await.is_ok()
                 {
                     let mut fresh = me.clone();
                     fresh.country = country;
@@ -934,7 +936,8 @@ async fn refresh_friends(server: &Server, user: &User) {
 }
 
 async fn update_blocked(server: &Server, user: &User) {
-    let ids = server.store.blocked(user.id).await.unwrap_or_default().iter().map(|u| u.id).collect();
+    let ids =
+        server.store.blocked(user.id).await.unwrap_or_default().iter().map(|u| u.id).collect();
     server.with(|l| l.set_blocked(&user.username, ids));
 }
 
@@ -1009,9 +1012,9 @@ async fn report(
         at: now(),
     };
     match server.store.create_report(&r).await {
-        Ok(()) => send(ServerMsg::Notice {
-            text: "Thank you. The moderators will look into it.".into(),
-        }),
+        Ok(()) => {
+            send(ServerMsg::Notice { text: "Thank you. The moderators will look into it.".into() })
+        }
         Err(e) => tracing::error!("report: {e}"),
     }
 }
@@ -1048,8 +1051,13 @@ async fn profile_msg(server: &Server, viewer: Option<&User>, name: &str) -> Opti
         None => Relation::None,
         Some(v) if v.id == user.id => Relation::Me,
         Some(v) => {
-            let blocked =
-                server.store.blocked(v.id).await.unwrap_or_default().iter().any(|b| b.id == user.id);
+            let blocked = server
+                .store
+                .blocked(v.id)
+                .await
+                .unwrap_or_default()
+                .iter()
+                .any(|b| b.id == user.id);
             if blocked {
                 Relation::Blocked
             } else {
