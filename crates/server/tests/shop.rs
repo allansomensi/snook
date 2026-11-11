@@ -83,6 +83,22 @@ async fn vip_invoices_extend_vip_and_bring_coins() {
 }
 
 #[tokio::test]
+async fn invoices_in_the_newer_api_find_the_player() {
+    let (server, id) = setup().await;
+    // No customer linked yet: the player comes from the subscription metadata.
+    let invoice = json!({
+        "type": "invoice.paid",
+        "data": { "object": {
+            "id": "in_2", "customer": "cus_new", "amount_paid": 1490, "currency": "brl",
+            "parent": { "subscription_details": { "metadata": { "user_id": id.to_string() } } },
+            "lines": { "data": [ { "period": { "end": now() + 86_400 } } ] }
+        }}
+    });
+    apply_event(&server, &invoice).await.unwrap();
+    assert!(server.store.wallet(id).await.unwrap().vip_until > now());
+}
+
+#[tokio::test]
 async fn unknown_players_and_events_are_ignored() {
     let (server, _) = setup().await;
     apply_event(&server, &checkout(999, "paid", "checkout.session.completed")).await.unwrap();
