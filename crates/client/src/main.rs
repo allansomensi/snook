@@ -273,7 +273,7 @@ async fn main() {
             screen = Screen::Lan;
         }
         Some("setup") => screen = Screen::Setup(Setup::new(SetupKind::VsComputer)),
-        Some(tab @ ("shop" | "shop-coins" | "shop-vip")) => {
+        Some(tab) if tab.starts_with("shop") => {
             online.connect();
             shop.open(&mut online);
             shop.dev_tab(tab);

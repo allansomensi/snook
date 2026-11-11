@@ -44,6 +44,8 @@ pub struct Hud {
     zoom_drag: bool,
     /// The reaction picker is open.
     reactions_open: bool,
+    /// Offline: the game history panel is open (it starts folded).
+    history_open: bool,
     /// Set by the caller: the camera is already in its default place.
     pub camera_default: bool,
 }
@@ -86,6 +88,7 @@ impl Default for Hud {
             // Development aid: SNOOK_OPEN_REACTIONS opens the picker.
             reactions_open: crate::dev::flag("SNOOK_OPEN_REACTIONS"),
             camera_default: true,
+            history_open: false,
         }
     }
 }
@@ -226,14 +229,14 @@ fn status_line(m: &Match) -> Option<String> {
                     tw("{name} is aiming…", &[("name", name)])
                 });
             }
-            if *placing_cue_ball {
+            if *placing_cue_ball || m.game.ball_in_hand().is_some() {
                 let zone = if m.game.ball_in_hand() == Some(BallInHand::Kitchen) {
                     t(" behind the line")
                 } else {
                     ""
                 };
                 return Some(tw(
-                    "Ball in hand: drag the cue ball{zone} · release to aim",
+                    "Ball in hand: drag the cue ball{zone} to move it",
                     &[("zone", &zone)],
                 ));
             }
@@ -861,11 +864,11 @@ impl Hud {
     /// one to write to).
     fn draw_history(&mut self, ui: &mut Ui, m: &mut Match) {
         let sh = crate::ui::vh();
-        if !self.chat_open {
+        if !self.history_open {
             let label = t("History");
             let w = ui.text_size(label, 13.0, true).x + 30.0;
             if ui.button(Rect::new(12.0, sh - BOTTOM_BAR - 40.0, w, 32.0), label, true) {
-                self.chat_open = true;
+                self.history_open = true;
             }
             return;
         }
@@ -873,7 +876,7 @@ impl Hud {
         ui.panel(r);
         ui.text(t("Game history"), r.x + 10.0, r.y + 7.0, 14.0, GOLD, true);
         if ui.button(Rect::new(r.x + r.w - 30.0, r.y + 5.0, 24.0, 20.0), "–", true) {
-            self.chat_open = false;
+            self.history_open = false;
         }
         let lines: Vec<FeedLine> = m
             .log

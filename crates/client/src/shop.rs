@@ -111,7 +111,8 @@ fn preview(item: &Item, r: Rect) {
         }
         Look::Balls { colors, eight, ivory } => {
             // Two rows: the solids and two stripes, and the 8.
-            let rad = (r.w / 11.0).min(r.h / 5.0);
+            // Seven balls in a row must fit: 7 × 2.3 radii wide.
+            let rad = (r.w / 17.0).min(r.h / 5.5);
             for (k, col) in colors.iter().enumerate() {
                 let x = r.x + r.w / 2.0 + (k as f32 - 3.0) * rad * 2.3;
                 draw_circle(x, c.y - rad * 1.2, rad, rgb(*col));
@@ -151,6 +152,9 @@ impl ShopScreen {
         self.tab = match name {
             "shop-coins" => Tab::Coins,
             "shop-vip" => Tab::Vip,
+            "shop-balls" => Tab::Items(Category::Balls),
+            "shop-cues" => Tab::Items(Category::Cue),
+            "shop-chalk" => Tab::Items(Category::Chalk),
             _ => Tab::Items(Category::Cloth),
         };
     }
@@ -245,7 +249,7 @@ impl ShopScreen {
         let in_use = online.effective(&wallet, category);
         let cols = ((area.w + 12.0) / 222.0).floor().max(1.0) as usize;
         let cw = (area.w - (cols - 1) as f32 * 12.0) / cols as f32;
-        let ch = 196.0f32.min(area.h);
+        let ch = 196.0;
         let rows_fit = ((area.h + 12.0) / (ch + 12.0)).floor().max(1.0) as usize;
         let total_rows = items.len().div_ceil(cols);
         self.first = ui.scroll_list(area, self.first, total_rows, rows_fit);

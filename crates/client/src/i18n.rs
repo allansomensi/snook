@@ -931,8 +931,8 @@ fn portuguese(en: &str) -> Option<&'static str> {
         }
         "The server address has no host name." => "O endereço do servidor não tem nome de host.",
         "Welcome to Snook! Be kind, play fair." => "Bem-vindo ao Snook! Seja gentil, jogue limpo.",
-        "Ball in hand: drag the cue ball{zone} · release to aim" => {
-            "Bola na mão: arraste a branca{zone} · solte para mirar"
+        "Ball in hand: drag the cue ball{zone} to move it" => {
+            "Bola na mão: arraste a branca{zone} para movê-la"
         }
         " behind the line" => " atrás da linha",
         "Ball in hand  ·  {group}" => "Bola na mão  ·  {group}",

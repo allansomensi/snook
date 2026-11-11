@@ -510,7 +510,6 @@ impl Match {
     }
 
     fn begin_turn(&mut self) {
-        let placing = self.game.ball_in_hand().is_some();
         let computer = match self.current_controller() {
             Controller::Computer(level) => {
                 let result = Arc::new(Mutex::new(None));
@@ -554,12 +553,12 @@ impl Match {
         if let Some((total, left)) = &mut self.clock {
             *left = *total;
         }
-        let computer_or_remote =
-            computer.is_some() || self.current_controller() == Controller::Remote;
         self.aim = Aim { yaw: self.game.default_aim(), ..Aim::default() };
         // A pocket called for the 8 in an earlier visit still stands.
         self.called_pocket = self.game.called_pocket_of(self.game.current_player());
-        self.phase = Phase::Turn { placing_cue_ball: placing && !computer_or_remote, computer };
+        // Ball in hand never locks the turn: the cue ball can be dragged at
+        // any time, and the power bar and aiming work straight away.
+        self.phase = Phase::Turn { placing_cue_ball: false, computer };
     }
 
     pub fn shot_from_aim(&self) -> Shot {
