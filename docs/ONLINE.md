@@ -2,38 +2,73 @@
 
 ## Pieces
 
-- **`snook_proto`**: every message between the game and the server, as JSON
-  objects with a `type` field, one per WebSocket text frame.
-- **`snook_server`**: one process holds the lounge in memory (who's online, chat
-  history, invitations, running matches) and stores accounts, ratings and match
-  history in SQLite.
-- **The game** (`crates/client/src/net.rs`) keeps one WebSocket open on a
-  background thread, pings every 20 s and reconnects by itself after a drop.
+- **`snook_proto`**: every message between the game and the server (JSON
+  objects with a `type` field, one per WebSocket text frame), plus what both
+  sides must agree on: name rules, countries, rating tiers, achievements.
+- **`snook_server`**: the lounge, open tables, match rooms and tournaments
+  live in memory behind one mutex (short, synchronous methods); everything
+  slow runs outside it: the database (PostgreSQL, or memory for LAN games and
+  tests) and shot simulation (a blocking task per shot).
+- **The game** (`crates/client/src/net.rs`) keeps one WebSocket on a
+  background thread (4 ms read slices, `TCP_NODELAY`), pings every 15 s and
+  reconnects by itself. With a saved session it signs in as soon as the game
+  starts, so the menu shows the player and the lounge opens instantly.
 
 ## A session
 
-1. `hello { version }` — the server refuses outdated games.
-2. `register`, `login` or `resume { token }` → `auth_ok { player, token }`. The
-   game saves the token so the next start signs in automatically.
-3. The server sends `welcome`, `lounge` (players online) and `chat_history`, then
-   keeps the lounge up to date with `player_updated` / `player_left` / `chat`.
-4. `invite { to, rated }` → the other player gets `invited`; `answer_invite`
-   starts the match with `match_started` for both.
+1. `hello { version }`: older games are told to update.
+2. `register { username, password, country }`, `login`, `resume { token }`
+   or, on a LAN server, `guest { name }` → `auth_ok { player, token }`.
+   `leaderboard` and `profile` also work before signing in.
+3. The server sends `welcome`, `lounge`, `chat_history`, `tables` and
+   `tournaments`, then keeps them current (`player_updated`, `chat`,
+   `table_opened`, `tournament_updated`…).
+4. Games start from an invitation (`invite` → `answer_invite`), by sitting at
+   an open table (`open_table { rated, password }` → `join_table`), or by a
+   tournament pairing, all ending in `match_started`.
 
-## A match
+## A shot, without waiting for the network
 
-- The player at the table streams `aim` (≈10 per second) and `place_cue_ball` so
-  the opponent sees the cue move.
-- `shoot { shot, called_pocket, cue_ball }` sends only the stroke. The server
-  checks it, simulates it with `snook_core` and sends both players
-  `shot_played { start, end, report }`. Clients animate from `start` and then
-  adopt `end`, so both tables are always identical to the server's.
-- The shot clock runs on the server (`time_foul` gives ball in hand).
-- `resign`, an abandoned game or the last ball ends the match with
-  `match_ended { result }`, including rating changes. Then `rematch` (both
-  players) or `leave_match`.
-- If a player drops, the opponent gets `opponent_connection`; reconnecting
-  within the grace period resumes the match with a fresh `match_started`.
+```
+shooter                     server                         opponent
+  │ shoot{turn, stroke}        │                               │
+  │──────────────────────────▶ │ validate (turn, cue ball…)    │
+  │ (animates at once:         │── shot_taken ────────────────▶│ animates at once
+  │  local prediction)         │ simulate (blocking task)      │
+  │◀──────── shot_result{end} ─│── shot_result{end} ──────────▶│
+  │ adopts `end` when the      │                               │ adopts `end`
+  │ balls stop                 │                               │
+```
 
-Rated games use Elo (`snook_core::rating`). See `docs/DEPLOY.md` for limits and
-how to run the server.
+- The physics is deterministic, so the prediction normally matches the
+  server exactly (the end-to-end tests check it); the server's table is
+  adopted at the end either way.
+- A refused shot (`shot_rejected { turn, reason, game }`) rolls the table
+  back. A `shot_taken` that isn't the predicted one (the clock ran out at the
+  same moment) replaces the prediction.
+- `match_ended` that arrives while a shot is still on screen is applied when
+  the balls stop (the deciding shot is always shown, and a win on the 8-ball
+  is never mistaken for a resignation).
+- While aiming, `aim` is streamed ~20 times a second (relayed at most every
+  33 ms); the opponent's cue glides towards the latest aim.
+
+## Matches
+
+- The shot clock runs on the server (and keeps running if the shooter
+  disconnects); when it runs out the server plays a full-power shot where the
+  player was aiming.
+- `resign`, a disconnection longer than the grace period or the last ball end
+  the match with `match_ended { result }`, ratings included. Then `rematch`
+  (both players; not in tournaments) or `leave_match`.
+- Reconnecting within the grace period resumes the match with a fresh
+  `match_started`.
+
+## Tournaments
+
+Single elimination for 4, 8 or 16 players, seeded by rating with byes for empty
+seats. It starts when full (or when the host starts it). Matches start by
+themselves when both players are free; a player who is offline for two
+minutes when their match is ready loses it. Players still in a running
+tournament can't start other games.
+
+Rated games use Elo (`snook_core::rating`). See `docs/DEPLOY.md` for limits.

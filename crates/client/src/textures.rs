@@ -175,11 +175,15 @@ fn image(size: u16, f: impl Fn(f32, f32) -> [u8; 3]) -> Pixels {
     Pixels { width: size, height: size, rgba }
 }
 
-/// Billiard cloth: almost uniform, with very gentle large-scale variation.
+/// Billiard cloth: a deep tournament green, almost uniform, with very gentle
+/// large-scale variation and a fine nap that shows up close.
 pub fn felt() -> Pixels {
-    image(256, |u, v| {
+    image(512, |u, v| {
         let n = fbm(u * 4.0, v * 4.0, 4, 3, 3);
-        lerp3([0.16, 0.42, 0.10], [0.18, 0.46, 0.11], n)
+        let nap = fbm(u * 96.0, v * 96.0, 96, 7, 2) - 0.5;
+        let c = lerp3([0.085, 0.36, 0.17], [0.10, 0.40, 0.19], n);
+        let k = 1.0 + nap * 0.07;
+        c.map(|x| (x as f32 * k).round().clamp(0.0, 255.0) as u8)
     })
 }
 
@@ -264,10 +268,10 @@ mod tests {
     #[test]
     fn textures_have_expected_size_and_tile() {
         let f = felt();
-        assert_eq!(f.rgba.len(), 256 * 256 * 4);
+        assert_eq!(f.rgba.len(), 512 * 512 * 4);
         // Tileable noise: first and last columns are close.
-        let px = |x: usize, y: usize| f.rgba[(y * 256 + x) * 4 + 1] as i32;
-        assert!((px(0, 10) - px(255, 10)).abs() <= 3);
+        let px = |x: usize, y: usize| f.rgba[(y * 512 + x) * 4 + 1] as i32;
+        assert!((px(0, 10) - px(511, 10)).abs() <= 6);
         let s = shadow();
         assert_eq!(s.rgba[3], 0, "corner is transparent");
         assert!(s.rgba[(32 * 64 + 32) * 4 + 3] > 200, "centre is dark");

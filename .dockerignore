@@ -1,0 +1,7 @@
+target
+.git
+.github
+docs
+tools
+**/*.png
+!crates/client/assets/*.png

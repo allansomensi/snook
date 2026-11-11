@@ -1,0 +1,27 @@
+# Render Blueprint for the Snook server (free plan). See docs/DEPLOY.pt-BR.md.
+services:
+  - type: web
+    name: snook-server
+    runtime: docker
+    plan: free
+    # Closest Render region to South America.
+    region: virginia
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      # Neon connection string (the direct one, not "-pooler"). Set it in the dashboard.
+      - key: DATABASE_URL
+        sync: false
+      # Your username: you become an administrator the next time you sign in.
+      - key: SNOOK_ADMINS
+        sync: false
+      # Render sits behind Cloudflare: take the player's real address from these.
+      - key: SNOOK_CLIENT_IP_HEADER
+        value: cf-connecting-ip,true-client-ip,x-forwarded-for
+      - key: SNOOK_DB_POOL
+        value: "5"
+      - key: SNOOK_SHOT_CLOCK
+        value: "30"
+      - key: RUST_LOG
+        value: info

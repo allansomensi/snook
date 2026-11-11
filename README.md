@@ -4,15 +4,16 @@ A lightweight 3D eight-ball pool game for the desktop, written in Rust.
 
 Snook is built around what made the old online pool rooms special: a realistic
 cue (spin, draw, follow, jump and massé shots), a lounge where you meet people and
-chat, invitations to play, and a global ranking that keeps everyone coming back.
+chat, invitations, open tables and tournaments, friends, achievements, and a
+world ranking that keeps everyone coming back.
 
-| Top view | 3D view |
+| Menu | 3D view |
 |---|---|
-| ![Top view](docs/screenshots/top-view.png) | ![3D view](docs/screenshots/3d-view.png) |
+| ![Menu](docs/screenshots/menu.png) | ![3D view](docs/screenshots/3d-view.png) |
 
-| Lounge | After an online game |
+| Lounge | Profile |
 |---|---|
-| ![Lounge](docs/screenshots/lounge.png) | ![Result](docs/screenshots/online-result.png) |
+| ![Lounge](docs/screenshots/lounge.png) | ![Profile](docs/screenshots/profile.png) |
 
 ## Features
 
@@ -26,10 +27,22 @@ chat, invitations to play, and a global ranking that keeps everyone coming back.
 - **Computer opponent** with three levels. It plays with the same physics and rules:
   it simulates candidate shots and scores the outcome. Harder levels plan cue-ball
   position, play safeties and aim more accurately.
-- **Online lounge**: accounts (username + password), players online, lounge chat,
-  invitations to **rated** or **casual** games, chat with the opponent during a match,
-  rematches, a shot clock, reconnection after a dropped connection, and the
-  **global leaderboard**.
+- **Online lounge**: accounts with a country flag, players online with names
+  coloured by rating tier, lounge chat, invitations to **rated** or **casual**
+  games, **open tables** (public or **private with a password**),
+  **tournaments** (4, 8 or 16 players, public or private, with a live
+  bracket), **friends**, blocking and reporting, chat with the opponent
+  (with the game's events in the same chat), rematches, a shot clock and
+  reconnection after a dropped connection.
+- **Instant shots online**: your shot plays the moment you take it (local
+  prediction of the deterministic physics), the opponent's as soon as the
+  server announces it; the server's result is authoritative.
+- **Profiles and progress**: rating and tier, world rank, numbers, match
+  history with rating changes, **34 achievements**, and the **world top 100**.
+- **Local network**: host a game from the game itself (no server needed);
+  others find it automatically or join by address.
+- **Replay** of the last shot, a discreet **zoom bar**, and a staff **admin
+  panel** on the server.
 - **Elo rating** (chess-style) with a higher K-factor for new players. Rated games
   show only a short aiming line; the full ghost-ball guide is for practice and
   casual games.
@@ -57,7 +70,8 @@ The interface is available in English and Brazilian Portuguese (Settings → Gam
 | Cue elevation | elevation slider | W / S |
 | Ball in hand | drag the cue ball | B toggles, Enter confirms |
 | Call the 8-ball pocket | click a pocket on the table or on the little map (mandatory: the 8 in any other pocket loses) | |
-| Camera | right-drag to orbit, wheel to zoom | Tab top view, C reset |
+| Camera | drag outside the table (or right-drag) to turn it, wheel or the zoom bar to zoom; the target icon goes back to the top view | Tab 3D/top, C top view |
+| Replay of the last shot | the replay icon (top left) | R |
 | Menu / controls help | **Menu** button | Esc / H |
 | Full screen | | F11 |
 
@@ -80,10 +94,17 @@ Run the game:
 cargo run --release -p snook
 ```
 
-Run a local server and play online against yourself (start the game twice):
+Run a local server (in memory) and play online against yourself (start the
+game twice, with different `HOME` folders so the sessions don't collide):
 
 ```bash
-cargo run --release -p snook_server
+SNOOK_IN_MEMORY=1 cargo run --release -p snook_server
+```
+
+With PostgreSQL instead (what production uses):
+
+```bash
+DATABASE_URL=postgres://user:pass@localhost/snook cargo run --release -p snook_server
 ```
 
 The game connects to `ws://localhost:7878/ws` by default. To build a release that
@@ -94,7 +115,11 @@ change it in Settings):
 SNOOK_SERVER=wss://snook.example.com/ws cargo build --release -p snook
 ```
 
-Putting the server on the internet is described in [docs/DEPLOY.md](docs/DEPLOY.md).
+Putting the server on the internet is described in [docs/DEPLOY.md](docs/DEPLOY.md)
+(step by step for Render + Neon, in Portuguese: [docs/DEPLOY.pt-BR.md](docs/DEPLOY.pt-BR.md)).
+The staff panel is described in [docs/ADMIN.md](docs/ADMIN.md), the protocol in
+[docs/ONLINE.md](docs/ONLINE.md), and the reviews behind this release in
+[docs/SECURITY.md](docs/SECURITY.md) and [docs/UX.md](docs/UX.md).
 
 Useful flags (for development):
 
@@ -107,7 +132,8 @@ cargo run --release -p snook -- --demo --fps     # print frames per second
 cargo run --release -p snook -- --online         # open the lounge directly
 ```
 
-Run the tests:
+Run the tests (the PostgreSQL store test runs when
+`SNOOK_TEST_DATABASE_URL` points at an empty database):
 
 ```bash
 cargo test --workspace --release
@@ -119,13 +145,17 @@ cargo test --workspace --release
 crates/
   core/     snook_core: physics, table geometry, 8-ball rules, AI, Elo rating
             (no engine dependencies; shared by the client and the server)
-  proto/    snook_proto: the client/server messages (JSON over WebSocket)
-  server/   snook_server: accounts, lounge, chat, invitations, authoritative
-            matches, ratings and leaderboard (Axum + SQLite)
+  proto/    snook_proto: the client/server messages (JSON over WebSocket),
+            countries, rating tiers and the achievement catalogue
+  server/   snook_server: accounts, lounge, tables, tournaments, friends,
+            authoritative matches, ratings, achievements, the staff panel
+            (Axum; PostgreSQL, or in memory for LAN games and tests)
   client/   snook: the desktop client built on macroquad (3D scene with a
-            custom lighting shader, input, HUD, sound, online screens)
+            custom lighting shader, input, HUD, sound, online and LAN screens)
 vendor/
   miniquad/ miniquad with two platform fixes (see vendor/README.md)
+tools/      gen_countries.py: regenerates the country list and flag atlas
+Dockerfile, render.yaml: the server image and the Render blueprint
 ```
 
 Online games are **authoritative**: the client only sends the stroke (aim, power,
@@ -139,7 +169,9 @@ client.
 2. ~~3D client with offline modes~~
 3. ~~Game server: accounts, lounge with chat, invitations, authoritative matches~~
 4. ~~Rated games and the global leaderboard~~
-5. Installers for Windows, macOS and Linux; friends list; private rooms
+5. ~~Friends, private tables, tournaments, achievements, profiles, LAN, staff panel~~
+6. Signed installers and store releases (Microsoft Store, Steam, itch.io)
+7. Spectating games and replays of whole matches
 
 ## License
 
@@ -148,3 +180,8 @@ client.
 ## Credits
 
 Fonts: DejaVu Sans (Bitstream Vera license, see https://dejavu-fonts.github.io/License.html).
+
+Flags: [flag-icons](https://github.com/lipis/flag-icons) (MIT, see
+`crates/client/assets/flag-icons-LICENSE.txt`). Country names: ISO 3166 data
+and translations from the Debian [iso-codes](https://salsa.debian.org/iso-codes-team/iso-codes)
+project (via pycountry, LGPL-2.1).

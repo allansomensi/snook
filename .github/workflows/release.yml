@@ -1,0 +1,72 @@
+# Push a tag like `v0.1.0` to publish the game for Windows, macOS and Linux on
+# GitHub Releases and the server image on GitHub Container Registry.
+# Set the repository variable SNOOK_SERVER (Settings → Secrets and variables →
+# Actions → Variables) to your server, e.g. wss://snook-server.onrender.com/ws.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+  packages: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  game:
+    name: Game (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: windows-latest, name: windows-x64, exe: snook.exe }
+          - { os: macos-latest, name: macos-arm64, exe: snook }
+          - { os: ubuntu-22.04, name: linux-x64, exe: snook }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libasound2-dev libx11-dev libxi-dev libgl1-mesa-dev
+      - name: Build
+        env:
+          SNOOK_SERVER: ${{ vars.SNOOK_SERVER }}
+        run: cargo build --release --locked -p snook
+      - name: Package
+        shell: bash
+        run: |
+          dir="snook-${GITHUB_REF_NAME}-${{ matrix.name }}"
+          mkdir "$dir"
+          cp "target/release/${{ matrix.exe }}" README.md LICENSE "$dir/"
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            7z a "$dir.zip" "$dir" > /dev/null
+          else
+            tar czf "$dir.tar.gz" "$dir"
+          fi
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: snook-*.*
+          generate_release_notes: true
+
+  server:
+    name: Server image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/snook-server:${{ github.ref_name }}
+            ghcr.io/${{ github.repository_owner }}/snook-server:latest

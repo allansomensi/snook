@@ -53,3 +53,5 @@ pre { white-space: pre-wrap; background: #0c0806; border: 1px solid var(--line);
 .report { margin-bottom: 12px; }
 .report .head { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
 @media (max-width: 640px) { header { gap: 8px; } main { padding: 10px; } }
+a { color: var(--blue); }
+.row select { max-width: 220px; }

@@ -206,7 +206,7 @@ void main() {
     vec3 c = amb * base.rgb * bt.w;
     // A pool of light on the table that fades towards the rails and beyond.
     float spot = length(v_world.xz / vec2(1.25, 0.72));
-    float pool = mix(1.0, mix(1.0, 0.5, smoothstep(0.35, 1.3, spot)), Stage.x);
+    float pool = mix(1.0, mix(1.0, 0.42, smoothstep(0.3, 1.35, spot)), Stage.x);
     c += lamp(Lamp1, n, v, base.rgb, bt.y);
     if (Ambient.w > 1.5) {
         c += lamp(Lamp0, n, v, base.rgb, bt.x);
