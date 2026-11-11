@@ -358,12 +358,19 @@ pub struct Profile {
     pub achievements: Vec<(String, i64)>,
     pub history: Vec<HistoryEntry>,
     pub relation: Relation,
+    /// When they were last online: only for friends (0 otherwise).
+    #[serde(default)]
+    pub last_seen: i64,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct FriendInfo {
     pub player: PlayerInfo,
     pub online: bool,
+    /// When they were last online (Unix seconds; 0: unknown). Only friends
+    /// get this.
+    #[serde(default)]
+    pub last_seen: i64,
 }
 
 /// What a player may report another for.

@@ -134,6 +134,20 @@ impl CameraRig {
     }
 
     /// Back to the default: the whole table seen from above.
+    /// Already where [`CameraRig::reset`] would put it (nothing to reset).
+    pub fn is_default(&self) -> bool {
+        let (pitch, distance) = if self.follow_cue {
+            (DEFAULT_PITCH, DEFAULT_DISTANCE)
+        } else {
+            (FIXED_PITCH, FIXED_DISTANCE)
+        };
+        self.mode == CameraMode::Top
+            && self.orbit.abs() < 1e-3
+            && self.focus.length() < 1e-3
+            && (self.pitch - pitch).abs() < 1e-3
+            && (self.distance - distance).abs() < 1e-3
+    }
+
     pub fn reset(&mut self) {
         self.mode = CameraMode::Top;
         self.orbit = 0.0;

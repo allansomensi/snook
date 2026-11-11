@@ -60,7 +60,9 @@ impl Controls {
     /// True while the player is aiming with the mouse (dragging the cue or
     /// the aim point, or moving the cue ball): the HUD gets out of the way.
     pub fn aiming(&self) -> bool {
-        self.mode != DragMode::None && is_mouse_button_down(MouseButton::Left) && self.drag > 3.0
+        (self.mode != DragMode::None && is_mouse_button_down(MouseButton::Left) && self.drag > 3.0)
+            // Turning the view with the right button: the table, nothing else.
+            || (self.orbiting && self.orbit_drag > 4.0)
     }
 
     fn set_over_cue(&mut self, over: bool) {

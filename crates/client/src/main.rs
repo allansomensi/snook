@@ -357,6 +357,7 @@ async fn main() {
             rig.reset();
         }
         hud.top_view = rig.mode == CameraMode::Top;
+        hud.camera_default = rig.is_default();
         hud.aim_sensitivity = config.aim_sensitivity;
         hud.zoom = rig.zoom_level();
         controls.sensitivity = config.aim_sensitivity;
@@ -426,9 +427,6 @@ async fn main() {
             if config.language != before.language {
                 i18n::set_lang(config.language);
             }
-            if config.show_help != before.show_help {
-                hud.show_help = config.show_help;
-            }
             if config.server != before.server && !online.signed_in() {
                 online = Online::new(&config);
             }
@@ -472,10 +470,6 @@ async fn main() {
                         HudAction::ResetCamera => rig.reset(),
                         HudAction::Zoom(z) => rig.set_zoom_level(z),
                         HudAction::None => {
-                            if hud.show_help != config.show_help {
-                                config.show_help = hud.show_help;
-                                config.save();
-                            }
                             if m.is_online() {
                                 let net = if match_from_lan {
                                     lan.as_mut().map(|l| &mut l.net)

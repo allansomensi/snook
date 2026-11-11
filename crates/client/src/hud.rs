@@ -11,7 +11,7 @@ use snook_core::{BallId, BallInHand, Group};
 use crate::game::{Controller, Match, Phase};
 use crate::icons::Icon;
 use crate::textures::ball_color;
-use crate::ui::{ALERT, BORDER, CREAM, GOLD, MUTED, Ui};
+use crate::ui::{ALERT, BORDER, CREAM, FeedKind, FeedLine, GOLD, MUTED, Ui};
 
 pub struct Hud {
     /// The pause menu is open (online, the game keeps running behind it).
@@ -44,6 +44,8 @@ pub struct Hud {
     zoom_drag: bool,
     /// The reaction picker is open.
     reactions_open: bool,
+    /// Set by the caller: the camera is already in its default place.
+    pub camera_default: bool,
 }
 
 /// What the player asked for through the HUD.
@@ -63,7 +65,7 @@ impl Default for Hud {
     fn default() -> Self {
         Hud {
             paused: false,
-            show_help: true,
+            show_help: false,
             chat_input: String::new(),
             // Development aid: SNOOK_CHAT_CLOSED starts with the chat folded.
             chat_open: !crate::dev::flag("SNOOK_CHAT_CLOSED"),
@@ -83,13 +85,15 @@ impl Default for Hud {
             zoom_drag: false,
             // Development aid: SNOOK_OPEN_REACTIONS opens the picker.
             reactions_open: crate::dev::flag("SNOOK_OPEN_REACTIONS"),
+            camera_default: true,
         }
     }
 }
 
 impl Hud {
-    pub fn new(show_help: bool) -> Self {
-        Hud { show_help, ..Hud::default() }
+    /// The controls are only listed from the menu: never on the table.
+    pub fn new(_show_help: bool) -> Self {
+        Hud::default()
     }
 }
 
@@ -277,7 +281,12 @@ impl Hud {
                 self.confirm_leave = false;
             }
             if is_key_pressed(KeyCode::H) || is_key_pressed(KeyCode::F1) {
-                self.show_help = !self.show_help;
+                // The list of controls, in the menu.
+                self.show_help = !(self.paused && self.show_help);
+                self.paused = self.show_help;
+            }
+            if !self.paused {
+                self.show_help = false;
             }
         }
 
@@ -368,7 +377,7 @@ impl Hud {
                 Rect::new(x, 12.0, 30.0, 30.0),
                 Icon::CameraReset,
                 t("Reset the camera: top view, no zoom (C)"),
-                true,
+                !self.camera_default,
             ) {
                 action = HudAction::ResetCamera;
             }
@@ -405,7 +414,8 @@ impl Hud {
             draw_circle(r.x + 14.0, r.y + 13.0, 4.5, Color::new(0.95, 0.3, 0.25, pulse));
             ui.text(label, r.x + 26.0, r.y + 6.0, 14.0, CREAM, true);
         }
-        if self.show_help && !self.paused {
+        if self.show_help && self.paused {
+            draw_rectangle(0.0, 0.0, sw, sh, Color::new(0.0, 0.0, 0.0, 0.45));
             let lines = [
                 (t("Aim"), t("Drag the cue · click a spot")),
                 (t("Fine aim"), t("Shift + drag · A / D")),
@@ -418,27 +428,34 @@ impl Hud {
                 (t("Ball in hand"), t("Drag the cue ball")),
                 (t("Menu / help"), t("Esc · H")),
             ];
-            let h = 34.0 + lines.len() as f32 * 19.0;
-            let bottom = sh
-                - BOTTOM_BAR
-                - 8.0
-                - if m.is_online() && self.chat_open { CHAT_H + 8.0 } else { 0.0 };
+            let h = 34.0 + lines.len() as f32 * 21.0 + 52.0;
             let label_w =
                 lines.iter().map(|(a, _)| ui.text_size(a, 13.0, true).x).fold(0.0, f32::max);
             let value_w =
                 lines.iter().map(|(_, b)| ui.text_size(b, 13.0, false).x).fold(0.0, f32::max);
-            let r = Rect::new(12.0, bottom - h, label_w + value_w + 40.0, h);
+            let w = (label_w + value_w + 50.0).min(sw - 20.0);
+            let r = Rect::new((sw - w) / 2.0, (sh - h) / 2.0, w, h);
             ui.panel(r);
-            ui.text(t("Controls"), r.x + 12.0, r.y + 8.0, 14.0, GOLD, true);
+            ui.text(t("Controls"), r.x + 14.0, r.y + 10.0, 16.0, GOLD, true);
             for (k, (a, b)) in lines.iter().enumerate() {
-                let yy = r.y + 30.0 + k as f32 * 19.0;
-                ui.text(a, r.x + 12.0, yy, 13.0, CREAM, true);
-                ui.text(b, r.x + label_w + 26.0, yy, 13.0, MUTED, false);
+                let yy = r.y + 38.0 + k as f32 * 21.0;
+                ui.text(a, r.x + 14.0, yy, 13.0, CREAM, true);
+                let room = r.w - label_w - 40.0;
+                ui.text(&ui.ellipsize(b, room, 13.0), r.x + label_w + 28.0, yy, 13.0, MUTED, false);
+            }
+            if ui.button(
+                Rect::new(r.x + r.w / 2.0 - 70.0, r.y + r.h - 44.0, 140.0, 32.0),
+                t("Back"),
+                true,
+            ) {
+                self.show_help = false;
             }
         }
 
         if m.is_online() && !m.is_spectating() {
             self.draw_chat(ui, m);
+        } else if !m.is_online() {
+            self.draw_history(ui, m);
         }
 
         // Game over.
@@ -594,7 +611,7 @@ impl Hud {
         }
 
         // Pause menu (online the match keeps running behind it).
-        if self.paused {
+        if self.paused && !self.show_help {
             let online = m.is_online();
             draw_rectangle(0.0, 0.0, sw, sh, Color::new(0.0, 0.0, 0.0, 0.45));
             let r = Rect::new(sw / 2.0 - 160.0, sh / 2.0 - 172.0, 320.0, 344.0);
@@ -626,10 +643,8 @@ impl Hud {
             if ui.button(Rect::new(bx, r.y + 116.0, bw, 34.0), t("Settings"), true) {
                 action = HudAction::Settings;
             }
-            let help = if self.show_help { t("Hide controls") } else { t("Controls") };
-            if ui.button(Rect::new(bx, r.y + 160.0, bw, 34.0), help, true) {
-                self.show_help = !self.show_help;
-                self.paused = false;
+            if ui.button(Rect::new(bx, r.y + 160.0, bw, 34.0), t("Controls"), true) {
+                self.show_help = true;
             }
             let my_turn = m.current_controller() == Controller::Human;
             let can_resign = m.game.game_over().is_none() && (online || my_turn);
@@ -671,8 +686,15 @@ impl Hud {
     }
 }
 
-const CHAT_W: f32 = 320.0;
-const CHAT_H: f32 = 210.0;
+/// The chat (online) or the game history (offline): smaller on small
+/// windows, so it never hides much of the table.
+fn chat_w() -> f32 {
+    (crate::ui::vw() * 0.3).clamp(220.0, 320.0)
+}
+
+fn chat_h() -> f32 {
+    ((crate::ui::vh() - TOP_BAR - BOTTOM_BAR) * 0.38).clamp(120.0, 210.0)
+}
 
 impl Hud {
     /// A slim vertical zoom control on the right edge: almost invisible
@@ -802,7 +824,7 @@ impl Hud {
         }
         o.unread = 0;
         o.preview = None;
-        let r = Rect::new(12.0, sh - BOTTOM_BAR - CHAT_H - 8.0, CHAT_W, CHAT_H);
+        let r = Rect::new(12.0, sh - BOTTOM_BAR - chat_h() - 8.0, chat_w(), chat_h());
         ui.panel(r);
         ui.text(t("Chat"), r.x + 10.0, r.y + 7.0, 14.0, GOLD, true);
         if ui.button(Rect::new(r.x + r.w - 30.0, r.y + 5.0, 24.0, 20.0), "–", true) {
@@ -831,6 +853,41 @@ impl Hud {
             ui.focus = None;
         }
         self.reaction_button(ui, m, Rect::new(r.x + r.w + 6.0, r.y + r.h - 34.0, 32.0, 32.0));
+    }
+
+    /// Offline, what happened in the game so far, in the chat's place (no
+    /// one to write to).
+    fn draw_history(&mut self, ui: &mut Ui, m: &mut Match) {
+        let sh = crate::ui::vh();
+        if !self.chat_open {
+            let label = t("History");
+            let w = ui.text_size(label, 13.0, true).x + 30.0;
+            if ui.button(Rect::new(12.0, sh - BOTTOM_BAR - 40.0, w, 32.0), label, true) {
+                self.chat_open = true;
+            }
+            return;
+        }
+        let r = Rect::new(12.0, sh - BOTTOM_BAR - chat_h() - 8.0, chat_w(), chat_h());
+        ui.panel(r);
+        ui.text(t("Game history"), r.x + 10.0, r.y + 7.0, 14.0, GOLD, true);
+        if ui.button(Rect::new(r.x + r.w - 30.0, r.y + 5.0, 24.0, 20.0), "–", true) {
+            self.chat_open = false;
+        }
+        let lines: Vec<FeedLine> = m
+            .log
+            .iter()
+            .map(|(text, important)| FeedLine {
+                from: None,
+                text: text.clone(),
+                kind: if *important { FeedKind::Alert } else { FeedKind::Event },
+            })
+            .collect();
+        let log = Rect::new(r.x + 6.0, r.y + 28.0, r.w - 12.0, r.h - 34.0);
+        if lines.is_empty() {
+            ui.text(t("Nothing yet."), log.x + 6.0, log.y + 6.0, 13.0, MUTED, false);
+        } else {
+            self.chat_scroll = ui.chat_log(log, &lines, None, self.chat_scroll);
+        }
     }
 
     /// The reactions button and, when open, the picker above it.
@@ -1130,10 +1187,11 @@ impl Hud {
         let gap = 8.0;
         let bh = bar.h - 18.0;
         let shoot = Rect::new(sw - 10.0 - bh * 1.15, bar.y + 9.0, bh * 1.15, bh);
-        let bw = 84.0;
-        let pops = [Pop::Elevation, Pop::Spin, Pop::FineAim];
+        // Narrow windows shrink the buttons before anything overlaps.
+        let bw = (sw * 0.075).clamp(62.0, 84.0);
+        let pops = [Pop::Elevation, Pop::Spin];
         let bx0 = 10.0;
-        let mut anchors = [0.0f32; 3];
+        let mut anchors = [0.0f32; 2];
         for (k, pop) in pops.into_iter().enumerate() {
             let r = Rect::new(bx0 + k as f32 * (bw + gap), bar.y + 9.0, bw, bh);
             anchors[k] = r.x + r.w / 2.0;
@@ -1143,18 +1201,16 @@ impl Hud {
             }
             draw_pop_icon(ui, m, pop, r);
         }
-        let left_end = bx0 + pops.len() as f32 * (bw + gap);
+        // Fine aim right on the bar: one click on an arrow, one tiny step.
+        let fw = (sw * 0.17).clamp(150.0, 210.0);
+        let fine = Rect::new(bx0 + pops.len() as f32 * (bw + gap), bar.y + 9.0, fw, bh);
+        self.fine_aim_inline(ui, m, fine, my_turn);
+        let left_end = fine.x + fine.w + gap;
         // The power bar, centred in the space between (room for "100%" on its right).
         let room = (shoot.x - 60.0) - (left_end + 24.0);
         let tw = room.clamp(120.0, 560.0);
         let px0 = left_end + 24.0 + (room - tw) / 2.0;
         let track = Rect::new(px0, bar.y + bar.h / 2.0 - 9.0, tw, 18.0);
-
-        // The recent game messages float just above the bar, on the left
-        // (online they are in the chat, with the players' messages).
-        if !m.is_online() {
-            draw_log(ui, m, Rect::new(14.0, bar.y - 66.0, (sw * 0.4).clamp(260.0, 460.0), 60.0));
-        }
 
         // A new turn starts with the power the player chose last time.
         let key = (m.games_played, m.game.shots_taken());
@@ -1201,12 +1257,10 @@ impl Hud {
             let h = match pop {
                 Pop::Spin => 186.0,
                 Pop::Elevation => 92.0,
-                Pop::FineAim => 96.0,
             };
             let k = match pop {
                 Pop::Elevation => 0,
                 Pop::Spin => 1,
-                Pop::FineAim => 2,
             };
             let x = (anchors[k] - w / 2.0).clamp(10.0, sw - w - 10.0);
             let r = Rect::new(x, bar.y - h - 8.0, w, h);
@@ -1214,7 +1268,6 @@ impl Hud {
             match pop {
                 Pop::Spin => self.spin_panel(ui, m, r),
                 Pop::Elevation => elevation_panel(ui, m, r),
-                Pop::FineAim => self.fine_aim_panel(ui, m, r),
             }
         }
     }
@@ -1264,24 +1317,28 @@ impl Hud {
         ui.text(&format!("{label}{side}"), r.x + 82.0, r.y + r.h - 27.0, 13.0, MUTED, false);
     }
 
-    fn fine_aim_panel(&mut self, ui: &mut Ui, m: &mut Match, r: Rect) {
-        ui.text(t("Fine aim"), r.x + 12.0, r.y + 8.0, 14.0, GOLD, true);
-        let deg = (m.aim.yaw.to_degrees()).rem_euclid(360.0);
-        let deg_text = format!("{deg:.1}°");
-        let dw = ui.text_size(&deg_text, 13.0, false).x;
-        ui.text(&deg_text, r.x + r.w - 12.0 - dw, r.y + 10.0, 13.0, MUTED, false);
-        let y = r.y + 46.0;
-        // One small step per click (holding the button doesn't repeat): the
-        // finest control there is.
+    /// Fine aim, built into the bar: the arrows turn the cue by one tiny
+    /// step per click (holding doesn't repeat); the dial in between can be
+    /// dragged for slightly bigger moves.
+    fn fine_aim_inline(&mut self, ui: &mut Ui, m: &mut Match, r: Rect, enabled: bool) {
+        crate::ui::rrect(r, 8.0, Color::new(0.12, 0.08, 0.05, 1.0));
+        crate::ui::rrect_lines(r, 8.0, 1.2, crate::ui::BORDER);
+        let label = t("Fine aim");
+        let size = ui.fit(12.0, label, r.w - 16.0);
+        ui.text_centered(label, r.x + r.w / 2.0, r.y + r.h - size - 6.0, size, CREAM, true);
+        let row = Rect::new(r.x + 6.0, r.y + 6.0, r.w - 12.0, (r.h - size - 16.0).max(24.0));
+        let aw = row.h.min(34.0);
         let step = 0.05f64.to_radians() * self.aim_sensitivity as f64;
-        if ui.button(Rect::new(r.x + 12.0, y, 32.0, 32.0), "◀", true) {
+        let left = Rect::new(row.x, row.y, aw, row.h);
+        let right = Rect::new(row.x + row.w - aw, row.y, aw, row.h);
+        if ui.button(left, "◀", enabled) {
             m.aim.yaw += step;
         }
-        if ui.button(Rect::new(r.x + r.w - 44.0, y, 32.0, 32.0), "▶", true) {
+        if ui.button(right, "▶", enabled) {
             m.aim.yaw -= step;
         }
-        let dial = Rect::new(r.x + 50.0, y, r.w - 100.0, 32.0);
-        let drag = ui.drag_area(82, dial);
+        let dial = Rect::new(left.x + aw + 4.0, row.y, row.w - 2.0 * aw - 8.0, row.h);
+        let drag = if enabled { ui.drag_area(82, dial) } else { crate::ui::Drag::Idle };
         match drag {
             crate::ui::Drag::Held(p) => {
                 if let Some(last) = self.fine_last {
@@ -1292,24 +1349,37 @@ impl Hud {
             _ => self.fine_last = None,
         }
         crate::ui::rrect(dial, 6.0, Color::new(0.05, 0.035, 0.025, 1.0));
-        let spacing = 10.0;
+        let spacing = 8.0;
         let offset = ((m.aim.yaw * 4000.0) as f32).rem_euclid(spacing);
         let mut tx = dial.x + offset;
+        let a = if enabled { 0.8 } else { 0.3 };
         while tx < dial.x + dial.w {
             let edge = ((tx - dial.x) / dial.w - 0.5).abs() * 2.0;
-            let alpha = 0.8 * (1.0 - edge * edge);
+            let alpha = a * (1.0 - edge * edge);
             draw_line(
                 tx,
-                dial.y + 6.0,
+                dial.y + 5.0,
                 tx,
-                dial.y + dial.h - 6.0,
+                dial.y + dial.h - 5.0,
                 1.5,
                 Color::new(0.9, 0.8, 0.6, alpha),
             );
             tx += spacing;
         }
+        let cx = dial.x + dial.w / 2.0;
+        draw_line(
+            cx,
+            dial.y + 2.0,
+            cx,
+            dial.y + dial.h - 2.0,
+            2.0,
+            Color::new(GOLD.r, GOLD.g, GOLD.b, a),
+        );
         let hot = matches!(drag, crate::ui::Drag::Held(_) | crate::ui::Drag::Hover);
         crate::ui::rrect_lines(dial, 6.0, 1.2, if hot { GOLD } else { crate::ui::BORDER });
+        if hot {
+            ui.tooltip(t("Fine aim: click the arrows, or drag here"), r);
+        }
         m.aim.yaw = m.aim.yaw.rem_euclid(std::f64::consts::TAU);
     }
 }
@@ -1335,7 +1405,6 @@ fn elevation_panel(ui: &mut Ui, m: &mut Match, r: Rect) {
 enum Pop {
     Spin,
     Elevation,
-    FineAim,
 }
 
 /// A small picture on each cue-setting button showing the current value.
@@ -1366,14 +1435,6 @@ fn draw_pop_icon(ui: &mut Ui, m: &Match, pop: Pop, r: Rect) {
             let butt = tip + vec2(-a.cos(), -a.sin()) * 30.0;
             draw_line(tip.x, tip.y, butt.x, butt.y, 2.5, Color::new(0.85, 0.7, 0.45, 1.0));
             t("Elevation")
-        }
-        Pop::FineAim => {
-            for k in -3..=3 {
-                let x = c.x + k as f32 * 6.0;
-                let h = if k == 0 { 12.0 } else { 7.0 };
-                draw_line(x, c.y - h, x, c.y + h, 1.5, if k == 0 { GOLD } else { MUTED });
-            }
-            t("Fine aim")
         }
     };
     let size = ui.fit(12.0, label, r.w - 8.0);
@@ -1440,32 +1501,6 @@ const BOTTOM_BAR: f32 = 78.0;
 const CARD_H: f32 = 44.0;
 
 /// The game log inside the bottom bar: the last few things that happened.
-fn draw_log(ui: &mut Ui, m: &Match, r: Rect) {
-    // Just text with a soft shadow, newest at the bottom, older lines fading:
-    // it never takes clicks away from the table.
-    let lines_fit = ((r.h - 4.0) / 18.0).floor().max(1.0) as usize;
-    let start = m.log.len().saturating_sub(lines_fit);
-    let lines = &m.log[start..];
-    let base_y = r.y + r.h - 18.0 * lines.len() as f32;
-    for (k, (text, important)) in lines.iter().enumerate() {
-        let age = (lines.len() - 1 - k) as f32;
-        let alpha = 1.0 - age * 0.3;
-        let base = if *important { ALERT } else { CREAM };
-        let color = Color::new(base.r, base.g, base.b, alpha);
-        let text = ui.ellipsize(text, r.w, 14.0);
-        let y = base_y + k as f32 * 18.0;
-        ui.text(
-            &text,
-            r.x + 1.0,
-            y + 1.0,
-            14.0,
-            Color::new(0.0, 0.0, 0.0, 0.8 * alpha),
-            k + 1 == lines.len(),
-        );
-        ui.text(&text, r.x, y, 14.0, color, k + 1 == lines.len());
-    }
-}
-
 /// The shoot button: a cue striking a ball, on green. Unmistakable, no text.
 fn shoot_button(ui: &mut Ui, r: Rect, enabled: bool) -> bool {
     ui.block(r);

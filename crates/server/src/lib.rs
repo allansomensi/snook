@@ -941,6 +941,7 @@ async fn friends_msg(server: &Server, user_id: i64, list: Vec<(User, FriendState
                     let online = l.player(&u.username);
                     friends.push(FriendInfo {
                         online: online.is_some(),
+                        last_seen: u.last_seen,
                         player: online
                             .unwrap_or_else(|| player_info(&u, false, PlayerStatus::Available)),
                     })
@@ -1065,6 +1066,7 @@ async fn profile_msg(server: &Server, viewer: Option<&User>, name: &str) -> Opti
                     achievements: Vec::new(),
                     history: Vec::new(),
                     relation: Relation::None,
+                    last_seen: 0,
                 }),
             });
         }
@@ -1141,6 +1143,7 @@ async fn profile_msg(server: &Server, viewer: Option<&User>, name: &str) -> Opti
                 })
                 .collect(),
             relation,
+            last_seen: if relation == Relation::Friend { user.last_seen } else { 0 },
         }),
     })
 }

@@ -240,6 +240,22 @@ pub fn floor() -> Pixels {
 }
 
 /// Soft round shadow: black with alpha falling off towards the edge.
+/// A soft white disc fading out (light on a wall).
+pub fn glow() -> Pixels {
+    let size: u16 = 64;
+    let mut rgba = Vec::with_capacity(size as usize * size as usize * 4);
+    for y in 0..size {
+        for x in 0..size {
+            let dx = (x as f32 + 0.5) / size as f32 * 2.0 - 1.0;
+            let dy = (y as f32 + 0.5) / size as f32 * 2.0 - 1.0;
+            let d = (dx * dx + dy * dy).sqrt();
+            let a = (1.0 - d).clamp(0.0, 1.0).powf(2.0);
+            rgba.extend_from_slice(&[255, 255, 255, (a * 255.0) as u8]);
+        }
+    }
+    Pixels { width: size, height: size, rgba }
+}
+
 pub fn shadow() -> Pixels {
     let size: u16 = 64;
     let mut rgba = Vec::with_capacity(size as usize * size as usize * 4);

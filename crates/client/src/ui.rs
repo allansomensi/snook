@@ -90,8 +90,9 @@ pub fn vh() -> f32 {
 pub fn update_scale(preference: f32) {
     let (sw, sh) = (screen_width().max(1.0), screen_height().max(1.0));
     // The layout is designed for about 1180×720 interface units.
-    let auto = (sw / 1180.0).min(sh / 720.0).clamp(0.62, 2.6);
-    let scale = (auto * preference.clamp(0.7, 1.5)).max(0.55);
+    // Small windows scale everything down rather than let it overflow.
+    let auto = (sw / 1180.0).min(sh / 720.0).clamp(0.45, 2.6);
+    let scale = (auto * preference.clamp(0.7, 1.5)).max(0.42);
     UI_SCALE.store(scale.to_bits(), std::sync::atomic::Ordering::Relaxed);
 }
 
@@ -202,6 +203,19 @@ impl Ui {
         s
     }
 
+    /// A label that fits `width`: smaller type first, then cut with "…".
+    pub fn fitted(&self, text: &str, size: f32, width: f32, bold: bool) -> (String, f32) {
+        let size = self.fit(size, text, width);
+        if self.text_size(text, size, bold).x <= width {
+            return (text.to_string(), size);
+        }
+        let mut s: String = text.to_string();
+        while !s.is_empty() && self.text_size(&format!("{s}…"), size, bold).x > width {
+            s.pop();
+        }
+        (format!("{}…", s.trim_end()), size)
+    }
+
     pub fn text_size(&self, text: &str, size: f32, bold: bool) -> Vec2 {
         let font = if bold { &self.bold } else { &self.regular };
         // Fonts are rasterised at the real pixel size, so text stays sharp at
@@ -271,9 +285,9 @@ impl Ui {
             );
         }
         rrect_lines(r, 6.0, 1.2, if hover { GOLD } else { BORDER });
-        let size = self.fit((r.h * 0.45).clamp(13.0, 22.0), label, r.w - 12.0);
+        let (label, size) = self.fitted(label, (r.h * 0.45).clamp(13.0, 22.0), r.w - 12.0, true);
         let color = if enabled { CREAM } else { MUTED };
-        self.text_centered(label, r.x + r.w / 2.0, r.y + (r.h - size) / 2.0, size, color, true);
+        self.text_centered(&label, r.x + r.w / 2.0, r.y + (r.h - size) / 2.0, size, color, true);
         enabled && hover && self.released
     }
 
@@ -296,8 +310,8 @@ impl Ui {
             Color::new(1.0, 1.0, 1.0, 0.08),
         );
         rrect_lines(r, 7.0, 1.2, if hover { GOLD } else { Color::new(0.3, 0.7, 0.45, 1.0) });
-        let size = self.fit((r.h * 0.45).clamp(13.0, 24.0), label, r.w - 12.0);
-        self.text_centered(label, r.x + r.w / 2.0, r.y + (r.h - size) / 2.0, size, WHITE, true);
+        let (label, size) = self.fitted(label, (r.h * 0.45).clamp(13.0, 24.0), r.w - 12.0, true);
+        self.text_centered(&label, r.x + r.w / 2.0, r.y + (r.h - size) / 2.0, size, WHITE, true);
         hover && self.released
     }
 
@@ -623,11 +637,12 @@ impl Ui {
         if selected {
             draw_rectangle(r.x + 8.0, r.y + r.h - 3.0, r.w - 16.0, 3.0, GOLD);
         }
+        let (label, size) = self.fitted(label, 15.0, r.w - 10.0, true);
         self.text_centered(
-            label,
+            &label,
             r.x + r.w / 2.0,
-            r.y + (r.h - 15.0) / 2.0,
-            15.0,
+            r.y + (r.h - size) / 2.0,
+            size,
             if selected { GOLD } else { CREAM },
             true,
         );
@@ -945,10 +960,10 @@ impl Ui {
                     Color::new(0.22, 0.15, 0.09, 1.0),
                 );
             }
-            let size = self.fit((r.h * 0.42).clamp(12.0, 16.0), label, w - 10.0);
+            let (label, size) = self.fitted(label, (r.h * 0.42).clamp(12.0, 16.0), w - 10.0, true);
             let color = if i == selected { GOLD } else { CREAM };
             self.text_centered(
-                label,
+                &label,
                 cell.x + w / 2.0,
                 cell.y + (r.h - size) / 2.0,
                 size,

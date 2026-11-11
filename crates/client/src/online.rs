@@ -1692,7 +1692,7 @@ impl Online {
                     let sub = if f.online {
                         Self::status_text(&f.player)
                     } else {
-                        t("offline").to_string()
+                        last_seen(f.last_seen)
                     };
                     ui.text(&sub, name_r.x, r.y + 22.0, 12.0, MUTED, false);
                     if ui.clicked(name_r) {
@@ -1756,6 +1756,27 @@ impl Online {
             self.spectate(&name);
         }
         action
+    }
+}
+
+/// "seen 5 min ago", "seen yesterday"… (friends only).
+pub fn last_seen(at: i64) -> String {
+    if at <= 0 {
+        return t("offline").to_string();
+    }
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs() as i64)
+        .unwrap_or(0);
+    let s = (now - at).max(0);
+    let n = |v: i64| v.to_string();
+    match s {
+        0..60 => t("seen just now").to_string(),
+        60..3600 => tw("seen {n} min ago", &[("n", &n(s / 60))]),
+        3600..86_400 => tw("seen {n} h ago", &[("n", &n(s / 3600))]),
+        86_400..172_800 => t("seen yesterday").to_string(),
+        172_800..2_592_000 => tw("seen {n} days ago", &[("n", &n(s / 86_400))]),
+        _ => tw("seen {n} months ago", &[("n", &n(s / 2_592_000))]),
     }
 }
 

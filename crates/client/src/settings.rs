@@ -162,8 +162,6 @@ impl SettingsScreen {
                 if config.camera_follow {
                     ui.checkbox(x + 260.0, y, t("Pull back for shots"), &mut config.shot_camera);
                 }
-                y += 32.0;
-                ui.checkbox(x, y, t("Show the controls panel"), &mut config.show_help);
                 y += 38.0;
                 if !in_match {
                     ui.text(t("Game server"), x, y + 7.0, 15.0, CREAM, false);

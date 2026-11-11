@@ -159,6 +159,10 @@ impl ProfileScreen {
         if !player.guest {
             parts.push(age(p.created_at));
         }
+        // Friends see when the other was last around.
+        if !p.online && p.last_seen > 0 {
+            parts.push(crate::online::last_seen(p.last_seen));
+        }
         ui.text(&parts.join("  ·  "), info_x, r.y + 61.0, 13.0, MUTED, false);
 
         // The rating, large, on the right.
