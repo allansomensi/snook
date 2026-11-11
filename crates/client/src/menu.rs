@@ -26,6 +26,21 @@ pub enum MenuAction {
 pub struct Menu {
     /// Hover animation of each item (0..1).
     hover: [f32; 4],
+    shade: Option<Texture2D>,
+}
+
+/// A smooth left-to-right darkening (a texture, so there is no banding).
+fn shade_texture() -> Texture2D {
+    const W: u16 = 256;
+    let mut rgba = Vec::with_capacity(W as usize * 4);
+    for x in 0..W {
+        let k = x as f32 / (W - 1) as f32;
+        let a = 0.6 * (1.0 - k * k * (3.0 - 2.0 * k));
+        rgba.extend_from_slice(&[0, 0, 0, (a * 255.0) as u8]);
+    }
+    let tex = Texture2D::from_rgba8(W, 1, &rgba);
+    tex.set_filter(FilterMode::Linear);
+    tex
 }
 
 impl Menu {
@@ -35,11 +50,14 @@ impl Menu {
         let dt = get_frame_time();
         let mut action = MenuAction::None;
         // Darker on the left, where the menu is, so the table stays visible.
-        for k in 0..24 {
-            let x = k as f32 / 24.0 * sw * 0.55;
-            let a = 0.55 * (1.0 - k as f32 / 24.0);
-            draw_rectangle(x, 0.0, sw * 0.55 / 24.0 + 1.0, sh, Color::new(0.0, 0.0, 0.0, a));
-        }
+        let shade = self.shade.get_or_insert_with(shade_texture);
+        draw_texture_ex(
+            shade,
+            0.0,
+            0.0,
+            WHITE,
+            DrawTextureParams { dest_size: Some(vec2(sw * 0.6, sh)), ..Default::default() },
+        );
 
         let left = (sw * 0.06).clamp(24.0, 90.0);
         let top = (sh * 0.09).clamp(20.0, 80.0);
@@ -152,7 +170,7 @@ impl Menu {
                     Stage::Reconnecting { .. } => {
                         (t("Reconnecting…").to_string(), t("the connection dropped").to_string())
                     }
-                    _ => (t("Sign in").to_string(), t("to play online and climb the ranking").to_string()),
+                    _ => (t("Sign in").to_string(), t("to play online").to_string()),
                 };
                 ui.text(&title, r.x + 56.0, r.y + 12.0, 17.0, CREAM, true);
                 let sub = ui.ellipsize(&sub, r.w - 70.0, 12.0);

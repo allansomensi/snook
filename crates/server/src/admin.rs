@@ -226,6 +226,7 @@ async fn overview(State(server): State<Arc<Server>>, headers: HeaderMap) -> ApiR
     Ok(Json(json!({
         "stored": o,
         "online": live.players.len(),
+        "addresses": server.with(|l| l.distinct_addresses()),
         "matches_live": live.rooms.iter().filter(|r| !r.finished).count(),
         "tables_open": live.tables,
         "tournaments": live.tournaments.len(),

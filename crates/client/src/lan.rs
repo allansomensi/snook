@@ -75,18 +75,26 @@ impl LanScreen {
             } else {
                 config.username.clone()
             };
+            if config.lan_name.chars().count() < 3 {
+                config.lan_name = format!("Player{}", crate::game::clock_seed() % 900 + 100);
+            }
         }
         ui.text_input(50, Rect::new(x, y + 18.0, inner, 34.0), &mut config.lan_name, 16);
         let name_ok = valid_username(config.lan_name.trim());
         if !name_ok {
             ui.text(t("3–16 letters, digits or underscores."), x, y + 56.0, 12.0, ALERT, false);
         }
-        y += 76.0;
+        y += 82.0;
 
         // Host.
         let host_r = Rect::new(x, y, inner, 44.0);
         if hosting.is_none() {
-            if ui.primary_button(host_r, t("Host a game on this computer")) && name_ok {
+            let clicked = if name_ok {
+                ui.primary_button(host_r, t("Host a game on this computer"))
+            } else {
+                ui.button(host_r, t("Host a game on this computer"), false)
+            };
+            if clicked {
                 action = LanAction::Host(config.lan_name.trim().to_string());
             }
         } else {

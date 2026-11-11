@@ -266,6 +266,19 @@ async fn main() {
             ranking.open(&mut online);
             screen = Screen::Ranking;
         }
+        Some(tab @ ("tables" | "tournaments" | "friends")) => {
+            online.connect();
+            online.tab = match tab {
+                "tables" => online::Tab::Tables,
+                "tournaments" => online::Tab::Tournaments,
+                _ => online::Tab::Friends,
+            };
+            screen = Screen::Online;
+        }
+        Some(name) if name.starts_with("profile:") => {
+            profile.open(&name["profile:".len()..], &mut online);
+            screen = Screen::Profile;
+        }
         _ => {}
     }
     let menu_rack = snook_core::rules::rack(&scene.table, 2024);

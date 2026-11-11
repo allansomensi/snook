@@ -9,7 +9,7 @@
 //! | `SNOOK_DB_POOL` | `5` | database connections |
 //! | `SNOOK_IN_MEMORY` | — | `1`: keep everything in memory (development only) |
 //! | `SNOOK_ADMINS` | — | comma-separated usernames that become administrators |
-//! | `SNOOK_CLIENT_IP_HEADER` | — | header with the real client address behind a proxy |
+//! | `SNOOK_CLIENT_IP_HEADER` | — | headers with the real client address behind a proxy, tried in order (e.g. `cf-connecting-ip,true-client-ip,x-forwarded-for`) |
 //! | `SNOOK_PROXY_HOPS` | `1` | proxies that append to `X-Forwarded-For` |
 //! | `SNOOK_MOTD` | a welcome line | message shown in the lounge |
 //! | `SNOOK_SHOT_CLOCK` | `30` | seconds per shot |

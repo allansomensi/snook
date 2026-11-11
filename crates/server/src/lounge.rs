@@ -295,8 +295,10 @@ impl Lounge {
         self.sessions.get(&key(name)).map(|s| &s.user)
     }
 
-    pub fn connections_from(&self, ip: &str) -> usize {
-        self.sessions.values().filter(|s| s.ip == ip).count()
+    /// Distinct client addresses online (if this is 1 with many players, the
+    /// proxy header is not configured).
+    pub fn distinct_addresses(&self) -> usize {
+        self.sessions.values().map(|s| s.ip.as_str()).collect::<HashSet<_>>().len()
     }
 
     /// A unique id for a LAN guest (negative, never stored).

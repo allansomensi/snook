@@ -96,7 +96,8 @@ const views = {
         stat(o.stored.active_users_7d, "Active (7 days)"), stat(o.stored.matches_24h, "Games (24 h)"),
         stat(o.stored.matches_total, "Games (all)"), stat(o.stored.open_reports, "Open reports"),
         stat(o.stored.banned, "Banned"), stat(h + "h " + m + "m", "Uptime · v" + o.version)),
-      o.persistent ? null : el("p", { class: "error" }, "This server keeps everything in memory: nothing is saved."));
+      o.persistent ? null : el("p", { class: "error" }, "This server keeps everything in memory: nothing is saved."),
+      o.online >= 4 && o.addresses === 1 ? el("p", { class: "error" }, "Every player comes from the same address: set SNOOK_CLIENT_IP_HEADER (see DEPLOY), or the per-address limits will block players.") : null);
     const announce = el("textarea", { rows: "2", maxlength: "200", placeholder: "Message to everyone in the lounge" });
     box.append(el("h2", {}, "Announcement"), announce,
       el("div", { class: "actions" }, el("button", {

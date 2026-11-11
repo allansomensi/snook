@@ -33,13 +33,13 @@ fn age(created_at: i64) -> String {
         .unwrap_or(0);
     let days = ((now - created_at).max(0) / 86_400) as u32;
     if days < 1 {
-        t("today").to_string()
+        t("joined today").to_string()
     } else if days < 60 {
-        tw("{n} days", &[("n", &days)])
+        tw("member for {n} days", &[("n", &days)])
     } else if days < 730 {
-        tw("{n} months", &[("n", &(days / 30))])
+        tw("member for {n} months", &[("n", &(days / 30))])
     } else {
-        tw("{n} years", &[("n", &(days / 365))])
+        tw("member for {n} years", &[("n", &(days / 365))])
     }
 }
 
@@ -93,12 +93,16 @@ impl ProfileScreen {
         {
             action = ProfileAction::Back;
         }
-        let Some(p) = online.profile.clone().filter(|p| p.player.username.eq_ignore_ascii_case(&self.name)) else {
+        let Some(mut p) = online.profile.clone().filter(|p| p.player.username.eq_ignore_ascii_case(&self.name)) else {
             ui.text_centered(t("Loading the profile…"), sw / 2.0, r.y + r.h / 2.0 - 10.0, 16.0, MUTED, false);
             return action;
         };
+        // Asked before signing in: the server didn't know who was looking.
+        if online.me.as_ref().is_some_and(|me| me.username.eq_ignore_ascii_case(&p.player.username)) {
+            p.relation = Relation::Me;
+        }
         self.header(ui, online, &p, r);
-        let body = Rect::new(r.x + 20.0, r.y + 186.0, r.w - 40.0, r.h - 206.0);
+        let body = Rect::new(r.x + 20.0, r.y + 204.0, r.w - 40.0, r.h - 224.0);
         let half = (body.w - 20.0) / 2.0;
         self.achievements(ui, &p, Rect::new(body.x, body.y, half, body.h));
         self.history(ui, &p, Rect::new(body.x + half + 20.0, body.y, half, body.h));
@@ -135,7 +139,7 @@ impl ProfileScreen {
             parts.push(crate::flags::name(&player.country).to_string());
         }
         if !player.guest {
-            parts.push(tw("member for {age}", &[("age", &age(p.created_at))]));
+            parts.push(age(p.created_at));
         }
         ui.text(&parts.join("  ·  "), info_x, r.y + 61.0, 13.0, MUTED, false);
 
@@ -169,6 +173,7 @@ impl ProfileScreen {
             ui.text_centered(label, c.x + c.w / 2.0, c.y + 34.0, size, MUTED, false);
         }
 
+        draw_line(r.x + 20.0, r.y + 192.0, r.x + r.w - 20.0, r.y + 192.0, 1.0, BORDER);
         // Actions.
         let mut bx = r.x + r.w - 24.0;
         let by = r.y + 156.0;
@@ -236,7 +241,6 @@ impl ProfileScreen {
                 }
             }
         }
-        draw_line(r.x + 20.0, r.y + 176.0, r.x + r.w - 20.0, r.y + 176.0, 1.0, BORDER);
     }
 
     fn achievements(&self, ui: &mut Ui, p: &Profile, area: Rect) {
@@ -265,7 +269,9 @@ impl ProfileScreen {
                 rrect_lines(c, 8.0, 1.2, Color::new(color.r, color.g, color.b, 0.6));
                 crate::icons::draw(Icon::Medal, vec2(c.x + cell / 2.0, c.y + cell / 2.0), cell * 0.62, color);
             } else {
-                crate::icons::draw(Icon::Lock, vec2(c.x + cell / 2.0, c.y + cell / 2.0), cell * 0.4, Color::new(0.4, 0.36, 0.32, 0.8));
+                // A faint medal: the colour hints at how hard it is.
+                let ghost = Color::new(color.r * 0.5, color.g * 0.5, color.b * 0.5, 0.35);
+                crate::icons::draw(Icon::Medal, vec2(c.x + cell / 2.0, c.y + cell / 2.0), cell * 0.55, ghost);
             }
             ui.block(c);
             if ui.hovering(c) {

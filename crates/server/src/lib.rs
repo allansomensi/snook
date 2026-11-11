@@ -94,8 +94,8 @@ pub struct Config {
     pub rules: Rules,
     /// Usernames that are made administrators when they sign in.
     pub admins: Vec<String>,
-    /// Header with the client's address when behind a proxy
-    /// (`x-forwarded-for`, `cf-connecting-ip`, `true-client-ip`…).
+    /// Headers with the client's address when behind a proxy, tried in
+    /// order (`cf-connecting-ip,true-client-ip,x-forwarded-for`…).
     pub client_ip_header: Option<String>,
     /// With `x-forwarded-for`: how many proxies append to it (the address is
     /// taken that many entries from the right).
@@ -179,19 +179,23 @@ impl Server {
         self.config.admins.iter().any(|a| a.eq_ignore_ascii_case(name))
     }
 
-    /// The client's address (from the proxy header when configured).
+    /// The client's address: from the first configured proxy header that is
+    /// present (e.g. `cf-connecting-ip,x-forwarded-for`), else the peer.
     pub fn client_ip(&self, peer: SocketAddr, headers: &HeaderMap) -> IpAddr {
-        let Some(name) = &self.config.client_ip_header else { return peer.ip() };
-        let Some(value) = headers.get(name.as_str()).and_then(|v| v.to_str().ok()) else {
-            return peer.ip();
-        };
-        let parts: Vec<&str> = value.split(',').map(str::trim).collect();
-        let pick = if name.eq_ignore_ascii_case("x-forwarded-for") {
-            parts.len().checked_sub(self.config.proxy_hops.max(1)).and_then(|i| parts.get(i))
-        } else {
-            parts.first()
-        };
-        pick.and_then(|p| p.parse().ok()).unwrap_or(peer.ip())
+        let Some(names) = &self.config.client_ip_header else { return peer.ip() };
+        for name in names.split(',').map(str::trim).filter(|n| !n.is_empty()) {
+            let Some(value) = headers.get(name).and_then(|v| v.to_str().ok()) else { continue };
+            let parts: Vec<&str> = value.split(',').map(str::trim).collect();
+            let pick = if name.eq_ignore_ascii_case("x-forwarded-for") {
+                parts.len().checked_sub(self.config.proxy_hops.max(1)).and_then(|i| parts.get(i))
+            } else {
+                parts.first()
+            };
+            if let Some(ip) = pick.and_then(|p| p.parse().ok()) {
+                return ip;
+            }
+        }
+        peer.ip()
     }
 
     pub async fn leaderboard(&self) -> Vec<LeaderboardEntry> {

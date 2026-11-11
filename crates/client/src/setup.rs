@@ -43,7 +43,7 @@ impl Setup {
         let sh = crate::ui::vh();
         draw_rectangle(0.0, 0.0, sw, sh, Color::new(0.0, 0.0, 0.0, 0.45));
         let w = 520.0f32.min(sw - 20.0);
-        let h = 500.0;
+        let h = 460.0;
         let r = Rect::new((sw - w) / 2.0, ((sh - h) / 2.0).max(8.0), w, h);
         ui.panel(r);
         let x = r.x + 30.0;
