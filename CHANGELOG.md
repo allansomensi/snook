@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.1.1-beta.1
+## 0.1.1-beta.2
 
 ### Distribution
 - Releases are built and published by dist: a Windows installer (`.msi`,
