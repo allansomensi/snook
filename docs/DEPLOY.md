@@ -103,8 +103,8 @@ games are told to update.
 - Chat: 200 characters, control and invisible characters removed, about one
   message a second with bursts of 5, no repeating the same line; blocked
   players' messages aren't delivered; muted players can't chat.
-- Rated games: Elo with K = 40 for the first 30 games, 20 after that, 10 above
-  2400. At most 5 rated games per pair of players per day.
+- Rated games: Elo with K = 24 for the first 10 games, 14 after that, 8 from
+  1900.
 - Shot clock (default 30 s): when it runs out the shot is played at full
   power where the player was aiming.
 - A player who disconnects has 60 s to come back; after that the game is lost.

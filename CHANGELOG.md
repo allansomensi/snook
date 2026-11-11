@@ -26,8 +26,8 @@ First public version.
   New Year). They pop up discreetly by the sender's card.
 - Progress is earned slowly: smaller rating changes (K 24 for the first 10
   games, then 14, 8 from 1900), everyone starts as a Rookie, feats (8-ball
-  wins, runouts, shutouts) count only in rated games, and at most 3 rated
-  games a day against the same opponent. Games against the computer never
+  wins, runouts, shutouts) count only in rated games. Games against the
+  computer never
   touch ratings, numbers, achievements or reactions.
 - The 8-ball pocket is called by clicking a pocket on the table (no panel),
   and the call is binding for the rest of the game.

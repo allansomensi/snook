@@ -793,9 +793,6 @@ fn portuguese(en: &str) -> Option<&'static str> {
         "You can't invite yourself." => "Você não pode convidar a si mesmo.",
         "That invitation is no longer valid." => "Esse convite não é mais válido.",
         "That player is no longer available." => "Esse jogador não está mais disponível.",
-        "You've played many rated games against each other today: this one is casual." => {
-            "Vocês já jogaram muitas partidas valendo rating hoje: esta será amistosa."
-        }
         "Resign first to leave a game in progress." => {
             "Desista primeiro para sair de uma partida em andamento."
         }

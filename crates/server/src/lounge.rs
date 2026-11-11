@@ -33,8 +33,6 @@ pub struct Rules {
     pub shot_clock: Duration,
     /// How long a disconnected player has to come back before forfeiting.
     pub reconnect_grace: Duration,
-    /// Rated games between the same two players per day before games become casual.
-    pub max_daily_rated_pair: u32,
     pub chat_history: usize,
     pub motd: String,
     /// LAN server: guests without accounts, no ratings.
@@ -52,7 +50,6 @@ impl Default for Rules {
         Rules {
             shot_clock: Duration::from_secs(30),
             reconnect_grace: Duration::from_secs(60),
-            max_daily_rated_pair: 3,
             chat_history: 60,
             motd: "Welcome to Snook! Be kind, play fair.".into(),
             lan: false,
@@ -176,8 +173,6 @@ pub struct Lounge {
     tournaments: BTreeMap<u64, Tournament>,
     next_id: u64,
     chat: VecDeque<ChatLine>,
-    /// Rated games per pair of user ids in the last day.
-    rated_pairs: HashMap<(i64, i64), VecDeque<Instant>>,
     /// Player -> who is watching their games (lower-case names).
     watchers: HashMap<String, HashSet<String>>,
     effects: Option<UnboundedSender<Effect>>,
@@ -1029,15 +1024,6 @@ impl Lounge {
         self.start_room([host, k.to_string()], rated, None);
     }
 
-    fn rated_today(&mut self, a: i64, b: i64) -> u32 {
-        let pair = (a.min(b), a.max(b));
-        let list = self.rated_pairs.entry(pair).or_default();
-        while list.front().is_some_and(|t| t.elapsed() > Duration::from_secs(86_400)) {
-            list.pop_front();
-        }
-        list.len() as u32
-    }
-
     fn start_room(
         &mut self,
         mut keys: [String; 2],
@@ -1057,18 +1043,6 @@ impl Lounge {
         let users = [self.sessions[&keys[0]].user.clone(), self.sessions[&keys[1]].user.clone()];
         let guests = [self.sessions[&keys[0]].guest, self.sessions[&keys[1]].guest];
         rated &= !guests[0] && !guests[1];
-        if rated
-            && tournament.is_none()
-            && self.rated_today(users[0].id, users[1].id) >= self.rules.max_daily_rated_pair
-        {
-            rated = false;
-            for k in &keys {
-                self.error(
-                    k,
-                    "You've played many rated games against each other today: this one is casual.",
-                );
-            }
-        }
         let id = self.new_id();
         self.create_room(id, keys, users, guests, rated, 0, tournament);
     }
@@ -1410,10 +1384,6 @@ impl Lounge {
         let room = self.rooms.get_mut(&id).expect("room");
         room.finished = true;
         room.rematch = [false, false];
-        if rated {
-            let pair = (users[0].id.min(users[1].id), users[0].id.max(users[1].id));
-            self.rated_pairs.entry(pair).or_default().push_back(Instant::now());
-        }
         // Show the new numbers at once; the database catches up.
         for (seat, k) in keys.iter().enumerate() {
             if let Some(s) = self.sessions.get_mut(k) {
@@ -1471,18 +1441,6 @@ impl Lounge {
             }
             let users =
                 [self.sessions[&keys[0]].user.clone(), self.sessions[&keys[1]].user.clone()];
-            let mut rated = rated;
-            if rated
-                && self.rated_today(users[0].id, users[1].id) >= self.rules.max_daily_rated_pair
-            {
-                rated = false;
-                for k in &keys {
-                    self.error(
-                        k,
-                        "You've played many rated games against each other today: this one is casual.",
-                    );
-                }
-            }
             let new_id = self.new_id();
             self.create_room(new_id, keys, users, guests, rated, breaker, None);
             if let Some(r) = self.rooms.get_mut(&new_id) {

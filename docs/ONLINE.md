@@ -63,9 +63,8 @@ shooter                     server                         opponent
 - Reconnecting within the grace period resumes the match with a fresh
   `match_started`.
 - Ratings: Elo with K 24 for the first 10 rated games, 14 after, 8 from
-  1900 (`crates/core/src/rating.rs`). Two accounts get at most 3 rated games
-  a day against each other; later ones are casual. Feats (8-ball wins,
-  runouts, shutouts) count in rated games only.
+  1900 (`crates/core/src/rating.rs`). Feats (8-ball wins, runouts,
+  shutouts) count in rated games only.
 - `spectate { username }` watches a friend's games (anyone's on a local
   network): `match_started { spectating: true, seat }` with `seat` the
   friend's, then every shot, aim and result of that table, and the next game

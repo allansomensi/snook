@@ -32,7 +32,7 @@ without consequence, take over accounts, or take the server down cheaply.
 
 - The server is authoritative: clients send strokes only; the server checks
   the turn, the cue-ball placement and the 8-ball call, simulates and decides.
-- Ratings change only on the server; 5 rated games per pair per day.
+- Ratings change only on the server.
 - Rated games show only the short aiming line in the official game.
 - All SQL uses bound parameters; `LIKE` patterns are escaped.
 - Passwords: Argon2id (default parameters).
