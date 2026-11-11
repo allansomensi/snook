@@ -26,6 +26,7 @@ jobs:
         with:
           context: .
           push: true
+          # Pre-releases (v0.2.0-beta.1) don't move `latest`.
           tags: |
             ghcr.io/${{ github.repository_owner }}/snook-server:${{ github.ref_name }}
-            ghcr.io/${{ github.repository_owner }}/snook-server:latest
+            ${{ !contains(github.ref_name, '-') && format('ghcr.io/{0}/snook-server:latest', github.repository_owner) || '' }}
