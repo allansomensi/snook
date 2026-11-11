@@ -1762,6 +1762,7 @@ dependencies = [
 name = "snook"
 version = "0.1.0"
 dependencies = [
+ "futures-util",
  "glam 0.33.12",
  "macroquad",
  "rustls",
@@ -1770,6 +1771,8 @@ dependencies = [
  "snook_proto",
  "snook_server",
  "sys-locale",
+ "tokio",
+ "tokio-tungstenite 0.30.0",
  "tungstenite 0.30.0",
 ]
 
@@ -2172,6 +2175,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "tokio-rustls"
+version = "0.26.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c9cc2678c2cdd569ef8215e2afd7954ada2ae20b4fdd2c5fe6139a3b02d105db"
+dependencies = [
+ "rustls",
+ "tokio",
+]
+
+[[package]]
 name = "tokio-stream"
 version = "0.1.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2202,8 +2215,12 @@ checksum = "17a073bfed563fa236697a068031408a93cd9522e08abf9933ead3e73411bd71"
 dependencies = [
  "futures-util",
  "log",
+ "rustls",
+ "rustls-pki-types",
  "tokio",
+ "tokio-rustls",
  "tungstenite 0.30.0",
+ "webpki-roots 0.26.11",
 ]
 
 [[package]]

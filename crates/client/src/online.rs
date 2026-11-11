@@ -116,6 +116,10 @@ pub struct Online {
     friend_input: String,
     pub profile: Option<Profile>,
     unread_friend_requests: bool,
+    /// Round trip to the server, measured with a ping every few seconds.
+    pub rtt: Option<std::time::Duration>,
+    ping_sent: Option<std::time::Instant>,
+    ping_timer: f32,
 }
 
 const MAX_RECONNECTS: u32 = 15;
@@ -183,6 +187,9 @@ impl Online {
             friend_input: String::new(),
             profile: None,
             unread_friend_requests: false,
+            rtt: None,
+            ping_sent: None,
+            ping_timer: 0.0,
         }
     }
 
@@ -265,6 +272,17 @@ impl Online {
             }
         }
         self.leaderboard_age += dt;
+        // Measure the round trip every few seconds while signed in.
+        if self.signed_in() {
+            self.ping_timer -= dt;
+            if self.ping_timer <= 0.0 {
+                self.ping_timer = 3.0;
+                if self.ping_sent.is_none_or(|t| t.elapsed().as_secs() > 10) {
+                    self.ping_sent = Some(std::time::Instant::now());
+                    self.send(ClientMsg::Ping);
+                }
+            }
+        }
 
         while let Some(event) = self.conn.as_mut().and_then(|c| c.poll()) {
             match event {
@@ -520,7 +538,11 @@ impl Online {
                 Some(m) if m.is_online() => m.handle_server(ServerMsg::Error { message }),
                 _ => self.toast(crate::i18n::server_text(&message), false),
             },
-            ServerMsg::Pong => {}
+            ServerMsg::Pong => {
+                if let Some(sent) = self.ping_sent.take() {
+                    self.rtt = Some(sent.elapsed());
+                }
+            }
             other => {
                 if let Some(m) = current.as_mut().filter(|m| m.is_online()) {
                     m.handle_server(other);
@@ -818,7 +840,13 @@ impl Online {
         let title_w = ui.text_size("SNOOK", 24.0, true).x;
         let title = if self.lan { t("LAN game") } else { t("lounge") };
         ui.text(title, header.x + 66.0 + title_w, header.y + 19.0, 15.0, MUTED, false);
-        let online_text = tw("{n} online", &[("n", &self.players.len())]);
+        let online_text = match self.rtt {
+            Some(rtt) => tw(
+                "{n} online · ping {ms} ms",
+                &[("n", &self.players.len()), ("ms", &rtt.as_millis())],
+            ),
+            None => tw("{n} online", &[("n", &self.players.len())]),
+        };
         let mut right = header.x + header.w - 10.0;
         if !self.lan {
             right -= 34.0;
@@ -1762,4 +1790,21 @@ fn same_players(a: &Match, b: &Match) -> bool {
     x.sort();
     y.sort();
     x == y
+}
+
+/// Draws the round trip to the server, small, in a corner (during matches).
+pub fn draw_ping(ui: &Ui, rtt: Option<std::time::Duration>, x_right: f32, y: f32) {
+    let Some(rtt) = rtt else { return };
+    let ms = rtt.as_millis();
+    let color = if ms < 80 {
+        Color::new(0.45, 0.9, 0.5, 0.85)
+    } else if ms < 200 {
+        Color::new(1.0, 0.8, 0.35, 0.9)
+    } else {
+        Color::new(1.0, 0.45, 0.4, 0.95)
+    };
+    let text = format!("{ms} ms");
+    let w = ui.text_size(&text, 12.0, true).x;
+    draw_circle(x_right - w - 10.0, y + 7.0, 3.5, color);
+    ui.text(&text, x_right - w, y, 12.0, color, true);
 }

@@ -14,8 +14,12 @@ macroquad = { version = "0.4.16", default-features = false, features = ["audio"]
 snook_proto = { path = "../proto" }
 # Hosting LAN games (in memory, no database).
 snook_server = { path = "../server", default-features = false }
-# Online play: a blocking WebSocket client on a background thread (ws:// and wss://).
+# Online play: an event-driven WebSocket client on a background thread
+# (ws:// and wss://): it wakes the moment a message comes in or goes out.
 tungstenite = { version = "0.30", default-features = false, features = ["handshake", "rustls-tls-webpki-roots"] }
+tokio-tungstenite = { version = "0.30", default-features = false, features = ["connect", "rustls-tls-webpki-roots"] }
+tokio = { version = "1", features = ["rt", "net", "time", "sync", "macros"] }
+futures-util = { version = "0.3", default-features = false, features = ["sink", "std"] }
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12", "logging"] }
 sys-locale = "0.3"
 serde_json = "1"

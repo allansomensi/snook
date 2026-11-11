@@ -203,6 +203,7 @@ pub fn shot_error(e: ShotError) -> String {
 
 fn portuguese(en: &str) -> Option<&'static str> {
     Some(match en {
+        "{n} online · ping {ms} ms" => "{n} online · ping {ms} ms",
         "Right-drag · Wheel · C" => "Arraste com o botão direito · Roda · C",
         "Win %" => "% vit.",
         "Reset the camera: top view, no zoom (C)" => "Voltar a câmera: visão de cima, sem zoom (C)",

@@ -1,12 +1,20 @@
-//! Connection to the Snook server: a blocking WebSocket client running on a
-//! background thread, talking to the game through channels.
+//! Connection to the Snook server: a WebSocket client on a background
+//! thread, talking to the game through channels.
+//!
+//! The thread runs a small single-threaded async runtime and waits on both
+//! the socket and the game's outgoing queue at once, so a message is sent
+//! the moment the game queues it and handed to the game the moment it
+//! arrives. (An earlier version alternated between short blocking reads and
+//! writes; on Windows short socket timeouts are rounded up, which delayed
+//! every shot, aim update and chat line.)
 
 use std::io::ErrorKind;
-use std::net::{TcpStream, ToSocketAddrs};
 use std::sync::mpsc::{Receiver, Sender, TryRecvError, channel};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
+use futures_util::{SinkExt, StreamExt};
 use snook_proto::{ClientMsg, PROTOCOL_VERSION, ServerMsg, parse_server};
+use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender, unbounded_channel};
 use tungstenite::Message;
 use tungstenite::client::IntoClientRequest;
 
@@ -21,7 +29,7 @@ pub enum NetEvent {
 
 /// A live (or connecting) connection. Dropping it closes the socket.
 pub struct Connection {
-    tx: Sender<ClientMsg>,
+    tx: UnboundedSender<ClientMsg>,
     rx: Receiver<NetEvent>,
     closed: bool,
 }
@@ -29,22 +37,24 @@ pub struct Connection {
 const PING_EVERY: Duration = Duration::from_secs(15);
 /// The server pings back within seconds; silence this long means a dead link.
 const SILENCE_LIMIT: Duration = Duration::from_secs(60);
-/// How long a read waits before outgoing messages are checked again: short,
-/// so a shot or aim update leaves within a few milliseconds.
-const POLL: Duration = Duration::from_millis(4);
+const CONNECT_TIMEOUT: Duration = Duration::from_secs(20);
 
 impl Connection {
     /// Starts connecting to `url` (`ws://host:port/ws` or `wss://…`).
     pub fn open(url: &str) -> Connection {
-        let (tx, out_rx) = channel::<ClientMsg>();
+        let (tx, out_rx) = unbounded_channel::<ClientMsg>();
         let (in_tx, rx) = channel::<NetEvent>();
         let url = url.trim().to_string();
         std::thread::Builder::new()
             .name("snook-net".into())
             .spawn(move || {
-                let reason = match run(&url, &out_rx, &in_tx) {
-                    Ok(()) => "Disconnected.".to_string(),
-                    Err(e) => e,
+                let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build();
+                let reason = match runtime {
+                    Ok(rt) => match rt.block_on(run(&url, out_rx, &in_tx)) {
+                        Ok(()) => "Disconnected.".to_string(),
+                        Err(e) => e,
+                    },
+                    Err(e) => format!("Network error: {e}."),
                 };
                 let _ = in_tx.send(NetEvent::Closed(reason));
             })
@@ -102,98 +112,91 @@ fn friendly(e: &tungstenite::Error) -> String {
     }
 }
 
-fn run(url: &str, out_rx: &Receiver<ClientMsg>, in_tx: &Sender<NetEvent>) -> Result<(), String> {
+async fn run(
+    url: &str,
+    mut out_rx: UnboundedReceiver<ClientMsg>,
+    in_tx: &Sender<NetEvent>,
+) -> Result<(), String> {
     let request = url.into_client_request().map_err(|e| friendly(&e))?;
     let uri = request.uri();
     let host = uri.host().ok_or("The server address has no host name.")?.to_string();
     let secure = uri.scheme_str() == Some("wss");
     let port = uri.port_u16().unwrap_or(if secure { 443 } else { 80 });
-    let addrs: Vec<_> = (host.as_str(), port)
-        .to_socket_addrs()
-        .map_err(|_| crate::i18n::tw("Could not find the server “{host}”.", &[("host", &host)]))?
-        .collect();
-    let mut last_err = None;
-    let mut stream = None;
-    for addr in addrs {
-        match TcpStream::connect_timeout(&addr, Duration::from_secs(8)) {
-            Ok(s) => {
-                stream = Some(s);
-                break;
-            }
-            Err(e) => last_err = Some(e),
-        }
-    }
-    let stream = stream.ok_or_else(|| {
-        friendly(&tungstenite::Error::Io(
-            last_err.unwrap_or_else(|| std::io::Error::from(ErrorKind::NotFound)),
-        ))
-    })?;
-    let _ = stream.set_nodelay(true);
-    stream.set_read_timeout(Some(Duration::from_secs(10))).map_err(|e| e.to_string())?;
-    let (mut ws, _) = tungstenite::client_tls_with_config(
-        request,
-        stream.try_clone().map_err(|e| e.to_string())?,
-        None,
-        None,
+    let stream = tokio::time::timeout(
+        CONNECT_TIMEOUT,
+        tokio::net::TcpStream::connect((host.as_str(), port)),
     )
-    .map_err(|e| match e {
-        tungstenite::HandshakeError::Failure(e) => friendly(&e),
-        tungstenite::HandshakeError::Interrupted(_) => "The server took too long to answer.".into(),
+    .await
+    .map_err(|_| "The server took too long to answer.".to_string())?
+    .map_err(|e| match e.kind() {
+        ErrorKind::NotFound => {
+            crate::i18n::tw("Could not find the server “{host}”.", &[("host", &host)])
+        }
+        _ => friendly(&tungstenite::Error::Io(e)),
     })?;
-    // Short timeouts from now on so sending and receiving can share the thread.
-    stream.set_read_timeout(Some(POLL)).map_err(|e| e.to_string())?;
-
-    let send = |ws: &mut tungstenite::WebSocket<_>, msg: &ClientMsg| -> Result<(), String> {
-        ws.send(Message::text(msg.to_json())).map_err(|e| friendly(&e))
-    };
-    send(&mut ws, &ClientMsg::Hello { version: PROTOCOL_VERSION })?;
+    // No Nagle delay: small game messages go out at once.
+    let _ = stream.set_nodelay(true);
+    let (ws, _) = tokio::time::timeout(
+        CONNECT_TIMEOUT,
+        tokio_tungstenite::client_async_tls_with_config(request, stream, None, None),
+    )
+    .await
+    .map_err(|_| "The server took too long to answer.".to_string())?
+    .map_err(|e| friendly(&e))?;
+    let (mut sink, mut source) = ws.split();
+    let send_msg = |msg: &ClientMsg| Message::text(msg.to_json());
+    sink.send(send_msg(&ClientMsg::Hello { version: PROTOCOL_VERSION }))
+        .await
+        .map_err(|e| friendly(&e))?;
     if in_tx.send(NetEvent::Connected).is_err() {
         return Ok(());
     }
-
-    let mut last_ping = Instant::now();
-    let mut last_heard = Instant::now();
+    let mut ping = tokio::time::interval(PING_EVERY);
+    ping.tick().await;
+    let mut last_heard = tokio::time::Instant::now();
     loop {
-        // Outgoing.
-        loop {
-            match out_rx.try_recv() {
-                Ok(msg) => send(&mut ws, &msg)?,
-                Err(TryRecvError::Empty) => break,
-                Err(TryRecvError::Disconnected) => {
-                    let _ = ws.close(None);
-                    let _ = ws.flush();
+        tokio::select! {
+            out = out_rx.recv() => match out {
+                Some(msg) => {
+                    sink.send(send_msg(&msg)).await.map_err(|e| friendly(&e))?;
+                    // Send whatever else is already queued in the same go.
+                    while let Ok(more) = out_rx.try_recv() {
+                        sink.send(send_msg(&more)).await.map_err(|e| friendly(&e))?;
+                    }
+                }
+                None => {
+                    // The game dropped the connection.
+                    let _ = sink.send(Message::Close(None)).await;
                     return Ok(());
                 }
-            }
-        }
-        if last_ping.elapsed() > PING_EVERY {
-            send(&mut ws, &ClientMsg::Ping)?;
-            last_ping = Instant::now();
-        }
-        if last_heard.elapsed() > SILENCE_LIMIT {
-            return Err("Lost contact with the server.".into());
-        }
-        // Incoming.
-        match ws.read() {
-            Ok(Message::Text(text)) => {
-                last_heard = Instant::now();
-                match parse_server(text.as_str()) {
-                    Ok(msg) => {
-                        if in_tx.send(NetEvent::Message(Box::new(msg))).is_err() {
-                            return Ok(());
+            },
+            incoming = source.next() => match incoming {
+                Some(Ok(Message::Text(text))) => {
+                    last_heard = tokio::time::Instant::now();
+                    match parse_server(text.as_str()) {
+                        Ok(msg) => {
+                            if in_tx.send(NetEvent::Message(Box::new(msg))).is_err() {
+                                return Ok(());
+                            }
                         }
+                        Err(e) => eprintln!("ignoring malformed server message: {e}"),
                     }
-                    Err(e) => eprintln!("ignoring malformed server message: {e}"),
                 }
+                Some(Ok(Message::Close(_))) | None => {
+                    return Err("The server closed the connection.".into())
+                }
+                Some(Ok(_)) => last_heard = tokio::time::Instant::now(),
+                Some(Err(tungstenite::Error::ConnectionClosed | tungstenite::Error::AlreadyClosed)) => {
+                    return Err("The server closed the connection.".into())
+                }
+                Some(Err(e)) => return Err(friendly(&e)),
+            },
+            _ = ping.tick() => {
+                if last_heard.elapsed() > SILENCE_LIMIT {
+                    return Err("Lost contact with the server.".into());
+                }
+                sink.send(send_msg(&ClientMsg::Ping)).await.map_err(|e| friendly(&e))?;
             }
-            Ok(Message::Close(_)) => return Err("The server closed the connection.".into()),
-            Ok(_) => last_heard = Instant::now(),
-            Err(tungstenite::Error::Io(e))
-                if matches!(e.kind(), ErrorKind::WouldBlock | ErrorKind::TimedOut) => {}
-            Err(tungstenite::Error::ConnectionClosed | tungstenite::Error::AlreadyClosed) => {
-                return Err("The server closed the connection.".into());
-            }
-            Err(e) => return Err(friendly(&e)),
         }
     }
 }
@@ -201,14 +204,20 @@ fn run(url: &str, out_rx: &Receiver<ClientMsg>, in_tx: &Sender<NetEvent>) -> Res
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::time::Instant;
+
+    fn run_blocking(url: &str) -> Result<(), String> {
+        let (_tx, out_rx) = unbounded_channel();
+        let (in_tx, _rx) = channel();
+        let rt = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
+        rt.block_on(run(url, out_rx, &in_tx))
+    }
 
     #[test]
     fn bad_addresses_fail_cleanly() {
-        let (_tx, out_rx) = channel();
-        let (in_tx, _rx) = channel();
-        let err = run("not a url", &out_rx, &in_tx).unwrap_err();
+        let err = run_blocking("not a url").unwrap_err();
         assert!(err.contains("wss://"), "{err}");
-        let err = run("ws://127.0.0.1:1/ws", &out_rx, &in_tx).unwrap_err();
+        let err = run_blocking("ws://127.0.0.1:1/ws").unwrap_err();
         assert!(
             ["refused", "recusada", "Network", "rede"].iter().any(|w| err.contains(w)),
             "{err}"
@@ -219,9 +228,53 @@ mod tests {
     #[test]
     #[ignore]
     fn tls_handshake_reaches_http() {
-        let (_tx, out_rx) = channel();
-        let (in_tx, _rx) = channel();
-        let err = run("wss://example.com/ws", &out_rx, &in_tx).unwrap_err();
+        let err = run_blocking("wss://example.com/ws").unwrap_err();
         assert!(!err.contains("Secure connection failed"), "{err}");
+    }
+
+    fn wait_for(c: &mut Connection, what: &str, pred: impl Fn(&ServerMsg) -> bool) -> Instant {
+        let deadline = Instant::now() + Duration::from_secs(10);
+        loop {
+            match c.poll() {
+                Some(NetEvent::Message(m)) if pred(&m) => return Instant::now(),
+                Some(NetEvent::Closed(r)) => panic!("closed while waiting for {what}: {r}"),
+                Some(_) => {}
+                None => {
+                    assert!(Instant::now() < deadline, "timed out waiting for {what}");
+                    std::thread::yield_now();
+                }
+            }
+        }
+    }
+
+    /// A chat line goes from one game to another through a server in
+    /// milliseconds (it used to wait on socket read timeouts).
+    #[test]
+    fn messages_cross_the_server_at_once() {
+        let host = snook_server::lan::LanHost::start("test").expect("host");
+        let url = format!("ws://127.0.0.1:{}/ws", host.port);
+        let mut a = Connection::open(&url);
+        let mut b = Connection::open(&url);
+        for (c, name) in [(&mut a, "alpha"), (&mut b, "bravo")] {
+            // The hello is queued first, so the sign-in can go at once.
+            c.send(ClientMsg::Guest { name: name.into() });
+            wait_for(c, "auth", |m| matches!(m, ServerMsg::AuthOk { .. }));
+        }
+        let mut worst = Duration::ZERO;
+        for k in 0..20 {
+            // Chat is rate-limited: stay under it.
+            std::thread::sleep(Duration::from_millis(1100));
+            let text = format!("ping {k}");
+            let sent = Instant::now();
+            a.send(ClientMsg::Chat { text: text.clone() });
+            let got = wait_for(
+                &mut b,
+                "chat",
+                |m| matches!(m, ServerMsg::Chat { line } if line.text == text),
+            );
+            worst = worst.max(got - sent);
+        }
+        println!("worst chat latency through the server: {worst:?}");
+        assert!(worst < Duration::from_millis(50), "chat took {worst:?}");
     }
 }
