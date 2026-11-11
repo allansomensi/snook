@@ -10,7 +10,9 @@ use snook_core::{
     ShotError, ShotReport, Simulation,
 };
 
-use snook_proto::{AimState, ChatKind, ChatLine, ClientMsg, MatchResult, PlayerInfo, ServerMsg};
+use snook_proto::{
+    AimState, ChatKind, ChatLine, ClientMsg, MatchResult, PlayerInfo, SPECTATOR_SEAT, ServerMsg,
+};
 
 use crate::config::AimGuide;
 use crate::i18n::{t, tw};
@@ -149,8 +151,13 @@ pub struct OnlineMatch {
     pub preview: Option<(FeedLine, f32)>,
     /// Achievements of this player (they unlock reactions).
     pub unlocked: Vec<String>,
-    /// Reactions on screen: who sent which, and for how long it has shown.
+    /// Reactions on screen: who sent which (a seat, or [`SPECTATOR_SEAT`]),
+    /// and for how long it has shown.
     pub reactions: Vec<(usize, &'static str, f32)>,
+    /// Watching a friend's game (`seat` is the friend's).
+    pub spectator: bool,
+    /// How many people are watching.
+    pub spectators: u32,
     /// The opponent has sent their aim this turn (until then their cue is hidden).
     pub remote_aimed: bool,
     /// The opponent's latest aim; the cue glides towards it.
@@ -240,15 +247,19 @@ impl Match {
         clock_left: f32,
         tournament: Option<u64>,
         guide: AimGuide,
+        spectating: bool,
     ) -> Self {
         let mut controllers = [Controller::Remote; 2];
         // Development aid: SNOOK_AUTOPLAY=1 lets the computer play this seat
         // (two such games can play a whole online match by themselves).
-        controllers[seat] = if crate::dev::flag("SNOOK_AUTOPLAY") {
-            Controller::Computer(Difficulty::Hard)
-        } else {
-            Controller::Human
-        };
+        // A spectator only watches: both seats are played from the server.
+        if !spectating {
+            controllers[seat] = if crate::dev::flag("SNOOK_AUTOPLAY") {
+                Controller::Computer(Difficulty::Hard)
+            } else {
+                Controller::Human
+            };
+        }
         let mut m = Match {
             game,
             names: [players[0].username.clone(), players[1].username.clone()],
@@ -283,6 +294,8 @@ impl Match {
                 preview: None,
                 unlocked: Vec::new(),
                 reactions: Vec::new(),
+                spectator: spectating,
+                spectators: 0,
                 remote_aimed: false,
                 remote_target: None,
                 sim_turn: None,
@@ -1218,14 +1231,23 @@ impl Match {
                 o.push_feed(feed);
             }
             ServerMsg::Reaction { seat, code } => {
-                if let Some(r) = snook_proto::reaction(&code)
-                    && seat < 2
-                {
-                    // One at a time per player: a new one replaces the last.
-                    o.reactions.retain(|(s, ..)| *s != seat);
-                    o.reactions.push((seat, r.code, 0.0));
+                if let Some(r) = snook_proto::reaction(&code) {
+                    if seat < 2 {
+                        // One at a time per player: a new one replaces the last.
+                        o.reactions.retain(|(s, ..)| *s != seat);
+                    } else {
+                        // The crowd: a few at most, the oldest go first.
+                        let crowd = o.reactions.iter().filter(|(s, ..)| *s >= 2).count();
+                        if crowd >= 4
+                            && let Some(i) = o.reactions.iter().position(|(s, ..)| *s >= 2)
+                        {
+                            o.reactions.remove(i);
+                        }
+                    }
+                    o.reactions.push((seat.min(SPECTATOR_SEAT), r.code, 0.0));
                 }
             }
+            ServerMsg::Spectators { count } => o.spectators = count,
             ServerMsg::Error { message } => {
                 self.notify(crate::i18n::server_text(&message), true);
             }
@@ -1240,10 +1262,16 @@ impl Match {
         }
     }
 
+    /// Watching someone else's game.
+    pub fn is_spectating(&self) -> bool {
+        self.online.as_ref().is_some_and(|o| o.spectator)
+    }
+
     /// Sends a chat line to the opponent.
     pub fn send_chat(&mut self, text: &str) {
         let text = snook_proto::clean_chat(text);
         if let Some(o) = self.online.as_mut()
+            && !o.spectator
             && !text.is_empty()
         {
             o.outbox.push(ClientMsg::MatchChat { text });
@@ -1297,7 +1325,7 @@ mod tests {
 
     fn online_match(seat: usize) -> Match {
         let game = EightBallGame::new(4, 0);
-        Match::online(1, seat, &players(), false, game, 30, 30.0, None, AimGuide::Full)
+        Match::online(1, seat, &players(), false, game, 30, 30.0, None, AimGuide::Full, false)
     }
 
     fn finish_animation(m: &mut Match) {

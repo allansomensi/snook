@@ -306,6 +306,76 @@ async fn reactions_need_to_be_unlocked() {
 }
 
 #[tokio::test]
+async fn friends_can_watch_and_react() {
+    let url = start(Rules::default()).await;
+    let (mut alice, _) = Client::register(&url, "alice").await;
+    let (mut bob, _) = Client::register(&url, "bob").await;
+    let (mut carol, _) = Client::register(&url, "carol").await;
+    let (mut dave, _) = Client::register(&url, "dave").await;
+    carol.send(ClientMsg::FriendRequest { username: "alice".into() }).await;
+    alice.expect("request", |m| matches!(m, ServerMsg::FriendRequestReceived { .. })).await;
+    alice.send(ClientMsg::FriendAnswer { username: "carol".into(), accept: true }).await;
+    carol
+        .expect(
+            "friends",
+            |m| matches!(m, ServerMsg::Friends { friends, .. } if !friends.is_empty()),
+        )
+        .await;
+    let (game, sa, _) = start_match(&mut alice, &mut bob, "bob", "alice", false).await;
+
+    // Not a friend: refused.
+    dave.send(ClientMsg::Spectate { username: "alice".into() }).await;
+    dave.expect("refused", |m| matches!(m, ServerMsg::Error { .. })).await;
+
+    // A friend watches, from Alice's side; both players see the count.
+    carol.send(ClientMsg::Spectate { username: "alice".into() }).await;
+    let ServerMsg::MatchStarted { seat, spectating, .. } =
+        carol.expect("watching", |m| matches!(m, ServerMsg::MatchStarted { .. })).await
+    else {
+        unreachable!()
+    };
+    assert!(spectating);
+    assert_eq!(seat, sa);
+    for c in [&mut alice, &mut bob] {
+        c.expect("count", |m| matches!(m, ServerMsg::Spectators { count: 1 })).await;
+    }
+
+    // The spectator sees the shots and can react (quietly).
+    let d = ai::decide(&game, Difficulty::Easy, 1);
+    let shooter = if game.current_player() == sa { &mut alice } else { &mut bob };
+    shooter
+        .send(ClientMsg::Shoot {
+            turn: 0,
+            shot: d.shot,
+            called_pocket: d.called_pocket,
+            cue_ball: d.cue_ball,
+        })
+        .await;
+    carol.expect("shot", |m| matches!(m, ServerMsg::ShotTaken { .. })).await;
+    carol.expect("result", |m| matches!(m, ServerMsg::ShotResult { .. })).await;
+    carol.send(ClientMsg::React { code: "clap".into() }).await;
+    bob.expect(
+        "crowd",
+        |m| matches!(m, ServerMsg::Reaction { seat, .. } if *seat == snook_proto::SPECTATOR_SEAT),
+    )
+    .await;
+    // Players' chat stays between them.
+    alice.send(ClientMsg::MatchChat { text: "psst".into() }).await;
+    bob.expect("chat", |m| matches!(m, ServerMsg::MatchChat { .. })).await;
+
+    // The game ends; when Alice goes back to the lounge, so does Carol.
+    alice.send(ClientMsg::Resign).await;
+    carol.expect("ended", |m| matches!(m, ServerMsg::MatchEnded { .. })).await;
+    alice.send(ClientMsg::LeaveMatch).await;
+    let m = carol
+        .expect("back", |m| {
+            matches!(m, ServerMsg::SpectateEnded { .. } | ServerMsg::MatchChat { .. })
+        })
+        .await;
+    assert!(matches!(m, ServerMsg::SpectateEnded { .. }), "the spectator got the players' chat");
+}
+
+#[tokio::test]
 async fn login_errors_and_validation() {
     let url = start(Rules::default()).await;
     let (_alice, token) = Client::register(&url, "Alice").await;

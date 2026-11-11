@@ -362,6 +362,10 @@ impl Online {
                     if let Some(to) = crate::dev::var("SNOOK_AUTOINVITE") {
                         self.send(ClientMsg::Invite { to, rated: true });
                     }
+                    // SNOOK_AUTOWATCH=<name> watches that friend's game.
+                    if let Some(username) = crate::dev::var("SNOOK_AUTOWATCH") {
+                        self.send(ClientMsg::Spectate { username });
+                    }
                 }
             }
             ServerMsg::AuthError { reason } => {
@@ -506,11 +510,14 @@ impl Online {
                 shot_clock_secs,
                 clock_left,
                 tournament,
+                spectating,
             } => {
                 self.outgoing = None;
-                self.incoming.clear();
+                if !spectating {
+                    self.incoming.clear();
+                }
                 // Development aid: SNOOK_AUTOCHAT="text" says it at the start of a match.
-                if let Some(text) = crate::dev::var("SNOOK_AUTOCHAT") {
+                if let Some(text) = crate::dev::var("SNOOK_AUTOCHAT").filter(|_| !spectating) {
                     self.send(ClientMsg::MatchChat { text });
                 }
                 // SNOOK_AUTOREACT="code" sends that reaction.
@@ -527,6 +534,7 @@ impl Online {
                     clock_left,
                     tournament,
                     config.guide,
+                    spectating,
                 );
                 match current.as_mut() {
                     // Same match after reconnecting, or a rematch with the same opponent.
@@ -548,6 +556,12 @@ impl Online {
                 Some(m) if m.is_online() => m.handle_server(ServerMsg::Error { message }),
                 _ => self.toast(crate::i18n::server_text(&message), false),
             },
+            ServerMsg::SpectateEnded { reason } => {
+                if current.as_ref().is_some_and(|m| m.is_spectating()) {
+                    *current = None;
+                }
+                self.toast(crate::i18n::server_text(&reason), false);
+            }
             ServerMsg::MyAchievements { codes } => {
                 if let Some(o) = current.as_mut().and_then(|m| m.online.as_mut()) {
                     o.unlocked = codes.clone();
@@ -569,7 +583,16 @@ impl Online {
     }
 
     /// Called when the player leaves the table to go back to the lounge.
+    /// Starts watching a friend's game.
+    pub fn spectate(&mut self, name: &str) {
+        self.send(ClientMsg::Spectate { username: name.to_string() });
+    }
+
     pub fn leave_match(&mut self, m: &Match) {
+        if m.is_spectating() {
+            self.send(ClientMsg::StopSpectating);
+            return;
+        }
         if m.game.game_over().is_none() {
             self.send(ClientMsg::Resign);
         }
@@ -1112,6 +1135,7 @@ impl Online {
         self.list_first = ui.scroll_list(list, self.list_first, players.len(), visible);
         let mut invite = None;
         let mut open = None;
+        let mut watch = None;
         for (k, p) in players.iter().skip(self.list_first).take(visible).enumerate() {
             let r = Rect::new(list.x, list.y + k as f32 * row_h, list.w - 8.0, row_h - 6.0);
             let hover = ui.hovering(r);
@@ -1123,14 +1147,26 @@ impl Online {
             if ui.clicked(name_r) && !p.guest {
                 open = Some(p.username.clone());
             }
-            let can = p.status == PlayerStatus::Available && self.outgoing.is_none();
-            if ui.button(Rect::new(r.x + r.w - 96.0, r.y + 7.0, 88.0, r.h - 14.0), t("Invite"), can)
-            {
-                invite = Some(p.username.clone());
+            let button = Rect::new(r.x + r.w - 96.0, r.y + 7.0, 88.0, r.h - 14.0);
+            // Friends' games (anyone's on a local network) can be watched.
+            let friend =
+                self.lan || self.friends.friends.iter().any(|f| f.player.username == p.username);
+            if p.status == PlayerStatus::Playing && friend {
+                if ui.icon_button(button, Icon::Eye, t("Watch the game"), true) {
+                    watch = Some(p.username.clone());
+                }
+            } else {
+                let can = p.status == PlayerStatus::Available && self.outgoing.is_none();
+                if ui.button(button, t("Invite"), can) {
+                    invite = Some(p.username.clone());
+                }
             }
         }
         if let Some(to) = invite {
             self.send(ClientMsg::Invite { to, rated: self.rated_games && !self.lan });
+        }
+        if let Some(name) = watch {
+            self.spectate(&name);
         }
         open.map(OnlineAction::Profile)
     }
@@ -1632,6 +1668,7 @@ impl Online {
         self.list_first = ui.scroll_list(list, self.list_first, total, visible);
         let mut invite = None;
         let mut remove = None;
+        let mut watch = None;
         let friends = self.friends.friends.clone();
         let outgoing = self.friends.outgoing.clone();
         let rows = friends.iter().map(Some).chain(outgoing.iter().map(|_| None));
@@ -1661,15 +1698,27 @@ impl Online {
                     if ui.clicked(name_r) {
                         action = Some(OnlineAction::Profile(f.player.username.clone()));
                     }
-                    let can = f.online
-                        && f.player.status == PlayerStatus::Available
-                        && self.outgoing.is_none();
-                    if ui.button(
-                        Rect::new(r.x + r.w - 136.0, r.y + 6.0, 88.0, r.h - 12.0),
-                        t("Invite"),
-                        can,
-                    ) {
-                        invite = Some(f.player.username.clone());
+                    if f.online && f.player.status == PlayerStatus::Playing {
+                        // Watch their game.
+                        if ui.icon_button(
+                            Rect::new(r.x + r.w - 136.0, r.y + 6.0, 88.0, r.h - 12.0),
+                            Icon::Eye,
+                            t("Watch the game"),
+                            true,
+                        ) {
+                            watch = Some(f.player.username.clone());
+                        }
+                    } else {
+                        let can = f.online
+                            && f.player.status == PlayerStatus::Available
+                            && self.outgoing.is_none();
+                        if ui.button(
+                            Rect::new(r.x + r.w - 136.0, r.y + 6.0, 88.0, r.h - 12.0),
+                            t("Invite"),
+                            can,
+                        ) {
+                            invite = Some(f.player.username.clone());
+                        }
                     }
                     if ui.icon_button_ex(
                         Rect::new(r.x + r.w - 40.0, r.y + 6.0, 32.0, r.h - 12.0),
@@ -1702,6 +1751,9 @@ impl Online {
         }
         if let Some(username) = remove {
             self.send(ClientMsg::FriendRemove { username });
+        }
+        if let Some(name) = watch {
+            self.spectate(&name);
         }
         action
     }

@@ -296,7 +296,21 @@ impl Hud {
         let x0 = ((sw - total) / 2.0).max(buttons_w).min(sw - total - 8.0);
         player_card(ui, m, 0, x0, 6.0, card_w);
         player_card(ui, m, 1, x0 + card_w + 10.0, 6.0, card_w);
-        draw_reactions(m, [x0 + 34.0, x0 + total - 34.0]);
+        // How many are watching: an eye and the number, by the cards.
+        let eye = vec2(x0 + total + 22.0, 27.0);
+        if let Some(o) = &m.online
+            && (o.spectators > 0 || o.spectator)
+        {
+            let n = o.spectators.to_string();
+            let tip =
+                Rect::new(eye.x - 14.0, eye.y - 14.0, 28.0 + ui.text_size(&n, 13.0, true).x, 28.0);
+            crate::icons::draw(Icon::Eye, eye, 20.0, MUTED);
+            ui.text(&n, eye.x + 14.0, eye.y - 8.0, 13.0, MUTED, true);
+            if ui.hovering(tip) {
+                ui.tooltip(&tw("{n} watching", &[("n", &n)]), tip);
+            }
+        }
+        draw_reactions(m, [x0 + 34.0, x0 + total - 34.0], eye);
         let mut y = TOP_BAR + 8.0;
         if let Some(status) = status_line(m) {
             let w = ui.text_size(&status, 15.0, false).x + 24.0;
@@ -327,13 +341,25 @@ impl Hud {
 
         // Cue panel (spin, elevation, fine aim) and the power stroke bar:
         // everything can be played with the mouse alone.
-        self.draw_bottom_bar(ui, m);
+        if m.is_spectating() {
+            if self.draw_spectator_bar(ui, m) {
+                action = HudAction::Lounge;
+            }
+        } else {
+            self.draw_bottom_bar(ui, m);
+        }
 
         // Menu, the overhead view and the replay, in the top bar.
         if !self.paused {
+            let label = if m.is_spectating() { t("Leave") } else { t("Menu") };
             let w = ui.text_size(t("Menu"), 13.0, true).x + 22.0;
-            if ui.button(Rect::new(10.0, 12.0, w, 30.0), t("Menu"), true) {
-                self.paused = true;
+            if ui.button(Rect::new(10.0, 12.0, w, 30.0), label, true) {
+                // A spectator has nothing to pause: the menu just leaves.
+                if m.is_spectating() {
+                    action = HudAction::Lounge;
+                } else {
+                    self.paused = true;
+                }
             }
             let mut x = 10.0 + w + 8.0;
             if ui.icon_button(
@@ -409,7 +435,7 @@ impl Hud {
             }
         }
 
-        if m.is_online() {
+        if m.is_online() && !m.is_spectating() {
             self.draw_chat(ui, m);
         }
 
@@ -417,7 +443,7 @@ impl Hud {
         if let (Phase::GameOver, Some(over), true) = (&m.phase, m.game.game_over(), m.is_online()) {
             let o = m.online.as_ref().expect("online");
             let me = o.seat;
-            let won = over.winner == me;
+            let won = over.winner == me && !o.spectator;
             let r = Rect::new(sw / 2.0 - 220.0, sh / 2.0 - 110.0, 440.0, 220.0);
             ui.panel(r);
             crate::ui::rrect_lines(r, 8.0, 2.0, if won { GOLD } else { BORDER });
@@ -467,7 +493,9 @@ impl Hud {
                     false,
                 ),
             }
-            let note = if o.tournament.is_some() {
+            let note = if o.spectator {
+                String::new()
+            } else if o.tournament.is_some() {
                 t("Tournament game: the next round starts from the lounge.").to_string()
             } else if o.opponent_left {
                 t("Your opponent went back to the lounge.").to_string()
@@ -479,22 +507,42 @@ impl Hud {
                 String::new()
             };
             ui.text_centered(&note, sw / 2.0, r.y + 138.0, 14.0, GOLD, false);
-            let can_rematch = !o.opponent_left && !o.rematch_requested && o.tournament.is_none();
-            let label = if o.rematch_offered { t("Accept rematch") } else { t("Rematch") };
-            let rr = Rect::new(r.x + 30.0, r.y + 164.0, 180.0, 38.0);
-            if can_rematch {
-                if ui.primary_button(rr, label) {
-                    m.rematch();
+            if o.spectator {
+                ui.text_centered(
+                    t("If they play again, you keep watching."),
+                    sw / 2.0,
+                    r.y + 138.0,
+                    14.0,
+                    MUTED,
+                    false,
+                );
+                if ui.button(
+                    Rect::new(sw / 2.0 - 100.0, r.y + 164.0, 200.0, 38.0),
+                    t("Stop watching"),
+                    true,
+                ) {
+                    action = HudAction::Lounge;
                 }
-            } else {
-                ui.button(rr, t("Rematch"), false);
             }
-            if ui.button(
-                Rect::new(r.x + 230.0, r.y + 164.0, 180.0, 38.0),
-                t("Back to lounge"),
-                true,
-            ) {
-                action = HudAction::Lounge;
+            if !o.spectator {
+                let can_rematch =
+                    !o.opponent_left && !o.rematch_requested && o.tournament.is_none();
+                let label = if o.rematch_offered { t("Accept rematch") } else { t("Rematch") };
+                let rr = Rect::new(r.x + 30.0, r.y + 164.0, 180.0, 38.0);
+                if can_rematch {
+                    if ui.primary_button(rr, label) {
+                        m.rematch();
+                    }
+                } else {
+                    ui.button(rr, t("Rematch"), false);
+                }
+                if ui.button(
+                    Rect::new(r.x + 230.0, r.y + 164.0, 180.0, 38.0),
+                    t("Back to lounge"),
+                    true,
+                ) {
+                    action = HudAction::Lounge;
+                }
             }
         } else if let (Phase::GameOver, Some(over)) = (&m.phase, m.game.game_over()) {
             let all_computers = m.controllers.iter().all(|c| matches!(c, Controller::Computer(_)));
@@ -906,12 +954,25 @@ const REACTION_TIME: f32 = 2.8;
 
 /// Reactions float down from the sender's card and fade (drawn even while
 /// the HUD fades for aiming: they are meant to be seen).
-fn draw_reactions(m: &mut Match, xs: [f32; 2]) {
+fn draw_reactions(m: &mut Match, xs: [f32; 2], eye: Vec2) {
     let dt = get_frame_time();
     let Some(o) = m.online.as_mut() else { return };
+    let mut crowd = 0;
     for (seat, code, age) in &mut o.reactions {
         *age += dt;
         let t = *age;
+        if *seat >= 2 {
+            // From the spectators: small, faint, drifting down from the eye,
+            // side by side, so the players hardly notice them.
+            let alpha = 0.75 * (t / 0.2).min(1.0) * ((REACTION_TIME - t) / 0.8).clamp(0.0, 1.0);
+            let at = vec2(
+                eye.x + 4.0 + crowd as f32 * 20.0,
+                TOP_BAR + 14.0 + 18.0 * (t / REACTION_TIME),
+            );
+            crate::reactions::draw(code, at, 18.0, alpha);
+            crowd += 1;
+            continue;
+        }
         let pop = if t < 0.25 {
             0.6 + 0.4 * (t / 0.25) + 0.25 * (t / 0.25 * std::f32::consts::PI).sin()
         } else {
@@ -1000,7 +1061,7 @@ fn turn_title(m: &Match) -> String {
     let player = m.game.current_player();
     let name = &m.names[player];
     let mine = match &m.online {
-        Some(o) => o.seat == player,
+        Some(o) => o.seat == player && !o.spectator,
         None => {
             m.controllers[player] == Controller::Human
                 && m.controllers.iter().filter(|c| **c == Controller::Human).count() == 1
@@ -1033,6 +1094,28 @@ fn turn_subtitle(m: &Match) -> String {
 
 impl Hud {
     /// The bottom bar: game log, the power bar and the cue settings.
+    /// Watching a friend: who, the reactions and a way out. Returns true to
+    /// stop watching.
+    fn draw_spectator_bar(&mut self, ui: &mut Ui, m: &mut Match) -> bool {
+        let sw = crate::ui::vw();
+        let sh = crate::ui::vh();
+        let bar = Rect::new(0.0, sh - BOTTOM_BAR, sw, BOTTOM_BAR);
+        draw_bar(bar, false);
+        let Some(o) = m.online.as_ref() else { return false };
+        let friend = m.names[o.seat].clone();
+        let cy = bar.y + bar.h / 2.0;
+        crate::icons::draw(Icon::Eye, vec2(30.0, cy), 22.0, GOLD);
+        ui.text(&tw("Watching {name}", &[("name", &friend)]), 50.0, cy - 17.0, 16.0, CREAM, true);
+        ui.text(t("Your reactions reach the table quietly."), 50.0, cy + 4.0, 12.0, MUTED, false);
+        let text_w = ui
+            .text_size(&tw("Watching {name}", &[("name", &friend)]), 16.0, true)
+            .x
+            .max(ui.text_size(t("Your reactions reach the table quietly."), 12.0, false).x);
+        self.reaction_button(ui, m, Rect::new(50.0 + text_w + 18.0, cy - 18.0, 36.0, 36.0));
+        let w = ui.text_size(t("Stop watching"), 13.0, true).x + 32.0;
+        ui.button(Rect::new(sw - w - 14.0, cy - 18.0, w, 36.0), t("Stop watching"), true)
+    }
+
     fn draw_bottom_bar(&mut self, ui: &mut Ui, m: &mut Match) {
         let sw = crate::ui::vw();
         let sh = crate::ui::vh();

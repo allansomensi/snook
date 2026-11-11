@@ -810,6 +810,22 @@ async fn handle_socket(server: Arc<Server>, socket: WebSocket, ip: IpAddr) {
                     None => send(ServerMsg::Error { message: "No such player.".into() }),
                 }
             }
+            // Friends only (anyone on a local network, where there are none).
+            ClientMsg::Spectate { username } => {
+                let allowed = server.config.rules.lan
+                    || (!guest
+                        && server.store.friends(me.id).await.is_ok_and(|list| {
+                            list.iter().any(|(u, st)| {
+                                *st == FriendState::Friends
+                                    && u.username.eq_ignore_ascii_case(&username)
+                            })
+                        }));
+                if allowed {
+                    server.with(|l| l.spectate(&lounge::key(&me.username), &username));
+                } else {
+                    send(ServerMsg::Error { message: "You can only watch your friends.".into() });
+                }
+            }
             msg if guest && is_account_msg(&msg) => {
                 send(ServerMsg::Error { message: "Guests don't have this.".into() })
             }

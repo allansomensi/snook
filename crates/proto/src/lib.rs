@@ -20,8 +20,11 @@ use glam::DVec2;
 use serde::{Deserialize, Serialize};
 use snook_core::{EightBallGame, GameOverReason, PocketId, Shot, ShotReport};
 
+/// The `seat` of a reaction sent by a spectator.
+pub const SPECTATOR_SEAT: usize = 2;
+
 /// Bumped whenever messages change incompatibly.
-pub const PROTOCOL_VERSION: u32 = 7;
+pub const PROTOCOL_VERSION: u32 = 8;
 
 /// Username rules: 3–16 characters, letters, digits and underscores.
 pub fn valid_username(name: &str) -> bool {
@@ -429,10 +432,16 @@ pub enum ClientMsg {
     MatchChat {
         text: String,
     },
-    /// A reaction (see [`REACTIONS`]) during a match.
+    /// A reaction (see [`REACTIONS`]) during a match, as a player or a
+    /// spectator.
     React {
         code: String,
     },
+    /// Watch the games of this friend (follows them from game to game).
+    Spectate {
+        username: String,
+    },
+    StopSpectating,
     Invite {
         to: String,
         rated: bool,
@@ -621,6 +630,9 @@ pub enum ServerMsg {
         /// Part of this tournament.
         #[serde(default)]
         tournament: Option<u64>,
+        /// Sent to a spectator: `seat` is the friend being watched.
+        #[serde(default)]
+        spectating: bool,
     },
     OpponentAim {
         aim: AimState,
@@ -666,10 +678,19 @@ pub enum ServerMsg {
     MatchChat {
         line: ChatLine,
     },
-    /// A player at the table sent a reaction.
+    /// A reaction at the table: `seat` 0 or 1 from a player,
+    /// [`SPECTATOR_SEAT`] from someone watching.
     Reaction {
         seat: usize,
         code: String,
+    },
+    /// How many people are watching this match.
+    Spectators {
+        count: u32,
+    },
+    /// The friend being watched went back to the lounge (or left).
+    SpectateEnded {
+        reason: String,
     },
     /// Every achievement this account has (after signing in and whenever
     /// one is unlocked): the game uses it to offer the reactions they grant.
@@ -828,6 +849,7 @@ mod tests {
             shot_clock_secs: 60,
             clock_left: 60.0,
             tournament: None,
+            spectating: false,
         };
         assert_eq!(parse_server(&msg.to_json()).unwrap(), msg);
         let c = ClientMsg::Shoot {

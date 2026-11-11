@@ -66,6 +66,14 @@ shooter                     server                         opponent
   1900 (`crates/core/src/rating.rs`). Two accounts get at most 3 rated games
   a day against each other; later ones are casual. Feats (8-ball wins,
   runouts, shutouts) count in rated games only.
+- `spectate { username }` watches a friend's games (anyone's on a local
+  network): `match_started { spectating: true, seat }` with `seat` the
+  friend's, then every shot, aim and result of that table, and the next game
+  too (rematch or a new opponent) until `stop_spectating` or
+  `spectate_ended` (the friend went back to the lounge). The players' chat
+  is not sent to spectators. Everyone at the table gets
+  `spectators { count }`. A spectator's `react` arrives as
+  `reaction { seat: 2 }`, through a limit shared by the whole crowd.
 - `react { code }` sends a reaction to the table (`reaction { seat, code }`
   to both players). Codes and what unlocks each are in
   `crates/proto/src/reactions.rs`; the server drops locked ones and allows a

@@ -29,6 +29,8 @@ pub enum Icon {
     Refresh,
     Table,
     Play,
+    /// Watching a game.
+    Eye,
 }
 
 fn arc(c: Vec2, r: f32, from: f32, to: f32, w: f32, color: Color) {
@@ -248,5 +250,12 @@ pub fn draw(icon: Icon, c: Vec2, s: f32, color: Color) {
             }
         }
         Icon::Play => draw_triangle(p(-0.45, -0.7), p(-0.45, 0.7), p(0.7, 0.0), color),
+        Icon::Eye => {
+            // Almond outline (two arcs) and the iris.
+            let r = 1.15 * h;
+            arc(c + vec2(0.0, 0.62 * h), r, -2.10, -1.04, w, color);
+            arc(c - vec2(0.0, 0.62 * h), r, 1.04, 2.10, w, color);
+            draw_circle(c.x, c.y, 0.30 * h, color);
+        }
     }
 }

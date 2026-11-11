@@ -16,6 +16,10 @@ First public version.
   place the caret, keys repeat when held.
 
 ### Online
+- Watch a friend's game: an eye next to them in Friends (or in the players
+  list) opens it; the players see an eye with how many are watching.
+  Spectators follow the friend into the rematch, can't read the players'
+  chat and can send reactions, which reach the table small and faint.
 - Reactions during a match: 4 for everyone; the other 16 come from hard
   rated-game achievements (100 games, 50 wins, 10 in a row, rating 2100…)
   and from winning a rated game during an event (Halloween, the holidays,

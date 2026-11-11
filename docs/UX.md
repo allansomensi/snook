@@ -56,6 +56,15 @@ What was reviewed in the game before the release, what changed and why.
   opponent's starts as soon as the server announces it; the opponent's cue
   glides instead of jumping 10 times a second.
 
+## Watching friends
+
+- An eye replaces "Invite" next to a friend who is playing. The game opens
+  as for a player, but the bottom bar only says who is being watched, the
+  reactions button and "Stop watching".
+- Players see an eye and the number of spectators by their cards (hover for
+  "3 watching"). Reactions from spectators are smaller and fainter than the
+  players' own and drift down from the eye, a few at most.
+
 ## Review before launch
 
 - Panels are almost opaque: the table behind no longer muddies the text.
