@@ -198,6 +198,10 @@ pub struct EightBallGame {
     ball_in_hand: Option<BallInHand>,
     game_over: Option<GameOver>,
     shots_taken: u32,
+    /// The pocket each player called for the 8-ball. A call is binding from
+    /// the first shot taken with it until the end of the game.
+    #[serde(default)]
+    called: [Option<PocketId>; 2],
 }
 
 impl EightBallGame {
@@ -218,6 +222,7 @@ impl EightBallGame {
             ball_in_hand: Some(BallInHand::Kitchen),
             game_over: None,
             shots_taken: 0,
+            called: [None, None],
         }
     }
 
@@ -325,6 +330,16 @@ impl EightBallGame {
             .unwrap_or(PocketId::FootLeft)
     }
 
+    /// The pocket `player` called for the 8-ball, once it is binding.
+    pub fn called_pocket_of(&self, player: usize) -> Option<PocketId> {
+        self.called[player % 2]
+    }
+
+    /// The current player is on the 8 but hasn't called a pocket yet.
+    pub fn may_call_pocket(&self) -> bool {
+        self.needs_called_pocket() && self.called[self.current].is_none()
+    }
+
     pub fn needs_called_pocket(&self) -> bool {
         !self.is_break && self.is_on_eight(self.current)
     }
@@ -369,6 +384,11 @@ impl EightBallGame {
         if self.ball_in_hand.is_some() && !self.can_place_cue_ball(self.ball(BallId::CUE).xy()) {
             return Err(ShotError::IllegalCueBallPosition);
         }
+        // Once called, the pocket for the 8 can't change.
+        let called_pocket = match self.called[self.current] {
+            Some(locked) if self.needs_called_pocket() => Some(locked),
+            _ => called_pocket,
+        };
         if self.needs_called_pocket() && called_pocket.is_none() {
             return Err(ShotError::MustCallPocket);
         }
@@ -400,6 +420,9 @@ impl EightBallGame {
         let shooter = self.current;
         let was_break = self.is_break;
         let on_eight = self.is_on_eight(shooter);
+        if on_eight && !was_break && pending.called_pocket.is_some() {
+            self.called[shooter] = pending.called_pocket;
+        }
         let events = sim.events();
 
         let first_contact_event = events.iter().find_map(|e| match *e {
@@ -883,6 +906,32 @@ mod tests {
         assert!(g.place_cue_ball(DVec2::new(0.0, 0.3)));
         let eight = g.ball(BallId::EIGHT).xy();
         assert!(!g.place_cue_ball(eight), "overlapping a ball");
+    }
+
+    #[test]
+    fn the_call_for_the_eight_is_binding() {
+        let mut g = EightBallGame::new(3, 0);
+        // Player 0 is on the 8 (every solid pocketed).
+        for b in g.balls.iter_mut() {
+            if (1..=7).contains(&b.id.0) {
+                b.status = BallStatus::Pocketed(PocketId::FootLeft);
+            }
+        }
+        g.groups = [Some(Group::Solids), Some(Group::Stripes)];
+        g.is_break = false;
+        g.ball_in_hand = None;
+        assert!(g.may_call_pocket());
+        // A soft shot that doesn't reach anything: the call becomes binding.
+        g.play_shot(&Shot::new(std::f64::consts::PI, 0.3), Some(PocketId::SideLeft)).unwrap();
+        assert_eq!(g.called_pocket_of(0), Some(PocketId::SideLeft));
+        g.current = 0;
+        g.ball_in_hand = None;
+        assert!(!g.may_call_pocket());
+        // A different pocket in the next shot is ignored.
+        let pending = g.prepare_shot(&Shot::new(0.0, 0.3), Some(PocketId::FootRight)).unwrap();
+        assert_eq!(pending.called_pocket, Some(PocketId::SideLeft));
+        // And no pocket at all is fine: the call stands.
+        assert!(g.prepare_shot(&Shot::new(0.0, 0.3), None).is_ok());
     }
 
     #[test]

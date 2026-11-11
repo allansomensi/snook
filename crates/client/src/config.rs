@@ -91,6 +91,8 @@ pub struct Config {
     /// Dark stage around the table (off: the whole bar room).
     pub focused_scene: bool,
     pub show_fps: bool,
+    /// Show the round trip to the server (lounge and online matches).
+    pub show_ping: bool,
     /// Interface size (1.0 = automatic for the window size).
     pub ui_size: f32,
     /// Multiplier for fine aiming with the mouse.
@@ -128,6 +130,7 @@ impl Default for Config {
             vignette: true,
             focused_scene: true,
             show_fps: false,
+            show_ping: false,
             aim_sensitivity: 1.0,
             ui_size: 1.0,
             quality: Quality::High,
@@ -189,6 +192,7 @@ impl Config {
                 "vignette" => c.vignette = v == "true",
                 "focused_scene" => c.focused_scene = v == "true",
                 "show_fps" => c.show_fps = v == "true",
+                "show_ping" => c.show_ping = v == "true",
                 "ui_size" => {
                     c.ui_size = v.parse::<f32>().map(|x| x.clamp(0.7, 1.5)).unwrap_or(c.ui_size)
                 }
@@ -222,7 +226,7 @@ impl Config {
 
     pub fn to_text(&self) -> String {
         format!(
-            "# Snook settings\nplayer_name = {}\nsecond_player_name = {}\nguide = {}\nshow_help = {}\nshot_camera = {}\ncamera_follow = {}\ngraphics_checked = {}\nlanguage = {}\nvignette = {}\nfocused_scene = {}\nshow_fps = {}\naim_sensitivity = {:.2}\nui_size = {:.2}\n\
+            "# Snook settings\nplayer_name = {}\nsecond_player_name = {}\nguide = {}\nshow_help = {}\nshot_camera = {}\ncamera_follow = {}\ngraphics_checked = {}\nlanguage = {}\nvignette = {}\nfocused_scene = {}\nshow_fps = {}\nshow_ping = {}\naim_sensitivity = {:.2}\nui_size = {:.2}\n\
              quality = {}\nmsaa = {}\nfullscreen = {}\nvolume = {:.2}\nserver = {}\nusername = {}\ntoken = {}\n\
              difficulty = {}\nshot_clock = {}\nlan_name = {}\n",
             self.player_name,
@@ -236,6 +240,7 @@ impl Config {
             self.vignette,
             self.focused_scene,
             self.show_fps,
+            self.show_ping,
             self.aim_sensitivity,
             self.ui_size,
             self.quality.name(),

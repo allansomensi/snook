@@ -356,6 +356,12 @@ fn pocket_candidates(g: &EightBallGame, prof: &Profile) -> Vec<Candidate> {
             if shot_ease(g, cue, target, pocket) <= 0.0 {
                 continue;
             }
+            // A called pocket is binding: the 8 can only go there.
+            if target == BallId::EIGHT
+                && g.called_pocket_of(g.current_player()).is_some_and(|c| c != pocket)
+            {
+                continue;
+            }
             let called = (target == BallId::EIGHT).then_some(pocket);
             let p = g.table().pocket(pocket);
             let t = g.ball(target).xy();
@@ -397,6 +403,11 @@ fn bank_candidates(g: &EightBallGame) -> Vec<Candidate> {
                 if !path_clear(g, cue, ghost, &[BallId::CUE, target]) {
                     continue;
                 }
+                if target == BallId::EIGHT
+                    && g.called_pocket_of(g.current_player()).is_some_and(|c| c != pocket)
+                {
+                    continue;
+                }
                 let called = (target == BallId::EIGHT).then_some(pocket);
                 out.push(Candidate { yaw: to_ghost.y.atan2(to_ghost.x), called });
             }
@@ -407,7 +418,9 @@ fn bank_candidates(g: &EightBallGame) -> Vec<Candidate> {
 
 /// Shots meant to hit a legal ball and leave the opponent in trouble.
 fn safety_options(g: &EightBallGame, me: usize, prof: &Profile) -> Vec<Scored> {
-    let called = g.needs_called_pocket().then(|| nearest_pocket(g, BallId::EIGHT));
+    let called = g.needs_called_pocket().then(|| {
+        g.called_pocket_of(g.current_player()).unwrap_or_else(|| nearest_pocket(g, BallId::EIGHT))
+    });
     let r = g.table().spec.ball_radius;
     let cue = g.ball(BallId::CUE).xy();
     let mut out = Vec::new();

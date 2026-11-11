@@ -384,7 +384,8 @@ fn click(m: &mut Match, scene: &Scene, at: Option<DVec2>) {
     if !matches!(m.phase, Phase::Turn { .. }) {
         return;
     }
-    if m.game.needs_called_pocket() {
+    // Calling a pocket for the 8 (only once: the call is then binding).
+    if m.game.may_call_pocket() {
         let nearest = PocketId::ALL
             .into_iter()
             .map(|id| (id, scene.pocket_center(id).distance(p)))

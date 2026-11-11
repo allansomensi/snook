@@ -840,7 +840,7 @@ impl Online {
         let title_w = ui.text_size("SNOOK", 24.0, true).x;
         let title = if self.lan { t("LAN game") } else { t("lounge") };
         ui.text(title, header.x + 66.0 + title_w, header.y + 19.0, 15.0, MUTED, false);
-        let online_text = match self.rtt {
+        let online_text = match self.rtt.filter(|_| config.show_ping) {
             Some(rtt) => tw(
                 "{n} online · ping {ms} ms",
                 &[("n", &self.players.len()), ("ms", &rtt.as_millis())],

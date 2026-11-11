@@ -231,6 +231,14 @@ fn status_line(m: &Match) -> Option<String> {
             if m.game.is_break() {
                 return Some(tw("{name} to break", &[("name", name)]));
             }
+            if let Some(pocket) = m.game.called_pocket_of(m.game.current_player())
+                && m.game.needs_called_pocket()
+            {
+                return Some(tw(
+                    "{name} is on the 8: called pocket {pocket}",
+                    &[("name", name), ("pocket", &crate::i18n::pocket(pocket))],
+                ));
+            }
             if m.game.needs_called_pocket() && m.called_pocket.is_none() {
                 return Some(tw(
                     "{name} is on the 8: click a pocket to call it",
@@ -312,7 +320,7 @@ impl Hud {
         // Cue panel (spin, elevation, fine aim) and the power stroke bar:
         // everything can be played with the mouse alone.
         self.draw_bottom_bar(ui, m);
-        if m.is_human_turn() && m.game.needs_called_pocket() && !self.paused {
+        if m.is_human_turn() && m.game.may_call_pocket() && !self.paused {
             draw_call_panel(ui, m);
         }
 
@@ -803,7 +811,10 @@ fn turn_subtitle(m: &Match) -> String {
         return t("Break the rack").into();
     }
     if m.game.needs_called_pocket() {
-        return t("On the 8-ball: call a pocket").into();
+        return match m.game.called_pocket_of(player) {
+            Some(p) => tw("On the 8-ball: {pocket} pocket", &[("pocket", &crate::i18n::pocket(p))]),
+            None => t("On the 8-ball: call a pocket").into(),
+        };
     }
     let group = match m.game.group_of(player) {
         Some(Group::Solids) => t("Solids (1–7)"),

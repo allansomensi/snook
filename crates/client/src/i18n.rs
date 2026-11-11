@@ -203,6 +203,11 @@ pub fn shot_error(e: ShotError) -> String {
 
 fn portuguese(en: &str) -> Option<&'static str> {
     Some(match en {
+        "{name} is on the 8: called pocket {pocket}" => {
+            "{name} está na bola 8: caçapa cantada {pocket}"
+        }
+        "On the 8-ball: {pocket} pocket" => "Na bola 8: caçapa {pocket}",
+        "Show ping (online)" => "Mostrar ping (online)",
         "{n} online · ping {ms} ms" => "{n} online · ping {ms} ms",
         "Right-drag · Wheel · C" => "Arraste com o botão direito · Roda · C",
         "Win %" => "% vit.",

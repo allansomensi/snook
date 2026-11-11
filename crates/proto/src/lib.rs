@@ -19,7 +19,7 @@ use serde::{Deserialize, Serialize};
 use snook_core::{EightBallGame, GameOverReason, PocketId, Shot, ShotReport};
 
 /// Bumped whenever messages change incompatibly.
-pub const PROTOCOL_VERSION: u32 = 5;
+pub const PROTOCOL_VERSION: u32 = 6;
 
 /// Username rules: 3–16 characters, letters, digits and underscores.
 pub fn valid_username(name: &str) -> bool {

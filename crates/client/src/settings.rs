@@ -102,6 +102,7 @@ impl SettingsScreen {
                 );
                 y += 32.0;
                 ui.checkbox(x, y, t("Show FPS"), &mut config.show_fps);
+                ui.checkbox(x + inner / 2.0, y, t("Show ping (online)"), &mut config.show_ping);
             }
             Tab::Game => {
                 ui.text(t("Language"), x, y + 1.0, 15.0, CREAM, false);

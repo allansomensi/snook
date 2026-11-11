@@ -673,7 +673,7 @@ async fn main() {
             }
         }
         // The round trip to the server, discreet, during online matches.
-        if current.as_ref().is_some_and(|m| m.is_online()) && !settings_open {
+        if config.show_ping && current.as_ref().is_some_and(|m| m.is_online()) && !settings_open {
             let rtt =
                 if match_from_lan { lan.as_ref().and_then(|l| l.net.rtt) } else { online.rtt };
             online::draw_ping(&ui, rtt, ui::vw() - 12.0, 64.0);

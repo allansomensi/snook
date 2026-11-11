@@ -467,7 +467,8 @@ impl Match {
         let computer_or_remote =
             computer.is_some() || self.current_controller() == Controller::Remote;
         self.aim = Aim { yaw: self.game.default_aim(), ..Aim::default() };
-        self.called_pocket = None;
+        // A pocket called for the 8 in an earlier visit still stands.
+        self.called_pocket = self.game.called_pocket_of(self.game.current_player());
         self.phase = Phase::Turn { placing_cue_ball: placing && !computer_or_remote, computer };
     }
 
@@ -694,7 +695,7 @@ impl Match {
             match ready {
                 Some(decision) => {
                     if let (Some(pocket), true) =
-                        (decision.called_pocket, self.game.needs_called_pocket())
+                        (decision.called_pocket, self.game.may_call_pocket())
                     {
                         let name = self.names[self.game.current_player()].clone();
                         let text = tw(
@@ -1081,6 +1082,7 @@ impl Match {
                 }
                 if let Some(pocket) = called_pocket
                     && self.online.as_ref().is_some_and(|o| o.seat != seat)
+                    && self.game.called_pocket_of(seat).is_none()
                 {
                     let text = tw(
                         "{name} calls the 8-ball in the {pocket} pocket.",
