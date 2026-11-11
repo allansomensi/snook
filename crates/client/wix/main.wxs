@@ -70,16 +70,15 @@
                             Name='snook.exe'
                             DiskId='1'
                             Source='$(var.CargoTargetBinDir)\snook.exe'
-                            KeyPath='yes'>
-                            <Shortcut
-                                Id='StartMenuShortcut'
-                                Directory='ProgramMenuFolder'
-                                Name='Snook'
-                                Description='3D eight-ball pool'
-                                WorkingDirectory='APPLICATIONFOLDER'
-                                Icon='SnookIcon'
-                                Advertise='no'/>
-                        </File>
+                            KeyPath='yes'/>
+                        <Shortcut
+                            Id='StartMenuShortcut'
+                            Directory='ProgramMenuFolder'
+                            Name='Snook'
+                            Description='3D eight-ball pool'
+                            Target='[#exe0]'
+                            WorkingDirectory='APPLICATIONFOLDER'
+                            Icon='SnookIcon'/>
                     </Component>
                     <Component Id='DesktopShortcut' Guid='17B40C4E-3C66-4817-9191-4025070C845E'>
                         <RegistryValue
