@@ -61,7 +61,7 @@ The interface is available in English and Brazilian Portuguese (Settings → Gam
 
 | Action | Mouse | Keyboard |
 |---|---|---|
-| Aim | drag the cue stick, or click a ball or any spot on the cloth | A / D, ← / → (speeds up while held) |
+| Aim | drag on the table (the cue points at the mouse) or drag the cue stick; click a ball or spot | A / D, ← / → (speeds up while held) |
 | Fine aim | Shift + drag | Shift + A / D |
 | Quick aim | click a ball or any spot on the cloth | |
 | Shoot | set the power on the bar, then press the green button with the cue and ball (bottom right) | hold **Space**, release |
@@ -70,7 +70,7 @@ The interface is available in English and Brazilian Portuguese (Settings → Gam
 | Cue elevation | elevation slider | W / S |
 | Ball in hand | drag the cue ball | B toggles, Enter confirms |
 | Call the 8-ball pocket | click a pocket on the table or on the little map (mandatory: the 8 in any other pocket loses) | |
-| Camera | drag with the left button anywhere else to turn the table (goes 3D); wheel or the zoom bar to zoom; the camera icon goes back to the top view with no zoom | Tab 3D/top, C reset |
+| Camera | drag with the right button to turn the table (goes 3D; the left button never moves the camera); wheel or the zoom bar to zoom; the camera icon goes back to the top view with no zoom | Tab 3D/top, C reset |
 | Replay of the last shot | the replay icon (top left) | R |
 | Menu / controls help | **Menu** button | Esc / H |
 | Full screen | | F11 |

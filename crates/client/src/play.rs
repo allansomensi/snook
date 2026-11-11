@@ -2,13 +2,13 @@
 //!
 //! | Action | Mouse | Keyboard |
 //! |---|---|---|
-//! | Aim | drag the cue, or click a spot (Shift-drag: fine) | A / D or ← / → |
+//! | Aim | left-drag on the table or the cue, click a spot (Shift: fine) | A / D or ← / → |
 //! | Spin | spin ball in the panel | ↑ / ↓, Q / E |
 //! | Cue elevation | elevation slider | W / S |
 //! | Shoot | power slider + Shoot | hold Space, release |
 //! | Ball in hand | drag the cue ball | B toggles, Enter confirms |
 //! | Call the 8-ball pocket | click a pocket | |
-//! | Camera | left-drag anywhere else turns the table, wheel zoom | Tab 3D/top, C top view |
+//! | Camera | right-drag turns the table (3D), wheel zoom | Tab 3D/top, C top view |
 
 use ::glam::DVec2;
 use macroquad::prelude::*;
@@ -32,6 +32,8 @@ enum DragMode {
     Place,
     /// Swinging the cue stick itself around the cue ball.
     Cue,
+    /// The cue points at the pointer.
+    Point,
     /// Shift-drag: very fine rotation.
     Fine,
 }
@@ -48,23 +50,17 @@ pub struct Controls {
     pub sensitivity: f32,
     /// The pointer is over the cue (shown with a "move" cursor).
     over_cue: bool,
-    /// A left-button drag that turns the camera (it didn't start on the cue,
-    /// the cue ball in hand, or with Shift held).
+    /// A right-button drag that turns the camera.
     orbiting: bool,
     /// How far the pointer moved during that drag.
     orbit_drag: f32,
-    /// A click on the table that should aim there.
-    pending_click: bool,
 }
 
 impl Controls {
     /// True while the player is aiming with the mouse (dragging the cue or
     /// the aim point, or moving the cue ball): the HUD gets out of the way.
     pub fn aiming(&self) -> bool {
-        !self.orbiting
-            && self.mode != DragMode::None
-            && is_mouse_button_down(MouseButton::Left)
-            && self.drag > 3.0
+        self.mode != DragMode::None && is_mouse_button_down(MouseButton::Left) && self.drag > 3.0
     }
 
     fn set_over_cue(&mut self, over: bool) {
@@ -119,45 +115,25 @@ impl Controls {
         &mut self,
         rig: &mut CameraRig,
         cam: &SceneCamera,
-        m: &Match,
-        radius: f32,
         ui_hovered: bool,
         typing: bool,
     ) {
         let mouse: Vec2 = mouse_position().into();
         let delta = mouse - self.last_mouse;
-        // The left button turns the table, except when it grabs something:
-        // the cue, the cue ball in hand, or a Shift-drag for fine aiming.
-        if is_mouse_button_pressed(MouseButton::Left) && !ui_hovered {
-            let my_turn = m.is_human_turn();
-            let cue = m.game.ball(snook_core::BallId::CUE).xy();
-            let near_cue_ball = pointer_on_table(cam, radius)
-                .is_some_and(|p| p.distance(cue) < radius as f64 * 1.8);
-            let shift = is_key_down(KeyCode::LeftShift) || is_key_down(KeyCode::RightShift);
-            let grabs = my_turn
-                && (shift
-                    || (m.game.ball_in_hand().is_some()
-                        && (m.is_placing_cue_ball() || near_cue_ball))
-                    || (!m.is_placing_cue_ball() && pointer_on_cue(m, cam, radius, mouse)));
-            self.orbiting = !grabs;
+        // Only the right button turns the table (going 3D from the top view);
+        // the left button is for aiming and never moves the camera.
+        if is_mouse_button_pressed(MouseButton::Right) && !ui_hovered {
+            self.orbiting = true;
             self.orbit_drag = 0.0;
         }
-        if self.orbiting && is_mouse_button_down(MouseButton::Left) {
+        if self.orbiting && is_mouse_button_down(MouseButton::Right) {
             self.orbit_drag += delta.length();
             // A few pixels of slack, so a click doesn't nudge the view.
             if self.orbit_drag > 4.0 {
                 self.orbit(rig, delta);
             }
         }
-        if self.orbiting && is_mouse_button_released(MouseButton::Left) {
-            // A click (no drag) on the table aims there, as before.
-            if self.orbit_drag <= 4.0 && !ui_hovered && m.is_human_turn() {
-                self.pending_click = true;
-            }
-            self.orbiting = false;
-        }
-        if !is_mouse_button_down(MouseButton::Left) && !is_mouse_button_released(MouseButton::Left)
-        {
+        if !is_mouse_button_down(MouseButton::Right) {
             self.orbiting = false;
         }
         if !typing {
@@ -204,7 +180,7 @@ impl Controls {
         let delta = mouse - self.last_mouse;
         self.last_mouse = mouse;
         rig.hold = false;
-        if !m.is_human_turn() || typing || self.orbiting {
+        if !m.is_human_turn() || typing {
             self.mode = DragMode::None;
             self.set_over_cue(false);
             return;
@@ -233,11 +209,6 @@ impl Controls {
                 && pointer_on_cue(m, cam, radius, mouse));
         self.set_over_cue(hovering_cue);
 
-        // A click on the table (not a drag, which turns the view) aims there.
-        if std::mem::take(&mut self.pending_click) && pointer_free {
-            click(m, scene, pointer);
-        }
-
         // Start of a mouse drag: decide what it does.
         if is_mouse_button_pressed(MouseButton::Left) && pointer_free {
             self.drag = 0.0;
@@ -255,7 +226,7 @@ impl Controls {
                 } else if fine {
                     DragMode::Fine
                 } else {
-                    DragMode::None
+                    DragMode::Point
                 };
         }
         let down = is_mouse_button_down(MouseButton::Left);
@@ -267,6 +238,17 @@ impl Controls {
                 rig.hold = true;
                 if let Some(p) = pointer {
                     place_near(m, p);
+                }
+            }
+            DragMode::Point if down => {
+                // The cue points at the mouse; the camera waits until release.
+                rig.hold = true;
+                if let Some(p) = pointer
+                    && p.distance(cue) > radius as f64 * 1.5
+                    && self.drag > 3.0
+                {
+                    let d = p - cue;
+                    m.aim.yaw = d.y.atan2(d.x);
                 }
             }
             DragMode::Cue if down => {
@@ -288,7 +270,7 @@ impl Controls {
         if is_mouse_button_released(MouseButton::Left) {
             match self.mode {
                 DragMode::Place => m.set_placing(false),
-                DragMode::Fine if self.drag < 4.0 && pointer_free => {
+                DragMode::Point | DragMode::Fine if self.drag < 4.0 && pointer_free => {
                     m.aim.yaw = self.yaw_before;
                     click(m, scene, pointer);
                 }

@@ -97,9 +97,12 @@ bool cut_away(vec3 p, float mode, bool n_up) {
         vec4 q1 = Throats[2 * i + 1];
         bool throat = in_quad(p.xz, q0.xy, q0.zw, q1.xy, q1.zw);
         if (mode < 1.5) {
-            if (hole) return true;
+            if (hole || (throat && h.w > 0.0 && abs(p.z) > h.w)) return true;
         } else if (mode < 2.5) {
             if (hole || throat) return true;
+            // Nothing of the rail (the leather lip around a side pocket)
+            // reaches in front of the cushion line, over the cloth.
+            if (h.w > 0.0 && abs(p.z) < h.w - 0.008 && dot(d, d) < (h.z + 0.03) * (h.z + 0.03)) return true;
         } else if (mode < 3.5) {
             if (throat && p.y > Shadows.z + 0.0005) return true;
         } else {

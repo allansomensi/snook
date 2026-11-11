@@ -26,9 +26,9 @@ What was reviewed in the game before the release, what changed and why.
 ## At the table
 
 - **Camera**: the "3D view / Top view / Reset camera" buttons became one
-  icon (back to the top view, `C`). Dragging with the left button outside the
-  table, or anywhere while it isn't your turn, turns the view and goes 3D;
-  dragging on the table still aims. The right button still turns the view.
+  icon (a camera with a back arrow: top view and default zoom, `C`). Only
+  the right button turns the view (and goes 3D); the left button is only
+  for aiming, so the camera never moves by accident.
 - **Zoom bar**: a slim bar on the right edge, almost invisible until the
   pointer comes near, with + and −.
 - **Replay**: a small icon next to the camera icon (and `R`) replays the last

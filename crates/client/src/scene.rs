@@ -504,7 +504,11 @@ impl Scene {
             let r = pocket_radius_of(&table, id);
             let c2 = pocket_center_of(&table, id);
             let center = surface(c2, 0.0);
-            holes[k] = vec4(center.x, center.z, r, 0.0);
+            // Side pockets have no shelf to speak of: the cloth stops just past
+            // the cushion line and the mouth drops straight into the pocket
+            // (w = how far from the middle, across the table, the cloth goes).
+            let edge = if id.is_side() { (table.spec.width / 2.0) as f32 + 0.008 } else { 0.0 };
+            holes[k] = vec4(center.x, center.z, r, edge);
             let jaws: Vec<(DVec2, DVec2)> = table
                 .cushions
                 .iter()
@@ -960,7 +964,8 @@ fn jaw_wall(
         let (h0, h1) = (height(d0), height(d1));
         let in_rail = d0 >= rail_d - 1e-6;
         let (target, color) = if in_rail { (&mut *rail, cast) } else { (&mut *mb, felt) };
-        let quad = [surface(p0, 0.0), surface(p1, 0.0), surface(p1, h1), surface(p0, h0)];
+        // The facing goes on down into the pocket (seen where the mouth opens).
+        let quad = [surface(p0, -0.06), surface(p1, -0.06), surface(p1, h1), surface(p0, h0)];
         let i: Vec<u16> = quad.iter().map(|q| target.push(*q, Vec2::ZERO, n, color)).collect();
         target.indices.extend_from_slice(&[i[0], i[1], i[2], i[0], i[2], i[3]]);
     }

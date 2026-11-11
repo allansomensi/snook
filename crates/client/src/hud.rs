@@ -366,13 +366,13 @@ impl Hud {
         }
         if self.show_help && !self.paused {
             let lines = [
-                (t("Aim"), t("Drag the cue · click a ball or a spot")),
+                (t("Aim"), t("Drag the cue · click a spot")),
                 (t("Fine aim"), t("Shift + drag · A / D")),
                 (t("Quick aim"), t("Click a ball or a spot")),
                 (t("Shoot"), t("Set the power, then press the green button")),
                 (t("Spin"), t("Spin ball · ↑ ↓ · Q / E")),
                 (t("Elevation"), t("W / S (jump & massé)")),
-                (t("Camera"), t("Drag the table to turn it · Wheel · C")),
+                (t("Camera"), t("Right-drag · Wheel · C")),
                 (t("Replay"), t("R: watch the last shot again")),
                 (t("Ball in hand"), t("Drag the cue ball")),
                 (t("Menu / help"), t("Esc · H")),

@@ -368,7 +368,7 @@ async fn main() {
             && !hud.paused
             && !settings_open
         {
-            controls.camera(&mut rig, &cam, m, scene.ball_radius(), ui.hovered, ui.wants_keyboard);
+            controls.camera(&mut rig, &cam, ui.hovered, ui.wants_keyboard);
             controls.player(m, &scene, &cam, &mut rig, ui.hovered, ui.wants_keyboard);
         }
 
