@@ -457,10 +457,14 @@ impl Hud {
             }
         }
 
-        if m.is_online() && !m.is_spectating() {
-            self.draw_chat(ui, m);
-        } else if !m.is_online() {
-            self.draw_history(ui, m);
+        // The elevation and spin panels open in the same corner: while one
+        // is open, the chat (or history) steps aside.
+        if self.popover.is_none() {
+            if m.is_online() && !m.is_spectating() {
+                self.draw_chat(ui, m);
+            } else if !m.is_online() {
+                self.draw_history(ui, m);
+            }
         }
 
         // Game over.
