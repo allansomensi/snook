@@ -101,11 +101,11 @@ fn ball_icon(ui: &Ui, id: BallId, x: f32, y: f32, size: f32) {
     } else {
         draw_circle(cx, cy, r, color);
     }
-    draw_circle(cx, cy, r * 0.45, Color::from_rgba(246, 242, 228, 255));
+    draw_circle(cx, cy, r * 0.66, Color::from_rgba(246, 242, 228, 255));
     draw_circle_lines(cx, cy, r, 1.0, Color::new(0.0, 0.0, 0.0, 0.6));
     let label = id.0.to_string();
-    let fs = size * 0.38;
-    ui.text_centered(&label, cx, cy - fs / 2.0 - 1.0, fs, BLACK, true);
+    let fs = if id.0 >= 10 { size * 0.5 } else { size * 0.6 };
+    ui.text_centered(&label, cx, cy - fs * 0.52, fs, BLACK, true);
 }
 
 fn player_card(ui: &mut Ui, m: &Match, seat: usize, x: f32, y: f32, w: f32) {
@@ -173,10 +173,10 @@ fn player_card(ui: &mut Ui, m: &Match, seat: usize, x: f32, y: f32, w: f32) {
             if remaining.is_empty() {
                 ui.text(t("On the 8-ball"), x + 10.0, ry + 1.0, 13.0, GOLD, false);
                 let tw_ = ui.text_size(t("On the 8-ball"), 13.0, false).x;
-                ball_icon(ui, BallId::EIGHT, x + 16.0 + tw_, ry, 16.0);
+                ball_icon(ui, BallId::EIGHT, x + 16.0 + tw_, ry - 2.0, 19.0);
             } else {
                 for (k, id) in remaining.into_iter().enumerate() {
-                    ball_icon(ui, id, x + 10.0 + k as f32 * 18.0, ry, 16.0);
+                    ball_icon(ui, id, x + 10.0 + k as f32 * 21.0, ry - 2.0, 19.0);
                 }
             }
         }
@@ -289,7 +289,6 @@ impl Hud {
         }
 
         self.draw_turn_banner(ui, m);
-        draw_power_meter(ui, m);
 
         // Cue panel (spin, elevation, fine aim) and the power stroke bar:
         // everything can be played with the mouse alone.
@@ -307,9 +306,9 @@ impl Hud {
             let mut x = 10.0 + w + 8.0;
             if ui.icon_button(
                 Rect::new(x, 12.0, 30.0, 30.0),
-                Icon::Target,
-                t("Top view (C)"),
-                !self.top_view,
+                Icon::CameraReset,
+                t("Reset the camera: top view, no zoom (C)"),
+                true,
             ) {
                 action = HudAction::ResetCamera;
             }
@@ -348,13 +347,13 @@ impl Hud {
         }
         if self.show_help && !self.paused {
             let lines = [
-                (t("Aim"), t("Drag the cue · click a spot")),
+                (t("Aim"), t("Drag the cue · click a ball or a spot")),
                 (t("Fine aim"), t("Shift + drag · A / D")),
                 (t("Quick aim"), t("Click a ball or a spot")),
                 (t("Shoot"), t("Set the power, then press the green button")),
                 (t("Spin"), t("Spin ball · ↑ ↓ · Q / E")),
                 (t("Elevation"), t("W / S (jump & massé)")),
-                (t("Camera"), t("Drag outside the table · Wheel · C")),
+                (t("Camera"), t("Drag the table to turn it · Wheel · C")),
                 (t("Replay"), t("R: watch the last shot again")),
                 (t("Ball in hand"), t("Drag the cue ball")),
                 (t("Menu / help"), t("Esc · H")),
@@ -798,57 +797,6 @@ fn turn_subtitle(m: &Match) -> String {
     }
 }
 
-/// Shown while the cue is being drawn back (for any player, so spectators see it).
-fn draw_power_meter(ui: &mut Ui, m: &Match) {
-    // The player's own power is shown on the stroke bar.
-    if !m.aim.charging || !matches!(m.phase, Phase::Turn { .. }) || m.is_human_turn() {
-        return;
-    }
-    let sw = crate::ui::vw();
-    let sh = crate::ui::vh();
-    let w = (sw * 0.32).clamp(260.0, 420.0);
-    let r = Rect::new((sw - w) / 2.0, sh - 78.0, w, 22.0);
-    crate::ui::rrect(
-        Rect::new(r.x - 10.0, r.y - 28.0, r.w + 20.0, r.h + 44.0),
-        12.0,
-        Color::new(0.0, 0.0, 0.0, 0.55),
-    );
-    crate::ui::rrect(r, 11.0, Color::new(0.06, 0.04, 0.03, 1.0));
-    let p = m.aim.power.clamp(0.0, 1.0);
-    // Filled with a green → yellow → red ramp, in slices.
-    let slices = 40;
-    let filled = (p * slices as f32).ceil() as usize;
-    for k in 0..filled {
-        let t = k as f32 / slices as f32;
-        let color = if t < 0.5 {
-            Color::new(0.25 + 1.3 * t, 0.85, 0.3, 1.0)
-        } else {
-            Color::new(0.95, 0.85 - 1.2 * (t - 0.5), 0.25, 1.0)
-        };
-        let x0 = r.x + 3.0 + t * (r.w - 6.0);
-        let x1 = (r.x + 3.0 + ((k + 1) as f32 / slices as f32).min(p) * (r.w - 6.0)).max(x0);
-        draw_rectangle(x0, r.y + 4.0, x1 - x0, r.h - 8.0, color);
-    }
-    for k in 1..4 {
-        let x = r.x + r.w * k as f32 / 4.0;
-        draw_line(x, r.y + 3.0, x, r.y + r.h - 3.0, 1.0, Color::new(0.0, 0.0, 0.0, 0.5));
-    }
-    crate::ui::rrect_lines(r, 11.0, 1.2, BORDER);
-    ui.text(
-        &tw("Power {pct}%", &[("pct", &format!("{:.0}", p * 100.0))]),
-        r.x,
-        r.y - 22.0,
-        15.0,
-        CREAM,
-        true,
-    );
-    if m.is_human_turn() {
-        let hint = t("release Space to shoot · Esc cancels");
-        let hw = ui.text_size(hint, 13.0, false).x;
-        ui.text(hint, r.x + r.w - hw, r.y - 20.0, 13.0, MUTED, false);
-    }
-}
-
 impl Hud {
     /// The bottom bar: game log, the power bar and the cue settings.
     fn draw_bottom_bar(&mut self, ui: &mut Ui, m: &mut Match) {
@@ -858,14 +806,14 @@ impl Hud {
         draw_bar(bar, false);
         let my_turn = m.is_human_turn() && !self.paused;
 
-        // Left to right: power, cue elevation, contact point, fine aim, and
-        // the shoot button in the corner.
+        // Cue settings on the left, the power bar in the middle and the shoot
+        // button on the right: the bar reads evenly from edge to edge.
         let gap = 8.0;
         let bh = bar.h - 18.0;
         let shoot = Rect::new(sw - 10.0 - bh * 1.15, bar.y + 9.0, bh * 1.15, bh);
         let bw = 84.0;
         let pops = [Pop::Elevation, Pop::Spin, Pop::FineAim];
-        let bx0 = shoot.x - 14.0 - pops.len() as f32 * (bw + gap) + gap;
+        let bx0 = 10.0;
         let mut anchors = [0.0f32; 3];
         for (k, pop) in pops.into_iter().enumerate() {
             let r = Rect::new(bx0 + k as f32 * (bw + gap), bar.y + 9.0, bw, bh);
@@ -876,10 +824,12 @@ impl Hud {
             }
             draw_pop_icon(ui, m, pop, r);
         }
-        // A compact power bar, grouped with the other cue controls.
-        let px1 = bx0 - 66.0;
-        let px0 = (px1 - 300.0).max(24.0);
-        let track = Rect::new(px0, bar.y + bar.h / 2.0 - 9.0, (px1 - px0).max(120.0), 18.0);
+        let left_end = bx0 + pops.len() as f32 * (bw + gap);
+        // The power bar, centred in the space between (room for "100%" on its right).
+        let room = (shoot.x - 60.0) - (left_end + 24.0);
+        let tw = room.clamp(120.0, 560.0);
+        let px0 = left_end + 24.0 + (room - tw) / 2.0;
+        let track = Rect::new(px0, bar.y + bar.h / 2.0 - 9.0, tw, 18.0);
 
         // The recent game messages float just above the bar, on the left
         // (online they are in the chat, with the players' messages).
@@ -1002,13 +952,14 @@ impl Hud {
         let dw = ui.text_size(&deg_text, 13.0, false).x;
         ui.text(&deg_text, r.x + r.w - 12.0 - dw, r.y + 10.0, 13.0, MUTED, false);
         let y = r.y + 46.0;
-        let dt = get_frame_time() as f64;
-        let rate = 0.9f64.to_radians() * self.aim_sensitivity as f64;
-        if ui.hold_button(80, Rect::new(r.x + 12.0, y, 32.0, 32.0), "◀") {
-            m.aim.yaw += rate * dt;
+        // One small step per click (holding the button doesn't repeat): the
+        // finest control there is.
+        let step = 0.05f64.to_radians() * self.aim_sensitivity as f64;
+        if ui.button(Rect::new(r.x + 12.0, y, 32.0, 32.0), "◀", true) {
+            m.aim.yaw += step;
         }
-        if ui.hold_button(81, Rect::new(r.x + r.w - 44.0, y, 32.0, 32.0), "▶") {
-            m.aim.yaw -= rate * dt;
+        if ui.button(Rect::new(r.x + r.w - 44.0, y, 32.0, 32.0), "▶", true) {
+            m.aim.yaw -= step;
         }
         let dial = Rect::new(r.x + 50.0, y, r.w - 100.0, 32.0);
         let drag = ui.drag_area(82, dial);
@@ -1139,6 +1090,8 @@ fn draw_power_track(ui: &mut Ui, track: Rect, p: f32, hot: bool, enabled: bool) 
             Color::new(color.r, color.g, color.b, a),
         );
     }
+    // The outline goes under the knob.
+    crate::ui::rrect_lines(track, 9.0, 1.2, if hot { GOLD } else { crate::ui::BORDER });
     // The knob.
     let kx = track.x + 4.0 + p * (track.w - 8.0);
     let ky = track.y + track.h / 2.0;
@@ -1150,7 +1103,6 @@ fn draw_power_track(ui: &mut Ui, track: Rect, p: f32, hot: bool, enabled: bool) 
         if enabled { Color::new(0.93, 0.92, 0.88, 1.0) } else { Color::new(0.5, 0.48, 0.45, 1.0) },
     );
     draw_circle(kx - 3.5, ky - 3.5, 4.0, Color::new(1.0, 1.0, 1.0, 0.7));
-    crate::ui::rrect_lines(track, 9.0, 1.2, if hot { GOLD } else { crate::ui::BORDER });
     if p > 0.0 {
         let text = format!("{:.0}%", p * 100.0);
         ui.text(&text, track.x + track.w + 8.0, track.y + 1.0, 14.0, CREAM, true);

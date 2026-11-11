@@ -68,7 +68,7 @@ impl Scene {
     pub fn new(table: Table, quality: Quality, focused: bool) -> Self {
         let detailed_room = quality != Quality::Low;
         let (ball_tex, ball_segments) = match quality {
-            Quality::Low => (256, 24),
+            Quality::Low => (512, 24),
             Quality::Medium => (512, 32),
             Quality::High => (512, 48),
             Quality::Ultra => (1024, 64),
@@ -268,6 +268,7 @@ impl Scene {
         // Jaw rubbers are drawn after the pocket holes are opened, so their
         // ends stay whole where they meet the hole.
         let mut jaws = MeshBuilder::default();
+        let mut jaw_rails = MeshBuilder::default();
         for seg in &table.cushions {
             let mid = (seg.a + seg.b) / 2.0;
             let dir = (seg.b - seg.a).normalize();
@@ -292,20 +293,26 @@ impl Scene {
             }
             let out3 = vec3(out.x as f32, 0.0, -out.y as f32);
             if !axis_aligned {
-                jaw_wall(&mut jaws, &table, seg.a, clip_to_hole(&table, seg.a, seg.b), -out);
+                let end = clip_to_hole(&table, seg.a, seg.b);
+                jaw_wall(&mut jaws, &mut jaw_rails, &table, seg.a, end, -out);
                 continue;
             }
             // Rail cushions run on into the pocket corners (the throat and hole
             // are cut out in the shader); a jaw stops where it meets the hole.
             let (start, end) = if axis_aligned {
-                let near_side = |p: DVec2| {
-                    table
-                        .pockets
-                        .iter()
-                        .any(|pk| pk.id.is_side() && pk.mouth_center.distance(p) < 0.1)
+                // Each end runs on towards the nearest pocket hole, but stops
+                // where the cushion line passes closest to the hole's centre:
+                // further on it would come out of the cut, past the pocket.
+                let run_on = |p: DVec2, out: DVec2| -> f64 {
+                    let nearest = table.pockets.iter().min_by(|x, y| {
+                        x.mouth_center.distance(p).total_cmp(&y.mouth_center.distance(p))
+                    });
+                    match nearest {
+                        Some(pk) => (pocket_center_of(&table, pk.id) - p).dot(out).clamp(0.0, 0.13),
+                        None => 0.0,
+                    }
                 };
-                let ext = |p: DVec2| if near_side(p) { 0.07 } else { 0.13 };
-                (seg.a - dir * ext(seg.a), seg.b + dir * ext(seg.b))
+                (seg.a - dir * run_on(seg.a, -dir), seg.b + dir * run_on(seg.b, dir))
             } else {
                 unreachable!("jaws handled above")
             };
@@ -319,6 +326,7 @@ impl Scene {
         }
         add(cushions, &felt, Surface::MATTE.cut(2.0));
         add(jaws, &felt, Surface::MATTE);
+        add(jaw_rails, &white, Surface::lit(0.6, 50.0, 0.1, 0.3));
 
         // Table body: one solid piece with rounded outer corners: the rail
         // ring on top (between the cushions and the outer edge) and the apron
@@ -887,7 +895,14 @@ fn is_axis_aligned(a: DVec2, b: DVec2) -> bool {
 /// The face of a pocket jaw: the vertical cut through the cushion rubber and
 /// the rail along the jaw line, from `a` (the cushion nose) to `b` (the hole).
 /// Its top follows what was cut: the nose slope, the cushion top, then the rail.
-fn jaw_wall(mb: &mut MeshBuilder, table: &Table, a: DVec2, b: DVec2, into_throat: DVec2) {
+fn jaw_wall(
+    mb: &mut MeshBuilder,
+    rail: &mut MeshBuilder,
+    table: &Table,
+    a: DVec2,
+    b: DVec2,
+    into_throat: DVec2,
+) {
     let along = b - a;
     let len = along.length();
     if len < 1e-6 {
@@ -934,15 +949,20 @@ fn jaw_wall(mb: &mut MeshBuilder, table: &Table, a: DVec2, b: DVec2, into_throat
     // so the facings don't read as black slabs.
     let n = surface(into_throat, 0.0) - surface(DVec2::ZERO, 0.0);
     let n = (n.normalize_or_zero() + Vec3::Y * 0.6).normalize_or_zero();
-    let color = rgb(170, 180, 170);
+    let felt = rgb(170, 180, 170);
+    // Where the jaw cuts through the rail, the facing is the pocket casting
+    // (only the rubber part is covered in cloth).
+    let cast = rgb(150, 142, 122);
     for w in ds.windows(2) {
         let (d0, d1) = (w[0], w[1]);
         let p0 = a + dir * (d0 / rate);
         let p1 = a + dir * (d1 / rate);
         let (h0, h1) = (height(d0), height(d1));
+        let in_rail = d0 >= rail_d - 1e-6;
+        let (target, color) = if in_rail { (&mut *rail, cast) } else { (&mut *mb, felt) };
         let quad = [surface(p0, 0.0), surface(p1, 0.0), surface(p1, h1), surface(p0, h0)];
-        let i: Vec<u16> = quad.iter().map(|q| mb.push(*q, Vec2::ZERO, n, color)).collect();
-        mb.indices.extend_from_slice(&[i[0], i[1], i[2], i[0], i[2], i[3]]);
+        let i: Vec<u16> = quad.iter().map(|q| target.push(*q, Vec2::ZERO, n, color)).collect();
+        target.indices.extend_from_slice(&[i[0], i[1], i[2], i[0], i[2], i[3]]);
     }
 }
 

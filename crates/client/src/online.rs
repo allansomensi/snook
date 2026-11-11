@@ -678,7 +678,7 @@ impl Online {
         let sw = crate::ui::vw();
         let sh = crate::ui::vh();
         let w = 440.0f32.min(sw - 20.0);
-        let h = if self.register { 470.0 } else { 400.0 };
+        let h = if self.register { 490.0 } else { 400.0 };
         let r = Rect::new((sw - w) / 2.0, ((sh - h) / 2.0).max(10.0), w, h);
         ui.panel(r);
         let x = r.x + 28.0;
@@ -718,16 +718,13 @@ impl Online {
             if crate::countries::field(ui, cr, &self.country, &label) {
                 crate::countries::open();
             }
-            y += 62.0;
-            ui.text(
-                t("At least 8 characters. Use a password you don't use elsewhere."),
-                x,
-                y - 6.0,
-                12.0,
-                MUTED,
-                false,
-            );
-            y += 10.0;
+            y += 56.0;
+            let hint = t("At least 8 characters. Use a password you don't use elsewhere.");
+            for line in ui.wrap(hint, inner, 12.0) {
+                ui.text(&line, x, y, 12.0, MUTED, false);
+                y += 15.0;
+            }
+            y += 6.0;
         }
 
         let name_ok = valid_username(self.username.trim());

@@ -359,28 +359,6 @@ impl Ui {
         }
     }
 
-    /// True while the left button is held on this button (for auto-repeat).
-    pub fn hold_button(&mut self, id: u64, r: Rect, label: &str) -> bool {
-        self.block(r);
-        let hover = r.contains(self.mouse);
-        if self.pressed && hover {
-            self.active = Some(id);
-        }
-        let held = self.active == Some(id);
-        let bg = if held {
-            Color::new(0.50, 0.33, 0.15, 1.0)
-        } else if hover {
-            Color::new(0.38, 0.25, 0.12, 1.0)
-        } else {
-            Color::new(0.25, 0.16, 0.09, 1.0)
-        };
-        rrect(r, 6.0, bg);
-        rrect_lines(r, 6.0, 1.2, if hover || held { GOLD } else { BORDER });
-        let size = self.fit((r.h * 0.5).clamp(12.0, 20.0), label, r.w - 8.0);
-        self.text_centered(label, r.x + r.w / 2.0, r.y + (r.h - size) / 2.0, size, CREAM, true);
-        held
-    }
-
     /// While the HUD is faded out it must not react to the pointer (a drag
     /// that ends over a hidden button is not a click). Returns what to give
     /// back to [`Ui::resume_input`].

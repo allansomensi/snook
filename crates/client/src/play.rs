@@ -2,13 +2,13 @@
 //!
 //! | Action | Mouse | Keyboard |
 //! |---|---|---|
-//! | Aim | drag with the left button (Shift: fine) | A / D or ← / → |
+//! | Aim | drag the cue, or click a spot (Shift-drag: fine) | A / D or ← / → |
 //! | Spin | spin ball in the panel | ↑ / ↓, Q / E |
 //! | Cue elevation | elevation slider | W / S |
 //! | Shoot | power slider + Shoot | hold Space, release |
 //! | Ball in hand | drag the cue ball | B toggles, Enter confirms |
 //! | Call the 8-ball pocket | click a pocket | |
-//! | Camera | drag outside the table (or right-drag) to turn it, wheel zoom | Tab 3D/top, C top view |
+//! | Camera | left-drag anywhere else turns the table, wheel zoom | Tab 3D/top, C top view |
 
 use ::glam::DVec2;
 use macroquad::prelude::*;
@@ -32,8 +32,6 @@ enum DragMode {
     Place,
     /// Swinging the cue stick itself around the cue ball.
     Cue,
-    /// The cue follows the pointer.
-    Point,
     /// Shift-drag: very fine rotation.
     Fine,
 }
@@ -50,9 +48,13 @@ pub struct Controls {
     pub sensitivity: f32,
     /// The pointer is over the cue (shown with a "move" cursor).
     over_cue: bool,
-    /// A left-button drag that turns the camera (it started off the table,
-    /// or when it isn't this player's turn).
+    /// A left-button drag that turns the camera (it didn't start on the cue,
+    /// the cue ball in hand, or with Shift held).
     orbiting: bool,
+    /// How far the pointer moved during that drag.
+    orbit_drag: f32,
+    /// A click on the table that should aim there.
+    pending_click: bool,
 }
 
 impl Controls {
@@ -98,11 +100,6 @@ fn pointer_on_cue(m: &Match, cam: &SceneCamera, radius: f32, mouse: Vec2) -> boo
     false
 }
 
-/// True for a point on the table, rails included.
-fn on_the_table(p: DVec2) -> bool {
-    p.x.abs() < 1.17 && p.y.abs() < 0.68
-}
-
 /// Point on the table plane (at ball-centre height) under the mouse.
 pub fn pointer_on_table(cam: &SceneCamera, radius: f32) -> Option<DVec2> {
     let (origin, dir) = cam.ray(mouse_position().into());
@@ -122,17 +119,45 @@ impl Controls {
         &mut self,
         rig: &mut CameraRig,
         cam: &SceneCamera,
+        m: &Match,
+        radius: f32,
         ui_hovered: bool,
         typing: bool,
-        my_turn: bool,
     ) {
         let mouse: Vec2 = mouse_position().into();
         let delta = mouse - self.last_mouse;
+        // The left button turns the table, except when it grabs something:
+        // the cue, the cue ball in hand, or a Shift-drag for fine aiming.
         if is_mouse_button_pressed(MouseButton::Left) && !ui_hovered {
-            let on_table = pointer_on_table(cam, 0.0).is_some_and(on_the_table);
-            self.orbiting = !my_turn || !on_table;
+            let my_turn = m.is_human_turn();
+            let cue = m.game.ball(snook_core::BallId::CUE).xy();
+            let near_cue_ball = pointer_on_table(cam, radius)
+                .is_some_and(|p| p.distance(cue) < radius as f64 * 1.8);
+            let shift = is_key_down(KeyCode::LeftShift) || is_key_down(KeyCode::RightShift);
+            let grabs = my_turn
+                && (shift
+                    || (m.game.ball_in_hand().is_some()
+                        && (m.is_placing_cue_ball() || near_cue_ball))
+                    || (!m.is_placing_cue_ball() && pointer_on_cue(m, cam, radius, mouse)));
+            self.orbiting = !grabs;
+            self.orbit_drag = 0.0;
         }
-        if !is_mouse_button_down(MouseButton::Left) {
+        if self.orbiting && is_mouse_button_down(MouseButton::Left) {
+            self.orbit_drag += delta.length();
+            // A few pixels of slack, so a click doesn't nudge the view.
+            if self.orbit_drag > 4.0 {
+                self.orbit(rig, delta);
+            }
+        }
+        if self.orbiting && is_mouse_button_released(MouseButton::Left) {
+            // A click (no drag) on the table aims there, as before.
+            if self.orbit_drag <= 4.0 && !ui_hovered && m.is_human_turn() {
+                self.pending_click = true;
+            }
+            self.orbiting = false;
+        }
+        if !is_mouse_button_down(MouseButton::Left) && !is_mouse_button_released(MouseButton::Left)
+        {
             self.orbiting = false;
         }
         if !typing {
@@ -147,23 +172,7 @@ impl Controls {
                 rig.reset();
             }
         }
-        let orbit_drag = self.orbiting && is_mouse_button_down(MouseButton::Left);
-        if orbit_drag && ui_hovered {
-            // Keep turning even when the pointer passes over the interface.
-            self.orbit(rig, delta);
-        }
         if !ui_hovered {
-            if orbit_drag {
-                self.orbit(rig, delta);
-            } else if is_mouse_button_down(MouseButton::Right) {
-                // Dragging with the right button turns the table: from the
-                // overhead view, that means going 3D.
-                if rig.mode == CameraMode::Top && delta.length() > 1.5 {
-                    rig.enter_3d();
-                }
-                rig.orbit += delta.x * 0.005;
-                rig.pitch = (rig.pitch + delta.y * 0.004).clamp(0.12, 1.4);
-            }
             let (_, wheel) = mouse_wheel();
             if wheel != 0.0 {
                 let step = if wheel > 0.0 { 0.88 } else { 1.0 / 0.88 };
@@ -174,7 +183,7 @@ impl Controls {
     }
 
     fn orbit(&self, rig: &mut CameraRig, delta: Vec2) {
-        if rig.mode == CameraMode::Top && delta.length() > 1.5 {
+        if rig.mode == CameraMode::Top {
             rig.enter_3d();
         }
         rig.orbit += delta.x * 0.005;
@@ -224,6 +233,11 @@ impl Controls {
                 && pointer_on_cue(m, cam, radius, mouse));
         self.set_over_cue(hovering_cue);
 
+        // A click on the table (not a drag, which turns the view) aims there.
+        if std::mem::take(&mut self.pending_click) && pointer_free {
+            click(m, scene, pointer);
+        }
+
         // Start of a mouse drag: decide what it does.
         if is_mouse_button_pressed(MouseButton::Left) && pointer_free {
             self.drag = 0.0;
@@ -241,7 +255,7 @@ impl Controls {
                 } else if fine {
                     DragMode::Fine
                 } else {
-                    DragMode::Point
+                    DragMode::None
                 };
         }
         let down = is_mouse_button_down(MouseButton::Left);
@@ -253,17 +267,6 @@ impl Controls {
                 rig.hold = true;
                 if let Some(p) = pointer {
                     place_near(m, p);
-                }
-            }
-            DragMode::Point if down => {
-                // The cue points at the mouse; the camera waits until release.
-                rig.hold = true;
-                if let Some(p) = pointer
-                    && p.distance(cue) > radius as f64 * 1.5
-                    && self.drag > 3.0
-                {
-                    let d = p - cue;
-                    m.aim.yaw = d.y.atan2(d.x);
                 }
             }
             DragMode::Cue if down => {
@@ -285,7 +288,7 @@ impl Controls {
         if is_mouse_button_released(MouseButton::Left) {
             match self.mode {
                 DragMode::Place => m.set_placing(false),
-                DragMode::Point | DragMode::Fine if self.drag < 4.0 && pointer_free => {
+                DragMode::Fine if self.drag < 4.0 && pointer_free => {
                     m.aim.yaw = self.yaw_before;
                     click(m, scene, pointer);
                 }
@@ -625,17 +628,6 @@ pub fn overlay(m: &Match, scene: &Scene, time: f32) -> Overlay {
         color: Color::new(1.0, 1.0, 1.0, 0.42),
     });
     out.ghost = Some(surface(ghost, r as f32));
-    // A faint ring under it: red when the first ball hit would be a foul.
-    let ring = match target {
-        Some(id) if !m.game.legal_targets().contains(&id) => Color::new(1.0, 0.35, 0.3, 0.75),
-        _ => Color::new(1.0, 1.0, 1.0, 0.18),
-    };
-    out.guides.push(Guide::Ring {
-        center: surface(ghost, line_y),
-        radius: r as f32,
-        width: 0.0012,
-        color: ring,
-    });
     if m.guide != AimGuide::Full {
         return out;
     }

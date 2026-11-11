@@ -13,6 +13,9 @@ struct Picker {
     open: bool,
     query: String,
     first: usize,
+    /// A click has started since the list opened. The click that opened it
+    /// ends (is released) over the list, and must not pick anything.
+    armed: bool,
 }
 
 thread_local! {
@@ -38,6 +41,7 @@ pub fn open() {
         p.open = true;
         p.query.clear();
         p.first = 0;
+        p.armed = false;
     });
 }
 
@@ -69,6 +73,10 @@ pub fn draw_picker(ui: &mut Ui) -> Option<String> {
     );
     PICKER.with(|p| {
         let mut p = p.borrow_mut();
+        if is_mouse_button_pressed(MouseButton::Left) {
+            p.armed = true;
+        }
+        let armed = p.armed;
         let input = Rect::new(r.x + 14.0, r.y + 48.0, r.w - 28.0, 32.0);
         if ui.focus.is_none() {
             ui.focus = Some(60);
@@ -100,7 +108,7 @@ pub fn draw_picker(ui: &mut Ui) -> Option<String> {
             }
             crate::flags::draw(code, row.x + 8.0, row.y + 6.0, 15.0);
             ui.text(name, row.x + 36.0, row.y + 6.0, 14.0, CREAM, false);
-            if hover && ui.clicked(row) {
+            if armed && hover && ui.clicked(row) {
                 chosen = Some(code.to_string());
             }
         }
@@ -108,11 +116,11 @@ pub fn draw_picker(ui: &mut Ui) -> Option<String> {
             chosen = Some(list[0].0.to_string());
         }
         let none = Rect::new(r.x + 14.0, r.y + r.h - 40.0, 160.0, 28.0);
-        if ui.button(none, t("Don't show a flag"), true) {
+        if ui.button(none, t("Don't show a flag"), true) && armed {
             chosen = Some(String::new());
         }
         rrect_lines(area, 5.0, 1.0, BORDER);
-        if chosen.is_some() || close || is_key_pressed(KeyCode::Escape) {
+        if chosen.is_some() || (close && armed) || is_key_pressed(KeyCode::Escape) {
             p.open = false;
             ui.focus = None;
         }

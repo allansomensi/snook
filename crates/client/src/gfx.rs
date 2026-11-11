@@ -76,6 +76,18 @@ bool in_quad(vec2 p, vec2 a, vec2 b, vec2 c, vec2 d) {
         || (s0 <= 0.0 && s1 <= 0.0 && s2 <= 0.0 && s3 <= 0.0);
 }
 
+// How far the cloth has dropped into the nearest pocket (0 flat … 1 at the
+// hole's edge): the cloth rolls over the edge, so it darkens as it goes.
+float pocket_drop(vec3 p) {
+    float k = 0.0;
+    for (int i = 0; i < 6; i++) {
+        vec4 h = Holes[i];
+        float d = length(p.xz - h.xy) - h.z;
+        k = max(k, 1.0 - smoothstep(0.0, 0.028, d));
+    }
+    return k;
+}
+
 bool cut_away(vec3 p, float mode, bool n_up) {
     for (int i = 0; i < 6; i++) {
         vec4 h = Holes[i];
@@ -221,6 +233,11 @@ void main() {
         float fresnel = 0.04 + 0.96 * pow(1.0 - ndv, 5.0);
         vec3 r = reflect(-v, n);
         c += environment(r) * Extra.x * (0.05 + 0.75 * fresnel);
+    }
+    // The cloth darkens where it rolls over into a pocket.
+    if (Extra.y > 0.5 && Extra.y < 1.5) {
+        float drop = pocket_drop(v_world);
+        c *= 1.0 - 0.82 * drop * drop;
     }
     // Filmic-style exposure curve: highlights (white balls under the lamps)
     // roll off smoothly instead of burning out to flat white.

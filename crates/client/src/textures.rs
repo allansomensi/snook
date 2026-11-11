@@ -82,13 +82,22 @@ fn ball_surface(id: BallId, p: Vec3) -> [u8; 3] {
         let dots = [Vec3::X, -Vec3::X, Vec3::Y, -Vec3::Y, Vec3::Z, -Vec3::Z];
         return if dots.iter().any(|d| p.dot(*d) > 0.996) { [190, 30, 30] } else { color };
     }
-    let spot_angle: f32 = 0.43;
+    // A large number circle with big, bold digits: readable from across the table.
+    let spot_angle: f32 = 0.56;
     for (s, e1) in [(Vec3::Z, Vec3::X), (-Vec3::Z, -Vec3::X)] {
         if p.dot(s) > spot_angle.cos() {
             let scale = spot_angle.sin();
             let a = p.dot(e1) / scale;
             let b = p.dot(Vec3::Y) / scale;
-            return if number_ink(id.0, a * 1.15, b * 1.15) { INK } else { IVORY };
+            let k = if id.0 >= 10 { 1.02 } else { 0.86 };
+            let (a, b) = (a * k, b * k);
+            // Bold: a stroke also inks a little to its left and below.
+            let bold = 0.05;
+            let ink = number_ink(id.0, a, b)
+                || number_ink(id.0, a + bold, b)
+                || number_ink(id.0, a, b - bold)
+                || number_ink(id.0, a + bold, b - bold);
+            return if ink { INK } else { IVORY };
         }
     }
     match id.kind() {
@@ -259,7 +268,12 @@ mod tests {
 
     #[test]
     fn ball_layout() {
-        assert_eq!(ball_surface(BallId(3), Vec3::new(0.0, 0.3, 0.95).normalize()), IVORY);
+        assert_eq!(ball_surface(BallId(3), Vec3::new(0.33, 0.33, 0.88).normalize()), IVORY);
+        assert_eq!(
+            ball_surface(BallId(3), Vec3::Z),
+            INK,
+            "the number is in the middle of the spot"
+        );
         assert_eq!(ball_surface(BallId(11), Vec3::X), IVORY);
         assert_eq!(ball_surface(BallId(11), Vec3::Y), ball_color(BallId(11)));
         assert_eq!(ball_surface(BallId(3), Vec3::X), ball_color(BallId(3)));

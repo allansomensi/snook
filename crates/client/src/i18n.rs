@@ -203,6 +203,9 @@ pub fn shot_error(e: ShotError) -> String {
 
 fn portuguese(en: &str) -> Option<&'static str> {
     Some(match en {
+        "Reset the camera: top view, no zoom (C)" => "Voltar a câmera: visão de cima, sem zoom (C)",
+        "Drag the table to turn it · Wheel · C" => "Arraste a mesa para girar · Roda · C",
+        "Drag the cue · click a ball or a spot" => "Arraste o taco · clique numa bola ou ponto",
         "{name} sank the 8-ball" => "{name} encaçapou a bola 8",
         "{name} sank the 8 too early" => "{name} encaçapou a 8 antes da hora",
         "{name} sank the 8 in the wrong pocket" => "{name} encaçapou a 8 na caçapa errada",

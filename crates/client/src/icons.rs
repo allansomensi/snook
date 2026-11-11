@@ -13,8 +13,8 @@ pub enum Icon {
     People,
     Gear,
     Power,
-    /// Centre the view (top view).
-    Target,
+    /// Back to the default camera.
+    CameraReset,
     Replay,
     Plus,
     Minus,
@@ -95,13 +95,6 @@ pub fn draw(icon: Icon, c: Vec2, s: f32, color: Color) {
             arc(c, 0.65 * h, -1.0, 4.14, w, color);
             line(p(0.0, -0.95), p(0.0, -0.15), w, color);
         }
-        Icon::Target => {
-            draw_circle_lines(c.x, c.y, 0.6 * h, w, color);
-            draw_circle(c.x, c.y, 0.18 * h, color);
-            for d in [vec2(1.0, 0.0), vec2(-1.0, 0.0), vec2(0.0, 1.0), vec2(0.0, -1.0)] {
-                line(c + d * 0.6 * h, c + d * 0.98 * h, w, color);
-            }
-        }
         Icon::Replay => {
             arc(c, 0.62 * h, -2.6, 2.2, w, color);
             let tip = c + Vec2::from_angle(-2.6) * 0.62 * h;
@@ -112,6 +105,25 @@ pub fn draw(icon: Icon, c: Vec2, s: f32, color: Color) {
                 color,
             );
             draw_triangle(p(-0.12, -0.25), p(-0.12, 0.25), p(0.28, 0.0), color);
+        }
+        Icon::CameraReset => {
+            // A camera body with its lens…
+            let body = Rect::new(c.x - 0.78 * h, c.y - 0.42 * h, 1.2 * h, 0.95 * h);
+            crate::ui::rrect(body, 0.16 * h, color);
+            draw_rectangle(c.x - 0.45 * h, c.y - 0.6 * h, 0.4 * h, 0.2 * h, color);
+            let lens = vec2(body.x + body.w / 2.0, body.y + body.h / 2.0);
+            draw_circle(lens.x, lens.y, 0.28 * h, Color::new(0.0, 0.0, 0.0, 0.7));
+            draw_circle(lens.x, lens.y, 0.15 * h, color);
+            // …and a "go back" arrow curling round its corner.
+            let ac = c + vec2(0.55 * h, 0.45 * h);
+            arc(ac, 0.36 * h, -1.2, 2.2, w, color);
+            let tip = ac + Vec2::from_angle(-1.2) * 0.36 * h;
+            draw_triangle(
+                tip + vec2(-0.26, -0.12) * h,
+                tip + vec2(0.18, -0.2) * h,
+                tip + vec2(0.0, 0.24) * h,
+                color,
+            );
         }
         Icon::Plus => {
             line(p(-0.65, 0.0), p(0.65, 0.0), w * 1.3, color);
