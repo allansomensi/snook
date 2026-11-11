@@ -434,7 +434,7 @@ async fn main() {
             }
             if let Some(m) = current.as_mut() {
                 m.guide = match m.online.as_ref() {
-                    Some(o) => config.guide.online(o.rated),
+                    Some(_) => config.guide.online(),
                     None => config.guide,
                 };
             }

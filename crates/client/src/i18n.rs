@@ -243,9 +243,7 @@ fn portuguese(en: &str) -> Option<&'static str> {
         "{winner} wins! ({how})" => "{winner} vence! ({how})",
         "#{n} in the world" => "#{n} no mundo",
         "3–16 letters, digits or underscores." => "3 a 16 letras, números ou sublinhados.",
-        "A short line, as in rated online games." => {
-            "Uma linha curta, como nas partidas online valendo rating."
-        }
+        "Only a short line from the cue ball." => "Só uma linha curta saindo da branca.",
         "A solid club player." => "Um jogador de clube sólido.",
         "Accept friend" => "Aceitar amizade",
         "Achievement unlocked: {title}" => "Conquista desbloqueada: {title}",

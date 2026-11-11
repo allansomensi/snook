@@ -45,7 +45,8 @@ What was reviewed in the game before the release, what changed and why.
   ones in grey, with what unlocks them). A reaction pops up by the sender's
   card for under three seconds and stays visible while aiming.
 - **Aiming guide online**: never the full guide against a person (it plays
-  the cut for you); at most the standard one, the short line when rated.
+  the cut for you): the standard one (ghost ball) or the short line, rated
+  or not.
 - **Shot clock** offline too (optional), on the player cards.
 - The deciding shot is always shown before the result.
 

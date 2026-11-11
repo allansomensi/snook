@@ -124,6 +124,8 @@ pub struct Match {
 /// State of a match played on a server.
 pub struct OnlineMatch {
     pub seat: usize,
+    /// Whether the game is rated (kept with the match state).
+    #[allow(dead_code)]
     pub rated: bool,
     pub ratings: [i32; 2],
     pub countries: [String; 2],
@@ -257,8 +259,8 @@ impl Match {
             notices: Vec::new(),
             log: Vec::new(),
             last_report: None,
-            // No full guide against people; rated games only a short line.
-            guide: guide.online(rated),
+            // No full guide against people.
+            guide: guide.online(),
             games_played: 0,
             wins: [0, 0],
             sounds: Vec::new(),
@@ -322,9 +324,7 @@ impl Match {
         if same_game {
             self.log = log;
         }
-        if !self.online.as_ref().is_some_and(|o| o.rated) {
-            self.guide = guide;
-        }
+        self.guide = guide;
         if let Some(o) = self.online.as_mut() {
             o.feed = feed;
         }

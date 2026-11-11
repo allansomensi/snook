@@ -28,8 +28,8 @@ First public version.
 - The 8-ball pocket is called by clicking a pocket on the table (no panel),
   and the call is binding for the rest of the game.
 - With the chat folded, new messages show a pulsing dot and a short preview.
-- No full aiming guide against people: at most the standard one (the short
-  line in rated games).
+- No full aiming guide against people: the standard one (ghost ball) or the
+  short line, in rated and casual games alike.
 - The game points at the public server out of the box.
 - Shots play instantly for both players (the shooter's is predicted locally;
   the server's result is authoritative).

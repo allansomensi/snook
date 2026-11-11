@@ -51,12 +51,11 @@ pub enum AimGuide {
 }
 
 impl AimGuide {
-    /// The guide used against a person over the network: never the full
-    /// guide (it would play the cut for you), and only the short line in
-    /// rated games.
-    pub fn online(self, rated: bool) -> AimGuide {
+    /// The guide used against a person over the network: the standard one
+    /// (ghost ball) or the short line, never the full guide (it would play
+    /// the cut for you).
+    pub fn online(self) -> AimGuide {
         match self {
-            _ if rated => AimGuide::Short,
             AimGuide::Full => AimGuide::Standard,
             g => g,
         }

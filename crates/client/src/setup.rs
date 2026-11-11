@@ -118,7 +118,7 @@ impl Setup {
         let hint = match config.guide {
             AimGuide::Full => t("Shows where the object ball and the cue ball go (not online)."),
             AimGuide::Standard => t("Shows the contact point; judging the cut is up to you."),
-            AimGuide::Short => t("A short line, as in rated online games."),
+            AimGuide::Short => t("Only a short line from the cue ball."),
         };
         ui.text(hint, x, y + 58.0, 12.0, MUTED, false);
         y += 82.0;
