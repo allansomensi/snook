@@ -12,6 +12,8 @@ snook_core = { path = "../core" }
 glam.workspace = true
 macroquad = { version = "0.4.16", default-features = false, features = ["audio"] }
 snook_proto = { path = "../proto" }
+# Hosting LAN games (in memory, no database).
+snook_server = { path = "../server", default-features = false }
 # Online play: a blocking WebSocket client on a background thread (ws:// and wss://).
 tungstenite = { version = "0.30", default-features = false, features = ["handshake", "rustls-tls-webpki-roots"] }
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12", "logging"] }

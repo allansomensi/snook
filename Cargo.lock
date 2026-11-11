@@ -1768,6 +1768,7 @@ dependencies = [
  "serde_json",
  "snook_core",
  "snook_proto",
+ "snook_server",
  "sys-locale",
  "tungstenite 0.30.0",
 ]

@@ -88,6 +88,31 @@ pub fn server_text(text: &str) -> String {
     if let Some(t) = portuguese(text) {
         return t.to_string();
     }
+    if let Some(rest) = text.strip_prefix("You are muted for ") {
+        let n = rest.split_whitespace().next().unwrap_or("?");
+        return tw("You are muted for {n} more minutes.", &[("n", &n)]);
+    }
+    if let Some(rest) = text.strip_prefix("This account is banned for ") {
+        let n = rest.split_whitespace().next().unwrap_or("?");
+        let reason = rest.split("Reason: ").nth(1).unwrap_or("").trim_end_matches('.');
+        return tw(
+            "This account is suspended for {n} more day(s). Reason: {reason}.",
+            &[("n", &n), ("reason", &reason)],
+        );
+    }
+    if let Some(rest) = text.strip_prefix("This account is banned. Reason: ") {
+        return tw("This account is banned. Reason: {reason}.", &[("reason", &rest.trim_end_matches('.'))]);
+    }
+    for (en, key) in [
+        ("You were muted for ", "You were muted: {r}"),
+        ("Your account was suspended for ", "Your account was suspended: {r}"),
+        ("Your account was banned: ", "Your account was banned: {r}"),
+        ("You were disconnected by a moderator: ", "You were disconnected by a moderator: {r}"),
+    ] {
+        if let Some(rest) = text.strip_prefix(en) {
+            return tw(key, &[("r", &rest)]);
+        }
+    }
     if let Some(rest) = text.strip_prefix("Can't shoot: ") {
         let reason = rest.trim_end_matches('.');
         return tw("Can't shoot: {e}.", &[("e", &t(reason))]);
@@ -123,6 +148,27 @@ pub fn ball(id: BallId) -> String {
 
 pub fn reason(r: GameOverReason) -> &'static str {
     t(r.description())
+}
+
+/// How a game in the history ended, from the player's side.
+pub fn history_reason(r: GameOverReason, won: bool) -> &'static str {
+    use GameOverReason::*;
+    t(match (r, won) {
+        (PocketedEight, true) => "sank the 8-ball",
+        (PocketedEight, false) => "the opponent sank the 8-ball",
+        (EightPocketedEarly, true) => "the opponent sank the 8 too early",
+        (EightPocketedEarly, false) => "sank the 8 too early",
+        (EightInWrongPocket, true) => "the opponent sank the 8 in the wrong pocket",
+        (EightInWrongPocket, false) => "sank the 8 in the wrong pocket",
+        (EightPocketedOnFoul, true) => "the opponent fouled on the 8",
+        (EightPocketedOnFoul, false) => "fouled on the 8",
+        (EightOffTable, true) => "the opponent knocked the 8 off the table",
+        (EightOffTable, false) => "knocked the 8 off the table",
+        (Resignation, true) => "the opponent resigned",
+        (Resignation, false) => "resigned",
+        (Abandoned, true) => "the opponent left",
+        (Abandoned, false) => "left the game",
+    })
 }
 
 pub fn foul(f: &Foul) -> String {

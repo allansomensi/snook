@@ -10,18 +10,25 @@ mod audio;
 mod camera;
 mod config;
 mod coords;
+mod countries;
+mod flags;
 mod game;
 mod gfx;
 mod hud;
 mod i18n;
 mod icon;
+mod icons;
+mod lan;
 mod menu;
 mod net;
 mod online;
 mod paint;
 mod play;
+mod profile;
+mod ranking;
 mod scene;
 mod settings;
+mod setup;
 mod textures;
 mod ui;
 
@@ -32,11 +39,15 @@ use crate::camera::{CameraMode, CameraRig};
 use crate::config::Config;
 use crate::game::Match;
 use crate::hud::{Hud, HudAction};
+use crate::lan::{LanAction, LanScreen};
 use crate::menu::{Menu, MenuAction};
 use crate::online::{Online, OnlineAction};
 use crate::play::Controls;
+use crate::profile::{ProfileAction, ProfileScreen};
+use crate::ranking::{Ranking, RankingAction};
 use crate::scene::{Overlay, Scene};
 use crate::settings::{SettingsAction, SettingsScreen};
+use crate::setup::{Setup, SetupAction, SetupKind};
 use crate::ui::Ui;
 
 /// Who plays a match.
@@ -48,13 +59,14 @@ pub enum MatchMode {
     Demo,
 }
 
-/// Choices made in the main menu.
+/// Choices made before an offline match.
 #[derive(Debug, Clone)]
 pub struct MatchSettings {
     pub mode: MatchMode,
-    pub player_name: String,
-    pub second_player_name: String,
+    pub names: [String; 2],
     pub guide: config::AimGuide,
+    /// Seconds per shot, if timed.
+    pub shot_clock: Option<u32>,
 }
 
 impl MatchSettings {
@@ -63,9 +75,9 @@ impl MatchSettings {
             mode,
             // An empty name field means the default name (the field itself is
             // left empty while the player types).
-            player_name: name_or(&c.player_name, "Player"),
-            second_player_name: name_or(&c.second_player_name, "Player 2"),
+            names: [name_or(&c.player_name, "Player"), name_or(&c.second_player_name, "Player 2")],
             guide: c.guide,
+            shot_clock: (c.shot_clock > 0).then_some(c.shot_clock),
         }
     }
 }
@@ -81,6 +93,7 @@ struct LaunchOptions {
     online: bool,
     settings: bool,
     on_eight: bool,
+    screen: Option<String>,
 }
 
 fn parse_args() -> LaunchOptions {
@@ -103,6 +116,7 @@ fn parse_args() -> LaunchOptions {
             "--online" => o.online = true,
             "--settings" => o.settings = true,
             "--on-eight" => o.on_eight = true,
+            "--screen" => o.screen = args.next(),
             "--window" => {
                 args.next();
             }
@@ -114,6 +128,7 @@ fn parse_args() -> LaunchOptions {
                      --demo                   computer vs computer\n  --top-view               overhead camera\n  \
                      --online                 open the online lounge\n  \
                      --settings               open the settings\n  \
+                     --screen <name>          open a screen (lan, setup, ranking)\n  \
                      --screenshot <file.png>  save a screenshot after --frames <n> frames and quit"
                 );
                 std::process::exit(0);
@@ -168,10 +183,22 @@ fn window_conf() -> macroquad::conf::Conf {
 }
 
 /// Which full-screen page is open over the 3D table.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Screen {
     Menu,
+    Setup(Setup),
+    /// The online lounge (or the sign-in form).
     Online,
+    Lan,
+    /// The lounge of a LAN game.
+    LanLounge,
+    Ranking,
+    Profile,
+}
+
+/// A LAN game: the server this computer hosts (if any) and the connection.
+struct LanSession {
+    host: Option<snook_server::lan::LanHost>,
+    net: Online,
 }
 
 #[macroquad::main(window_conf)]
@@ -202,8 +229,17 @@ async fn main() {
     rig.reset();
     let mut controls = Controls::default();
     let mut current: Option<Match> = None;
+    // The online match came from the LAN game (not the global server).
+    let mut match_from_lan = false;
     let mut screen = Screen::Menu;
-    let mut online: Option<Online> = None;
+    // The global server: signs in in the background when a session was saved.
+    let mut online = Online::new(&config);
+    let mut lan_screen: Option<LanScreen> = None;
+    let mut lan: Option<LanSession> = None;
+    let mut ranking = Ranking::default();
+    let mut profile = ProfileScreen::default();
+    // Where the profile and ranking go back to.
+    let mut back_to_lounge = false;
     let mut settings_open = options.settings;
     let mut settings_screen = SettingsScreen::default();
     if options.top_view {
@@ -217,8 +253,20 @@ async fn main() {
         current = Some(m);
     }
     if options.online {
-        online = Some(Online::start(&config));
+        online.connect();
         screen = Screen::Online;
+    }
+    match options.screen.as_deref() {
+        Some("lan") => {
+            lan_screen = Some(LanScreen::new());
+            screen = Screen::Lan;
+        }
+        Some("setup") => screen = Screen::Setup(Setup::new(SetupKind::VsComputer)),
+        Some("ranking") => {
+            ranking.open(&mut online);
+            screen = Screen::Ranking;
+        }
+        _ => {}
     }
     let menu_rack = snook_core::rules::rack(&scene.table, 2024);
     let vignette = vignette_texture();
@@ -243,20 +291,36 @@ async fn main() {
             config.save();
         }
 
-        // Network traffic (lounge and online matches).
-        if let Some(o) = online.as_mut() {
-            let was_in_match = current.as_ref().is_some_and(|m| m.is_online());
-            if o.update(dt, &mut current, &mut config) {
+        // Network traffic. Only the server that owns the current online match
+        // gets it (and sends its messages).
+        let online_match = current.as_ref().is_some_and(|m| m.is_online());
+        let was_online_match = online_match;
+        {
+            let mut none = None;
+            let global_slot = if online_match && match_from_lan { &mut none } else { &mut current };
+            if online.update(dt, global_slot, &mut config) {
                 config.save();
             }
-            let in_match = current.as_ref().is_some_and(|m| m.is_online());
-            if in_match && !was_in_match {
-                hud = Hud::new(config.show_help);
-                rig.reset();
+            if !was_online_match && current.as_ref().is_some_and(|m| m.is_online()) {
+                match_from_lan = false;
+            }
+        }
+        if let Some(l) = lan.as_mut() {
+            let mut none = None;
+            let owned = current.as_ref().is_some_and(|m| m.is_online());
+            let slot = if owned && !match_from_lan { &mut none } else { &mut current };
+            let before = slot.as_ref().is_some_and(|m| m.is_online());
+            l.net.update(dt, slot, &mut config);
+            if !before && current.as_ref().is_some_and(|m| m.is_online()) {
+                match_from_lan = true;
+            }
+        }
+        let in_online_match = current.as_ref().is_some_and(|m| m.is_online());
+        if in_online_match != was_online_match {
+            hud = Hud::new(config.show_help);
+            rig.reset();
+            if in_online_match {
                 settings_open = false;
-            } else if was_in_match && !in_match {
-                hud = Hud::new(config.show_help);
-                rig.reset();
             }
         }
 
@@ -274,6 +338,7 @@ async fn main() {
         }
         hud.top_view = rig.mode == CameraMode::Top;
         hud.aim_sensitivity = config.aim_sensitivity;
+        hud.zoom = rig.zoom_level();
         controls.sensitivity = config.aim_sensitivity;
         let mut cam = rig.update(dt, current.as_ref(), get_time() as f32);
         // Development aid: SNOOK_CAM="eye x,y,z,target x,y,z" fixes the camera.
@@ -290,7 +355,7 @@ async fn main() {
             && !hud.paused
             && !settings_open
         {
-            controls.camera(&mut rig, &cam, ui.hovered, ui.wants_keyboard);
+            controls.camera(&mut rig, &cam, ui.hovered, ui.wants_keyboard, m.is_human_turn());
             controls.player(m, &scene, &cam, &mut rig, ui.hovered, ui.wants_keyboard);
         }
 
@@ -341,6 +406,9 @@ async fn main() {
             if config.show_help != before.show_help {
                 hud.show_help = config.show_help;
             }
+            if config.server != before.server && !online.signed_in() {
+                online = Online::new(&config);
+            }
             if let Some(m) = current.as_mut() {
                 let rated = m.online.as_ref().is_some_and(|o| o.rated);
                 m.guide = if rated { config::AimGuide::Short } else { config.guide };
@@ -359,67 +427,169 @@ async fn main() {
                             current = None;
                             hud = Hud::new(config.show_help);
                             rig.reset();
+                            screen = Screen::Menu;
                         }
                         HudAction::Lounge => {
-                            if let Some(o) = online.as_mut() {
-                                o.leave_match(m);
+                            if match_from_lan {
+                                if let Some(l) = lan.as_mut() {
+                                    l.net.leave_match(m);
+                                }
+                                screen = Screen::LanLounge;
+                            } else {
+                                online.leave_match(m);
+                                screen = Screen::Online;
                             }
                             current = None;
                             hud = Hud::new(config.show_help);
                             rig.reset();
                         }
                         HudAction::Settings => settings_open = true,
-                        HudAction::ToggleView => {
-                            if rig.mode == CameraMode::Top {
-                                rig.enter_3d();
-                            } else {
-                                rig.reset();
-                            }
-                        }
                         HudAction::ResetCamera => rig.reset(),
+                        HudAction::Zoom(z) => rig.set_zoom_level(z),
                         HudAction::None => {
                             if hud.show_help != config.show_help {
                                 config.show_help = hud.show_help;
                                 config.save();
                             }
-                            if m.is_online()
-                                && let Some(o) = online.as_mut()
-                                && o.pending_invites() > 0
-                            {
-                                o.draw_invites(&mut ui, true);
+                            if m.is_online() {
+                                let net = if match_from_lan {
+                                    lan.as_mut().map(|l| &mut l.net)
+                                } else {
+                                    Some(&mut online)
+                                };
+                                if let Some(net) = net
+                                    && net.pending_invites() > 0
+                                {
+                                    net.draw_invites(&mut ui, true);
+                                }
                             }
                         }
                     }
                 }
-                None => match screen {
-                    Screen::Menu => match menu.draw(&mut ui, &mut config) {
-                        MenuAction::Start(mode) => {
-                            config.save();
-                            let settings = MatchSettings::from_config(mode, &config);
-                            current = Some(Match::new(&settings, game::clock_seed()));
-                            hud = Hud::new(config.show_help);
-                            rig.reset();
+                None => {
+                    let mut next: Option<Screen> = None;
+                    match &mut screen {
+                        Screen::Menu => match menu.draw(&mut ui, &online) {
+                            MenuAction::Online => {
+                                online.connect();
+                                next = Some(Screen::Online);
+                            }
+                            MenuAction::VsComputer => {
+                                next = Some(Screen::Setup(Setup::new(SetupKind::VsComputer)))
+                            }
+                            MenuAction::TwoPlayers => {
+                                next = Some(Screen::Setup(Setup::new(SetupKind::TwoPlayers)))
+                            }
+                            MenuAction::Lan => {
+                                lan_screen.get_or_insert_with(LanScreen::new);
+                                next = Some(if lan.is_some() { Screen::LanLounge } else { Screen::Lan });
+                            }
+                            MenuAction::Ranking => {
+                                ranking.open(&mut online);
+                                back_to_lounge = false;
+                                next = Some(Screen::Ranking);
+                            }
+                            MenuAction::Profile => {
+                                back_to_lounge = false;
+                                match online.me.clone() {
+                                    Some(me) => {
+                                        profile.open(&me.username, &mut online);
+                                        next = Some(Screen::Profile);
+                                    }
+                                    None => {
+                                        online.connect();
+                                        next = Some(Screen::Online);
+                                    }
+                                }
+                            }
+                            MenuAction::Settings => settings_open = true,
+                            MenuAction::Quit => break,
+                            MenuAction::None => {}
+                        },
+                        Screen::Setup(setup) => match setup.draw(&mut ui, &mut config) {
+                            SetupAction::Back => next = Some(Screen::Menu),
+                            SetupAction::Start(settings) => {
+                                config.save();
+                                current = Some(Match::new(&settings, game::clock_seed()));
+                                hud = Hud::new(config.show_help);
+                                rig.reset();
+                                next = Some(Screen::Menu);
+                            }
+                            SetupAction::None => {}
+                        },
+                        Screen::Online => match online.draw(&mut ui, &mut config) {
+                            OnlineAction::Leave => next = Some(Screen::Menu),
+                            OnlineAction::Profile(name) => {
+                                profile.open(&name, &mut online);
+                                back_to_lounge = true;
+                                next = Some(Screen::Profile);
+                            }
+                            OnlineAction::Ranking => {
+                                ranking.open(&mut online);
+                                back_to_lounge = true;
+                                next = Some(Screen::Ranking);
+                            }
+                            OnlineAction::None => {}
+                        },
+                        Screen::Lan => {
+                            let ls = lan_screen.get_or_insert_with(LanScreen::new);
+                            let hosting = lan.as_ref().and_then(|l| l.host.as_ref()).map(|h| h.port);
+                            match ls.draw(&mut ui, &mut config, hosting) {
+                                LanAction::Back => next = Some(Screen::Menu),
+                                LanAction::Host(name) => {
+                                    if let Some((host, url)) = ls.host(&name) {
+                                        lan = Some(LanSession { host: Some(host), net: Online::lan(&url, &name) });
+                                        config.save();
+                                        next = Some(Screen::LanLounge);
+                                    }
+                                }
+                                LanAction::Join(url, name) => {
+                                    lan = Some(LanSession { host: None, net: Online::lan(&url, &name) });
+                                    config.save();
+                                    next = Some(Screen::LanLounge);
+                                }
+                                LanAction::None => {}
+                            }
                         }
-                        MenuAction::Online => {
-                            config.save();
-                            online = Some(Online::start(&config));
-                            screen = Screen::Online;
-                        }
-                        MenuAction::Settings => settings_open = true,
-                        MenuAction::Quit => break,
-                        MenuAction::None => {}
-                    },
-                    Screen::Online => {
-                        let action = match online.as_mut() {
-                            Some(o) => o.draw(&mut ui, &mut config),
-                            None => OnlineAction::Leave,
-                        };
-                        if let OnlineAction::Leave = action {
-                            online = None;
-                            screen = Screen::Menu;
-                        }
+                        Screen::LanLounge => match lan.as_mut() {
+                            Some(l) => match l.net.draw(&mut ui, &mut config) {
+                                OnlineAction::Leave => {
+                                    // Leaving a LAN game closes it (and stops hosting).
+                                    lan = None;
+                                    next = Some(Screen::Menu);
+                                }
+                                OnlineAction::Profile(name) => {
+                                    l.net.request_profile(&name);
+                                }
+                                _ => {}
+                            },
+                            None => next = Some(Screen::Lan),
+                        },
+                        Screen::Ranking => match ranking.draw(&mut ui, &mut online) {
+                            RankingAction::Back => {
+                                next = Some(if back_to_lounge { Screen::Online } else { Screen::Menu })
+                            }
+                            RankingAction::Profile(name) => {
+                                profile.open(&name, &mut online);
+                                next = Some(Screen::Profile);
+                            }
+                            RankingAction::None => {}
+                        },
+                        Screen::Profile => match profile.draw(&mut ui, &mut online) {
+                            ProfileAction::Back => {
+                                next = Some(if back_to_lounge && online.signed_in() {
+                                    Screen::Online
+                                } else {
+                                    Screen::Menu
+                                })
+                            }
+                            ProfileAction::None => {}
+                        },
                     }
-                },
+                    if let Some(n) = next {
+                        screen = n;
+                    }
+                }
             }
         }
 
@@ -476,6 +646,12 @@ async fn main() {
             if *t <= 0.0 {
                 toast = None;
             }
+        }
+        // Achievements, friend requests, declined invitations…
+        let toast_bottom = if current.is_some() { ui::vh() - 92.0 } else { ui::vh() - 20.0 };
+        online.draw_toasts(&ui, toast_bottom);
+        if let Some(l) = &lan {
+            l.net.draw_toasts(&ui, toast_bottom);
         }
 
         let in_match = current.is_some();

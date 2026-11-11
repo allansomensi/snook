@@ -8,7 +8,7 @@
 //! | Shoot | power slider + Shoot | hold Space, release |
 //! | Ball in hand | drag the cue ball | B toggles, Enter confirms |
 //! | Call the 8-ball pocket | click a pocket | |
-//! | Camera | right-drag orbit, wheel zoom | Tab top view, C reset |
+//! | Camera | drag outside the table (or right-drag) to turn it, wheel zoom | Tab 3D/top, C top view |
 
 use ::glam::DVec2;
 use macroquad::prelude::*;
@@ -50,13 +50,19 @@ pub struct Controls {
     pub sensitivity: f32,
     /// The pointer is over the cue (shown with a "move" cursor).
     over_cue: bool,
+    /// A left-button drag that turns the camera (it started off the table,
+    /// or when it isn't this player's turn).
+    orbiting: bool,
 }
 
 impl Controls {
     /// True while the player is aiming with the mouse (dragging the cue or
     /// the aim point, or moving the cue ball): the HUD gets out of the way.
     pub fn aiming(&self) -> bool {
-        self.mode != DragMode::None && is_mouse_button_down(MouseButton::Left) && self.drag > 3.0
+        !self.orbiting
+            && self.mode != DragMode::None
+            && is_mouse_button_down(MouseButton::Left)
+            && self.drag > 3.0
     }
 
     fn set_over_cue(&mut self, over: bool) {
@@ -92,6 +98,11 @@ fn pointer_on_cue(m: &Match, cam: &SceneCamera, radius: f32, mouse: Vec2) -> boo
     false
 }
 
+/// True for a point on the table, rails included.
+fn on_the_table(p: DVec2) -> bool {
+    p.x.abs() < 1.17 && p.y.abs() < 0.68
+}
+
 /// Point on the table plane (at ball-centre height) under the mouse.
 pub fn pointer_on_table(cam: &SceneCamera, radius: f32) -> Option<DVec2> {
     let (origin, dir) = cam.ray(mouse_position().into());
@@ -104,16 +115,26 @@ pub fn pointer_on_table(cam: &SceneCamera, radius: f32) -> Option<DVec2> {
 }
 
 impl Controls {
-    /// Camera controls (allowed at any time during a match).
+    /// Camera controls (allowed at any time during a match). Dragging with
+    /// the left button outside the table (or anywhere while it's not this
+    /// player's turn) turns the view, going 3D; the right button always does.
     pub fn camera(
         &mut self,
         rig: &mut CameraRig,
         cam: &SceneCamera,
         ui_hovered: bool,
         typing: bool,
+        my_turn: bool,
     ) {
         let mouse: Vec2 = mouse_position().into();
         let delta = mouse - self.last_mouse;
+        if is_mouse_button_pressed(MouseButton::Left) && !ui_hovered {
+            let on_table = pointer_on_table(cam, 0.0).is_some_and(on_the_table);
+            self.orbiting = !my_turn || !on_table;
+        }
+        if !is_mouse_button_down(MouseButton::Left) {
+            self.orbiting = false;
+        }
         if !typing {
             if is_key_pressed(KeyCode::Tab) || is_key_pressed(KeyCode::T) {
                 if rig.mode == CameraMode::Top {
@@ -126,8 +147,15 @@ impl Controls {
                 rig.reset();
             }
         }
+        let orbit_drag = self.orbiting && is_mouse_button_down(MouseButton::Left);
+        if orbit_drag && ui_hovered {
+            // Keep turning even when the pointer passes over the interface.
+            self.orbit(rig, delta);
+        }
         if !ui_hovered {
-            if is_mouse_button_down(MouseButton::Right) {
+            if orbit_drag {
+                self.orbit(rig, delta);
+            } else if is_mouse_button_down(MouseButton::Right) {
                 // Dragging with the right button turns the table: from the
                 // overhead view, that means going 3D.
                 if rig.mode == CameraMode::Top && delta.length() > 1.5 {
@@ -145,6 +173,14 @@ impl Controls {
         }
     }
 
+    fn orbit(&self, rig: &mut CameraRig, delta: Vec2) {
+        if rig.mode == CameraMode::Top && delta.length() > 1.5 {
+            rig.enter_3d();
+        }
+        rig.orbit += delta.x * 0.005;
+        rig.pitch = (rig.pitch + delta.y * 0.004).clamp(0.12, 1.4);
+    }
+
     /// Shot controls for a human player.
     pub fn player(
         &mut self,
@@ -159,7 +195,7 @@ impl Controls {
         let delta = mouse - self.last_mouse;
         self.last_mouse = mouse;
         rig.hold = false;
-        if !m.is_human_turn() || typing {
+        if !m.is_human_turn() || typing || self.orbiting {
             self.mode = DragMode::None;
             self.set_over_cue(false);
             return;
@@ -479,9 +515,11 @@ pub fn overlay(m: &Match, scene: &Scene, time: f32) -> Overlay {
             Some(0.006 + if m.aim.charging { 0.03 + m.aim.power as f64 * 0.25 } else { 0.03 })
         }
         Phase::Simulating(_) if m.shot_time().is_some_and(|t| t < 0.15) => Some(-0.012),
-        Phase::Awaiting => Some(0.006),
         _ => None,
     };
+    if m.replay.is_some() {
+        return out;
+    }
     if let Some(gap) = gap {
         // Raise the cue just enough to clear the rail and other balls, like a
         // player would, so it never passes through anything.

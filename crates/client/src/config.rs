@@ -104,6 +104,12 @@ pub struct Config {
     pub username: String,
     /// Login token for automatic sign-in (empty when logged out).
     pub token: String,
+    /// Last difficulty chosen against the computer (0 easy, 1 medium, 2 hard).
+    pub difficulty: u8,
+    /// Offline shot clock in seconds (0: no clock).
+    pub shot_clock: u32,
+    /// Name used on local network games.
+    pub lan_name: String,
 }
 
 impl Default for Config {
@@ -131,6 +137,9 @@ impl Default for Config {
             server: DEFAULT_SERVER.into(),
             username: String::new(),
             token: String::new(),
+            difficulty: 1,
+            shot_clock: 0,
+            lan_name: String::new(),
         }
     }
 }
@@ -199,6 +208,11 @@ impl Config {
                 "server" if !v.is_empty() => c.server = v.to_string(),
                 "username" => c.username = v.to_string(),
                 "token" => c.token = v.to_string(),
+                "difficulty" => c.difficulty = v.parse::<u8>().map(|d| d.min(2)).unwrap_or(1),
+                "shot_clock" => {
+                    c.shot_clock = v.parse::<u32>().ok().filter(|s| [0, 30, 60].contains(s)).unwrap_or(0)
+                }
+                "lan_name" => c.lan_name = v.chars().take(16).collect(),
                 _ => {}
             }
         }
@@ -208,7 +222,8 @@ impl Config {
     pub fn to_text(&self) -> String {
         format!(
             "# Snook settings\nplayer_name = {}\nsecond_player_name = {}\nguide = {}\nshow_help = {}\nshot_camera = {}\ncamera_follow = {}\ngraphics_checked = {}\nlanguage = {}\nvignette = {}\nfocused_scene = {}\nshow_fps = {}\naim_sensitivity = {:.2}\nui_size = {:.2}\n\
-             quality = {}\nmsaa = {}\nfullscreen = {}\nvolume = {:.2}\nserver = {}\nusername = {}\ntoken = {}\n",
+             quality = {}\nmsaa = {}\nfullscreen = {}\nvolume = {:.2}\nserver = {}\nusername = {}\ntoken = {}\n\
+             difficulty = {}\nshot_clock = {}\nlan_name = {}\n",
             self.player_name,
             self.second_player_name,
             self.guide.name(),
@@ -228,7 +243,10 @@ impl Config {
             self.volume,
             self.server,
             self.username,
-            self.token
+            self.token,
+            self.difficulty,
+            self.shot_clock,
+            self.lan_name
         )
     }
 
@@ -238,7 +256,19 @@ impl Config {
         if let Some(dir) = path.parent() {
             let _ = std::fs::create_dir_all(dir);
         }
-        if let Err(e) = std::fs::write(&path, self.to_text()) {
+        // Written to a temporary file first, so a crash never leaves a
+        // half-written settings file; private to the user (it holds the
+        // session token).
+        let tmp = path.with_extension("ini.tmp");
+        let result = std::fs::write(&tmp, self.to_text()).and_then(|()| {
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                let _ = std::fs::set_permissions(&tmp, std::fs::Permissions::from_mode(0o600));
+            }
+            std::fs::rename(&tmp, &path)
+        });
+        if let Err(e) = result {
             eprintln!("could not save settings to {}: {e}", path.display());
         }
     }

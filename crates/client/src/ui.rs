@@ -13,6 +13,46 @@ pub const BORDER: Color = Color::new(0.45, 0.31, 0.16, 1.0);
 pub const ALERT: Color = Color::new(1.0, 0.56, 0.44, 1.0);
 pub const GREEN: Color = Color::new(0.12, 0.45, 0.25, 1.0);
 
+/// One line of a chat panel.
+#[derive(Debug, Clone, PartialEq)]
+pub struct FeedLine {
+    /// Who wrote it, with their rating (0: unknown) for the name's colour.
+    pub from: Option<(String, i32)>,
+    pub text: String,
+    pub kind: FeedKind,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FeedKind {
+    /// A message from a player.
+    Player,
+    /// From the staff.
+    Announcement,
+    /// Something that happened in the game.
+    Event,
+    /// Something important that happened in the game (a foul…).
+    Alert,
+}
+
+/// The colour of a rating tier (used for player names everywhere).
+pub fn tier_color(tier: snook_proto::Tier) -> Color {
+    use snook_proto::Tier;
+    match tier {
+        Tier::Rookie => Color::new(0.72, 0.72, 0.74, 1.0),
+        Tier::Amateur => Color::new(0.93, 0.89, 0.80, 1.0),
+        Tier::Skilled => Color::new(0.45, 0.86, 0.52, 1.0),
+        Tier::Expert => Color::new(0.42, 0.72, 1.0, 1.0),
+        Tier::Master => Color::new(0.78, 0.56, 1.0, 1.0),
+        Tier::Grandmaster => Color::new(1.0, 0.55, 0.28, 1.0),
+        Tier::Legend => Color::new(1.0, 0.83, 0.30, 1.0),
+    }
+}
+
+/// The colour of a player's name.
+pub fn name_color(p: &snook_proto::PlayerInfo) -> Color {
+    tier_color(p.tier())
+}
+
 /// State of a [`Ui::drag_area`].
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Drag {
@@ -537,15 +577,10 @@ impl Ui {
         format!("{s}…")
     }
 
-    /// A scrollable chat log (newest at the bottom). `scroll` counts lines up
-    /// from the bottom; the new value is returned.
-    pub fn chat_log(
-        &mut self,
-        r: Rect,
-        lines: &[snook_proto::ChatLine],
-        me: Option<&str>,
-        scroll: usize,
-    ) -> usize {
+    /// A scrollable chat log (newest at the bottom) mixing player messages
+    /// and what happened in the game. `scroll` counts lines up from the
+    /// bottom; the new value is returned.
+    pub fn chat_log(&mut self, r: Rect, lines: &[FeedLine], me: Option<&str>, scroll: usize) -> usize {
         self.block(r);
         let size = 14.0;
         let line_h = 19.0;
@@ -553,16 +588,30 @@ impl Ui {
         // Wrap only the newest messages that can be shown (measuring text is
         // the expensive part with a long history).
         let needed = visible + scroll + 1;
-        let mut rows: Vec<(Option<(String, bool)>, String)> = Vec::new();
+        let mut rows: Vec<(Option<(String, Color)>, String, FeedKind)> = Vec::new();
         for l in lines.iter().rev() {
-            let mine = me.is_some_and(|m| m == l.from);
-            let name = format!("{}: ", l.from);
-            let name_w = self.text_size(&name, size, true).x;
+            let (prefix, color) = match (&l.from, l.kind) {
+                (Some((name, rating)), FeedKind::Player) => {
+                    let mine = me.is_some_and(|m| m.eq_ignore_ascii_case(name));
+                    let c = if *rating > 0 {
+                        tier_color(snook_proto::Tier::of(*rating))
+                    } else {
+                        Color::new(0.55, 0.78, 0.95, 1.0)
+                    };
+                    (Some(format!("{name}: ")), if mine { GOLD } else { c })
+                }
+                (_, FeedKind::Announcement) => (Some("★ ".to_string()), GOLD),
+                _ => (Some("• ".to_string()), MUTED),
+            };
+            let bold = l.kind == FeedKind::Player;
+            let name_w = prefix.as_ref().map(|p| self.text_size(p, size, bold).x).unwrap_or(0.0);
             let wrapped = self.wrap(&l.text, (r.w - 16.0 - name_w).max(60.0), size);
-            let mut block: Vec<(Option<(String, bool)>, String)> = wrapped
+            let mut block: Vec<(Option<(String, Color)>, String, FeedKind)> = wrapped
                 .into_iter()
                 .enumerate()
-                .map(|(k, w)| (if k == 0 { Some((name.clone(), mine)) } else { None }, w))
+                .map(|(k, w)| {
+                    (if k == 0 { prefix.clone().map(|p| (p, color)) } else { None }, w, l.kind)
+                })
                 .collect();
             block.append(&mut rows);
             rows = block;
@@ -583,20 +632,22 @@ impl Ui {
         let end = rows.len() - scroll;
         let start = end.saturating_sub(visible);
         let mut indent = 0.0;
-        for (k, (name, text)) in rows[start..end].iter().enumerate() {
+        for (k, (name, text, kind)) in rows[start..end].iter().enumerate() {
             let y = r.y + 4.0 + k as f32 * line_h;
-            if let Some((name, mine)) = name {
-                self.text(
-                    name,
-                    r.x + 8.0,
-                    y,
-                    size,
-                    if *mine { GOLD } else { Color::new(0.55, 0.78, 0.95, 1.0) },
-                    true,
-                );
-                indent = self.text_size(name, size, true).x;
+            let bold = *kind == FeedKind::Player;
+            if let Some((name, color)) = name {
+                self.text(name, r.x + 8.0, y, size, *color, bold);
+                indent = self.text_size(name, size, bold).x;
             }
-            self.text(text, r.x + 8.0 + indent, y, size, CREAM, false);
+            // Game events are quieter than what people write.
+            let color = match kind {
+                FeedKind::Player => CREAM,
+                FeedKind::Announcement => Color::new(1.0, 0.9, 0.65, 1.0),
+                FeedKind::Alert => Color::new(0.88, 0.58, 0.48, 0.95),
+                FeedKind::Event => Color::new(0.70, 0.64, 0.56, 0.85),
+            };
+            let text_size = if matches!(kind, FeedKind::Event | FeedKind::Alert) { 13.0 } else { size };
+            self.text(text, r.x + 8.0 + indent, y + (size - text_size) * 0.5, text_size, color, false);
         }
         if scroll > 0 {
             let label = crate::i18n::t("▼ newer messages");
@@ -614,6 +665,155 @@ impl Ui {
             self.text(crate::i18n::t("No messages yet."), r.x + 8.0, r.y + 6.0, 14.0, MUTED, false);
         }
         scroll
+    }
+
+    /// A square button with an icon; `tip` is shown while hovering.
+    pub fn icon_button(&mut self, r: Rect, icon: crate::icons::Icon, tip: &str, enabled: bool) -> bool {
+        self.icon_button_ex(r, icon, tip, enabled, false)
+    }
+
+    /// Like [`Ui::icon_button`]; `subtle` draws it without a background until hovered.
+    pub fn icon_button_ex(
+        &mut self,
+        r: Rect,
+        icon: crate::icons::Icon,
+        tip: &str,
+        enabled: bool,
+        subtle: bool,
+    ) -> bool {
+        self.block(r);
+        let hover = enabled && r.contains(self.mouse);
+        let bg = if hover && self.down {
+            Color::new(0.50, 0.33, 0.15, 1.0)
+        } else if hover {
+            Color::new(0.38, 0.25, 0.12, 0.95)
+        } else if subtle {
+            Color::new(0.05, 0.035, 0.025, 0.45)
+        } else {
+            Color::new(0.20, 0.13, 0.08, 0.95)
+        };
+        rrect(r, (r.h * 0.22).min(8.0), bg);
+        if !subtle || hover {
+            rrect_lines(r, (r.h * 0.22).min(8.0), 1.2, if hover { GOLD } else { BORDER });
+        }
+        let color = if !enabled {
+            Color::new(0.5, 0.45, 0.4, 0.6)
+        } else if hover {
+            GOLD
+        } else {
+            CREAM
+        };
+        crate::icons::draw(icon, vec2(r.x + r.w / 2.0, r.y + r.h / 2.0), r.h * 0.52, color);
+        if hover && !tip.is_empty() {
+            self.tooltip(tip, r);
+        }
+        enabled && hover && self.released
+    }
+
+    /// A small dark label under (or above, near the bottom) `anchor`.
+    pub fn tooltip(&self, text: &str, anchor: Rect) {
+        let w = self.text_size(text, 13.0, true).x + 18.0;
+        let below = anchor.y + anchor.h + 30.0 < vh();
+        let y = if below { anchor.y + anchor.h + 6.0 } else { anchor.y - 30.0 };
+        let x = (anchor.x + anchor.w / 2.0 - w / 2.0).clamp(4.0, vw() - w - 4.0);
+        let r = Rect::new(x, y, w, 24.0);
+        rrect(r, 12.0, Color::new(0.0, 0.0, 0.0, 0.85));
+        self.text(text, r.x + 9.0, r.y + 5.0, 13.0, CREAM, true);
+    }
+
+    /// A flag (if any) and a player name in their tier colour. Returns the width used.
+    pub fn player_name(&self, p: &snook_proto::PlayerInfo, x: f32, y: f32, size: f32, max_w: f32) -> f32 {
+        self.name_with_flag(&p.username, &p.country, name_color(p), x, y, size, max_w)
+    }
+
+    /// A flag and a name in `color`. Returns the width used.
+    #[allow(clippy::too_many_arguments)]
+    pub fn name_with_flag(
+        &self,
+        name: &str,
+        country: &str,
+        color: Color,
+        x: f32,
+        y: f32,
+        size: f32,
+        max_w: f32,
+    ) -> f32 {
+        let fh = (size * 0.78).round();
+        let mut used = 0.0;
+        if crate::flags::draw(country, x, y + (size - fh) / 2.0 + 1.0, fh) {
+            used = crate::flags::width(fh) + 6.0;
+        }
+        let name = self.ellipsize(name, max_w - used, size);
+        self.text(&name, x + used, y, size, color, true);
+        used + self.text_size(&name, size, true).x
+    }
+
+    /// A rounded pill with short text (a tag such as "rated").
+    pub fn pill(&self, text: &str, x: f32, y: f32, color: Color) -> f32 {
+        let w = self.text_size(text, 11.0, true).x + 12.0;
+        let r = Rect::new(x, y, w, 17.0);
+        rrect(r, 8.5, Color::new(color.r, color.g, color.b, 0.16));
+        rrect_lines(r, 8.5, 1.0, Color::new(color.r, color.g, color.b, 0.6));
+        self.text(text, x + 6.0, y + 2.5, 11.0, color, true);
+        w
+    }
+
+    /// Scrolls a list area with the mouse wheel; returns the new first row.
+    pub fn scroll_list(&mut self, area: Rect, first: usize, rows: usize, visible: usize) -> usize {
+        self.block(area);
+        let max = rows.saturating_sub(visible);
+        let mut first = first.min(max);
+        if area.contains(self.mouse) {
+            let (_, wheel) = mouse_wheel();
+            if wheel > 0.0 {
+                first = first.saturating_sub(3);
+            } else if wheel < 0.0 {
+                first = (first + 3).min(max);
+            }
+        }
+        if rows > visible && visible > 0 {
+            // A thin scroll indicator on the right.
+            let track = Rect::new(area.x + area.w - 3.0, area.y, 3.0, area.h);
+            let h = (track.h * visible as f32 / rows as f32).max(16.0);
+            let y = track.y + (track.h - h) * first as f32 / max.max(1) as f32;
+            rrect(Rect::new(track.x, y, 3.0, h), 1.5, Color::new(0.91, 0.75, 0.38, 0.45));
+        }
+        first
+    }
+
+    /// True if the left button was released over `r` this frame (a click).
+    pub fn clicked(&self, r: Rect) -> bool {
+        self.released && r.contains(self.mouse)
+    }
+
+    pub fn hovering(&self, r: Rect) -> bool {
+        r.contains(self.mouse)
+    }
+
+    /// A row of joined toggle buttons; returns the index clicked.
+    pub fn segmented(&mut self, r: Rect, options: &[&str], selected: usize) -> Option<usize> {
+        self.block(r);
+        let n = options.len().max(1) as f32;
+        let w = r.w / n;
+        rrect(r, 7.0, Color::new(0.06, 0.04, 0.03, 1.0));
+        let mut clicked = None;
+        for (i, label) in options.iter().enumerate() {
+            let cell = Rect::new(r.x + i as f32 * w, r.y, w, r.h);
+            let hover = cell.contains(self.mouse);
+            if i == selected {
+                rrect(Rect::new(cell.x + 2.0, cell.y + 2.0, cell.w - 4.0, cell.h - 4.0), 6.0, Color::new(0.38, 0.25, 0.12, 1.0));
+            } else if hover {
+                rrect(Rect::new(cell.x + 2.0, cell.y + 2.0, cell.w - 4.0, cell.h - 4.0), 6.0, Color::new(0.22, 0.15, 0.09, 1.0));
+            }
+            let size = self.fit((r.h * 0.42).clamp(12.0, 16.0), label, w - 10.0);
+            let color = if i == selected { GOLD } else { CREAM };
+            self.text_centered(label, cell.x + w / 2.0, cell.y + (r.h - size) / 2.0, size, color, true);
+            if hover && self.released && i != selected {
+                clicked = Some(i);
+            }
+        }
+        rrect_lines(r, 7.0, 1.2, BORDER);
+        clicked
     }
 
     /// The circular "where does the tip hit the cue ball" control.
@@ -642,21 +842,26 @@ impl Ui {
     }
 }
 
-/// Outline points of a rounded rectangle, clockwise from the top-left corner.
-fn rounded_points(r: Rect, radius: f32) -> Vec<Vec2> {
+const CORNER_STEPS: usize = 6;
+const OUTLINE: usize = 4 * (CORNER_STEPS + 1);
+
+/// Outline points of a rounded rectangle, clockwise from the top-left corner
+/// (on the stack: these are drawn hundreds of times a frame).
+fn rounded_points(r: Rect, radius: f32) -> [Vec2; OUTLINE] {
     let rad = radius.min(r.w / 2.0).min(r.h / 2.0).max(0.0);
-    const STEPS: usize = 6;
     let corners = [
         (vec2(r.x + rad, r.y + rad), std::f32::consts::PI),
         (vec2(r.x + r.w - rad, r.y + rad), 1.5 * std::f32::consts::PI),
         (vec2(r.x + r.w - rad, r.y + r.h - rad), 0.0),
         (vec2(r.x + rad, r.y + r.h - rad), 0.5 * std::f32::consts::PI),
     ];
-    let mut pts = Vec::with_capacity(4 * (STEPS + 1));
+    let mut pts = [Vec2::ZERO; OUTLINE];
+    let mut i = 0;
     for (c, start) in corners {
-        for k in 0..=STEPS {
-            let a = start + k as f32 / STEPS as f32 * std::f32::consts::FRAC_PI_2;
-            pts.push(c + vec2(a.cos(), a.sin()) * rad);
+        for k in 0..=CORNER_STEPS {
+            let a = start + k as f32 / CORNER_STEPS as f32 * std::f32::consts::FRAC_PI_2;
+            pts[i] = c + vec2(a.cos(), a.sin()) * rad;
+            i += 1;
         }
     }
     pts

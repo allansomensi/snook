@@ -9,6 +9,7 @@ use crate::i18n::{t, tw};
 use snook_core::{BallId, BallInHand, Group};
 
 use crate::game::{Controller, Match, Phase};
+use crate::icons::Icon;
 use crate::textures::ball_color;
 use crate::ui::{ALERT, BORDER, CREAM, GOLD, MUTED, Ui};
 
@@ -38,6 +39,9 @@ pub struct Hud {
     power: f32,
     power_key: Option<(u32, u32)>,
     panel_key: Option<(u32, u32)>,
+    /// Camera zoom, 0 (far) to 1 (close): set by the caller, changed by the zoom bar.
+    pub zoom: f32,
+    zoom_drag: bool,
 }
 
 /// What the player asked for through the HUD.
@@ -47,8 +51,10 @@ pub enum HudAction {
     /// Online: back to the lounge.
     Lounge,
     Settings,
-    ToggleView,
+    /// Back to the overhead view of the whole table.
     ResetCamera,
+    /// The zoom bar moved (0 far … 1 close).
+    Zoom(f32),
 }
 
 impl Default for Hud {
@@ -70,6 +76,8 @@ impl Default for Hud {
             power: 0.5,
             power_key: None,
             panel_key: None,
+            zoom: 0.5,
+            zoom_drag: false,
         }
     }
 }
@@ -118,9 +126,17 @@ fn player_card(ui: &mut Ui, m: &Match, seat: usize, x: f32, y: f32, w: f32) {
         if active { 2.0 } else { 1.0 },
         if active { GOLD } else { crate::ui::BORDER },
     );
-    let reserve = if m.online.is_some() { 96.0 } else { 40.0 };
-    let name = ui.ellipsize(&m.names[seat], w - reserve, 15.0);
-    ui.text(&name, x + 10.0, y + 4.0, 15.0, if active { GOLD } else { CREAM }, true);
+    let reserve = if m.online.is_some() || m.clock.is_some() { 96.0 } else { 40.0 };
+    match &m.online {
+        Some(o) => {
+            let color = crate::ui::tier_color(snook_proto::Tier::of(o.ratings[seat]));
+            ui.name_with_flag(&m.names[seat], &o.countries[seat], color, x + 10.0, y + 4.0, 15.0, w - reserve);
+        }
+        None => {
+            let name = ui.ellipsize(&m.names[seat], w - reserve, 15.0);
+            ui.text(&name, x + 10.0, y + 4.0, 15.0, if active { GOLD } else { CREAM }, true);
+        }
+    }
     let wins = m.wins[seat].to_string();
     let ww = ui.text_size(&wins, 18.0, true).x;
     ui.text(&wins, x + w - ww - 10.0, y + 3.0, 18.0, CREAM, true);
@@ -128,16 +144,18 @@ fn player_card(ui: &mut Ui, m: &Match, seat: usize, x: f32, y: f32, w: f32) {
         let rating = o.ratings[seat].to_string();
         let rw = ui.text_size(&rating, 12.0, false).x;
         ui.text(&rating, x + w - ww - rw - 20.0, y + 7.0, 12.0, MUTED, false);
-        if active && matches!(m.phase, Phase::Turn { .. }) {
+    }
+    if let Some((left, total)) = m.shot_clock() {
+        if active && matches!(m.phase, Phase::Turn { .. }) && m.replay.is_none() {
             // Shot clock along the bottom of the card.
-            let frac = (o.clock_left / o.shot_clock.max(1.0)).clamp(0.0, 1.0);
-            let color = if o.clock_left < 10.0 { ALERT } else { GOLD };
+            let frac = (left / total.max(1.0)).clamp(0.0, 1.0);
+            let color = if left < 10.0 { ALERT } else { GOLD };
             crate::ui::rrect(
                 Rect::new(x + 6.0, y + CARD_H - 4.0, (w - 12.0) * frac, 2.5),
                 1.2,
                 color,
             );
-            let secs = format!("{:.0}s", o.clock_left.ceil());
+            let secs = format!("{:.0}s", left.ceil());
             let sw_ = ui.text_size(&secs, 13.0, true).x;
             ui.text(&secs, x + w - sw_ - 10.0, y + 24.0, 13.0, color, true);
         }
@@ -163,7 +181,6 @@ fn player_card(ui: &mut Ui, m: &Match, seat: usize, x: f32, y: f32, w: f32) {
 fn status_line(m: &Match) -> Option<String> {
     let name = &m.names[m.game.current_player()];
     match &m.phase {
-        Phase::Awaiting => Some(t("Shooting…").into()),
         Phase::Turn { placing_cue_ball, computer } => {
             if computer.is_some() {
                 return Some(tw("{name} is thinking…", &[("name", name)]));
@@ -222,15 +239,17 @@ impl Hud {
             }
         }
 
+        if !ui.wants_keyboard && is_key_pressed(KeyCode::R) {
+            if m.replay.is_some() {
+                m.stop_replay();
+            } else {
+                m.start_replay();
+            }
+        }
         // Top bar: menu and camera on the left, the players in the middle.
         draw_bar(Rect::new(0.0, 0.0, sw, TOP_BAR), true);
         // Cards centred, but never under the buttons on the left.
-        let view = if self.top_view { t("3D view") } else { t("Top view") };
-        let buttons_w: f32 = [t("Menu"), view, t("Reset camera")]
-            .iter()
-            .map(|l| ui.text_size(l, 13.0, true).x + 28.0)
-            .sum::<f32>()
-            + 14.0;
+        let buttons_w = ui.text_size(t("Menu"), 13.0, true).x + 22.0 + 2.0 * 36.0 + 30.0;
         let room = sw - 2.0 * buttons_w;
         let card_w = ((room - 10.0) / 2.0).clamp(150.0, 270.0);
         let total = card_w * 2.0 + 10.0;
@@ -273,21 +292,38 @@ impl Hud {
             draw_call_panel(ui, m);
         }
 
-        // Menu and camera buttons in the top bar.
+        // Menu, the overhead view and the replay, in the top bar.
         if !self.paused {
-            let view = if self.top_view { t("3D view") } else { t("Top view") };
-            let mut x = 10.0;
-            for (k, label) in [t("Menu"), view, t("Reset camera")].into_iter().enumerate() {
-                let w = ui.text_size(label, 13.0, true).x + 22.0;
-                if ui.button(Rect::new(x, 12.0, w, 30.0), label, true) {
-                    match k {
-                        0 => self.paused = true,
-                        1 => action = HudAction::ToggleView,
-                        _ => action = HudAction::ResetCamera,
-                    }
-                }
-                x += w + 6.0;
+            let w = ui.text_size(t("Menu"), 13.0, true).x + 22.0;
+            if ui.button(Rect::new(10.0, 12.0, w, 30.0), t("Menu"), true) {
+                self.paused = true;
             }
+            let mut x = 10.0 + w + 8.0;
+            if ui.icon_button(Rect::new(x, 12.0, 30.0, 30.0), Icon::Target, t("Top view (C)"), !self.top_view) {
+                action = HudAction::ResetCamera;
+            }
+            x += 36.0;
+            let can_replay = m.last_shot.is_some() && !m.shot_in_progress();
+            let tip = if m.replay.is_some() { t("Stop the replay (R)") } else { t("Watch the last shot again (R)") };
+            if ui.icon_button_ex(Rect::new(x, 12.0, 30.0, 30.0), Icon::Replay, tip, can_replay || m.replay.is_some(), true) {
+                if m.replay.is_some() {
+                    m.stop_replay();
+                } else {
+                    m.start_replay();
+                }
+            }
+            if let Some(z) = self.zoom_bar(ui) {
+                action = HudAction::Zoom(z);
+            }
+        }
+        if m.replay.is_some() {
+            let label = t("REPLAY");
+            let w = ui.text_size(label, 14.0, true).x + 40.0;
+            let r = Rect::new((sw - w) / 2.0, TOP_BAR + 8.0, w, 26.0);
+            let pulse = 0.6 + 0.4 * (get_time() as f32 * 3.0).sin();
+            crate::ui::rrect(r, 13.0, Color::new(0.0, 0.0, 0.0, 0.7));
+            draw_circle(r.x + 14.0, r.y + 13.0, 4.5, Color::new(0.95, 0.3, 0.25, pulse));
+            ui.text(label, r.x + 26.0, r.y + 6.0, 14.0, CREAM, true);
         }
         if self.show_help && !self.paused {
             let lines = [
@@ -297,7 +333,8 @@ impl Hud {
                 (t("Shoot"), t("Set the power, then press the green button")),
                 (t("Spin"), t("Spin ball · ↑ ↓ · Q / E")),
                 (t("Elevation"), t("W / S (jump & massé)")),
-                (t("Camera"), t("Right-drag · Wheel · Tab · C")),
+                (t("Camera"), t("Drag outside the table · Wheel · C")),
+                (t("Replay"), t("R: watch the last shot again")),
                 (t("Ball in hand"), t("Drag the cue ball")),
                 (t("Menu / help"), t("Esc · H")),
             ];
@@ -374,7 +411,9 @@ impl Hud {
                     false,
                 ),
             }
-            let note = if o.opponent_left {
+            let note = if o.tournament.is_some() {
+                t("Tournament game: the next round starts from the lounge.").to_string()
+            } else if o.opponent_left {
                 t("Your opponent went back to the lounge.").to_string()
             } else if o.rematch_requested {
                 tw("Waiting for {name}…", &[("name", &m.names[1 - me])])
@@ -384,7 +423,7 @@ impl Hud {
                 String::new()
             };
             ui.text_centered(&note, sw / 2.0, r.y + 138.0, 14.0, GOLD, false);
-            let can_rematch = !o.opponent_left && !o.rematch_requested;
+            let can_rematch = !o.opponent_left && !o.rematch_requested && o.tournament.is_none();
             let label = if o.rematch_offered { t("Accept rematch") } else { t("Rematch") };
             let rr = Rect::new(r.x + 30.0, r.y + 164.0, 180.0, 38.0);
             if can_rematch {
@@ -522,10 +561,55 @@ impl Hud {
     }
 }
 
-const CHAT_W: f32 = 300.0;
-const CHAT_H: f32 = 190.0;
+const CHAT_W: f32 = 320.0;
+const CHAT_H: f32 = 210.0;
 
 impl Hud {
+    /// A slim vertical zoom control on the right edge: almost invisible
+    /// until the pointer comes near.
+    fn zoom_bar(&mut self, ui: &mut Ui) -> Option<f32> {
+        let sw = crate::ui::vw();
+        let sh = crate::ui::vh();
+        let h = (sh * 0.28).clamp(120.0, 220.0);
+        let track = Rect::new(sw - 26.0, (sh - h) / 2.0, 6.0, h);
+        let zone = Rect::new(track.x - 16.0, track.y - 34.0, 40.0, h + 68.0);
+        let near = ui.hovering(zone) || self.zoom_drag;
+        let alpha = if near { 0.95 } else { 0.35 };
+        let mut out = None;
+        // + and − buttons.
+        let plus = Rect::new(track.x - 9.0, track.y - 30.0, 24.0, 24.0);
+        let minus = Rect::new(track.x - 9.0, track.y + h + 6.0, 24.0, 24.0);
+        if near {
+            if ui.icon_button_ex(plus, Icon::Plus, t("Zoom in"), true, true) {
+                out = Some((self.zoom + 0.12).min(1.0));
+            }
+            if ui.icon_button_ex(minus, Icon::Minus, t("Zoom out"), true, true) {
+                out = Some((self.zoom - 0.12).max(0.0));
+            }
+        } else {
+            crate::icons::draw(Icon::Plus, vec2(plus.x + 12.0, plus.y + 12.0), 10.0, Color::new(1.0, 1.0, 1.0, 0.3));
+            crate::icons::draw(Icon::Minus, vec2(minus.x + 12.0, minus.y + 12.0), 10.0, Color::new(1.0, 1.0, 1.0, 0.3));
+        }
+        let drag = ui.drag_area(95, Rect::new(track.x - 10.0, track.y, 26.0, h));
+        self.zoom_drag = matches!(drag, crate::ui::Drag::Held(_));
+        if let crate::ui::Drag::Held(p) | crate::ui::Drag::Released(p) = drag {
+            out = Some((1.0 - (p.y - track.y) / h).clamp(0.0, 1.0));
+        }
+        crate::ui::rrect(track, 3.0, Color::new(0.0, 0.0, 0.0, 0.45 * alpha));
+        let fill = h * self.zoom;
+        crate::ui::rrect(
+            Rect::new(track.x, track.y + h - fill, track.w, fill),
+            3.0,
+            Color::new(GOLD.r, GOLD.g, GOLD.b, 0.55 * alpha),
+        );
+        let ky = track.y + h - fill;
+        draw_circle(track.x + 3.0, ky, if near { 8.0 } else { 5.5 }, Color::new(0.93, 0.9, 0.84, alpha));
+        if let Some(z) = out {
+            self.zoom = z;
+        }
+        out
+    }
+
     /// The chat with the opponent (online matches).
     fn draw_chat(&mut self, ui: &mut Ui, m: &mut Match) {
         let sh = crate::ui::vh();
@@ -550,7 +634,7 @@ impl Hud {
         }
         let log = Rect::new(r.x + 6.0, r.y + 28.0, r.w - 12.0, r.h - 28.0 - 40.0);
         let me = m.names[o.seat].clone();
-        self.chat_scroll = ui.chat_log(log, &o.chat, Some(&me), self.chat_scroll);
+        self.chat_scroll = ui.chat_log(log, &o.feed, Some(&me), self.chat_scroll);
         let input = Rect::new(r.x + 6.0, r.y + r.h - 36.0, r.w - 12.0, 30.0);
         let sent =
             ui.text_input(CHAT_FIELD, input, &mut self.chat_input, snook_proto::MAX_CHAT_LEN);
@@ -753,8 +837,11 @@ impl Hud {
         let px0 = (px1 - 300.0).max(24.0);
         let track = Rect::new(px0, bar.y + bar.h / 2.0 - 9.0, (px1 - px0).max(120.0), 18.0);
 
-        // The recent game messages float just above the bar, on the left.
-        draw_log(ui, m, Rect::new(14.0, bar.y - 66.0, (sw * 0.4).clamp(260.0, 460.0), 60.0));
+        // The recent game messages float just above the bar, on the left
+        // (online they are in the chat, with the players' messages).
+        if !m.is_online() {
+            draw_log(ui, m, Rect::new(14.0, bar.y - 66.0, (sw * 0.4).clamp(260.0, 460.0), 60.0));
+        }
 
         // A new turn starts with the power the player chose last time.
         let key = (m.games_played, m.game.shots_taken());

@@ -568,6 +568,12 @@ impl EightBallGame {
         self.end_with(1 - player, GameOverReason::Abandoned);
     }
 
+    /// Ends the game with a result decided elsewhere (a client applying the
+    /// server's verdict). Does nothing if the game is already over.
+    pub fn conclude(&mut self, winner: usize, reason: GameOverReason) {
+        self.end_with(winner % 2, reason);
+    }
+
     fn end_with(&mut self, winner: usize, reason: GameOverReason) {
         if self.game_over.is_none() {
             self.game_over = Some(GameOver { winner, reason });

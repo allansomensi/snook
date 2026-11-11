@@ -43,6 +43,9 @@ pub const DEFAULT_DISTANCE: f32 = 1.75;
 /// The fixed view: from behind the head of the table, the whole table in sight.
 pub const FIXED_PITCH: f32 = 0.70;
 pub const FIXED_DISTANCE: f32 = 2.45;
+/// The zoom bar's range of camera distances.
+const ZOOM_NEAR: f32 = 0.6;
+const ZOOM_FAR: f32 = 3.2;
 /// Field of view of the overhead view: narrow, so the table looks flat.
 const TOP_FOV: f32 = 0.63;
 
@@ -100,8 +103,25 @@ impl CameraRig {
         self.focus.y = 0.0;
     }
 
+    /// Zoom as 0 (far) … 1 (close), for the zoom bar.
+    pub fn zoom_level(&self) -> f32 {
+        let (near, far) = (ZOOM_NEAR.ln(), ZOOM_FAR.ln());
+        ((far - self.distance.clamp(ZOOM_NEAR, ZOOM_FAR).ln()) / (far - near)).clamp(0.0, 1.0)
+    }
+
+    /// Sets the zoom from the zoom bar (0 far … 1 close).
+    pub fn set_zoom_level(&mut self, z: f32) {
+        let (near, far) = (ZOOM_NEAR.ln(), ZOOM_FAR.ln());
+        let d = (far - z.clamp(0.0, 1.0) * (far - near)).exp();
+        let min = if self.follow_cue && self.mode == CameraMode::Aim { 0.9 } else { ZOOM_NEAR };
+        self.distance = d.max(min);
+        if z < 0.05 {
+            self.focus = Vec3::ZERO;
+        }
+    }
+
     /// From the overhead view to the 3D view, seen from the same side, so a
-    /// right-drag can turn the table straight away.
+    /// drag can turn the table straight away.
     pub fn enter_3d(&mut self) {
         if self.mode == CameraMode::Top {
             self.mode = CameraMode::Aim;

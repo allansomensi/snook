@@ -26,10 +26,12 @@ pub struct Connection {
     closed: bool,
 }
 
-const PING_EVERY: Duration = Duration::from_secs(20);
+const PING_EVERY: Duration = Duration::from_secs(15);
 /// The server pings back within seconds; silence this long means a dead link.
 const SILENCE_LIMIT: Duration = Duration::from_secs(60);
-const POLL: Duration = Duration::from_millis(15);
+/// How long a read waits before outgoing messages are checked again: short,
+/// so a shot or aim update leaves within a few milliseconds.
+const POLL: Duration = Duration::from_millis(4);
 
 impl Connection {
     /// Starts connecting to `url` (`ws://host:port/ws` or `wss://…`).
