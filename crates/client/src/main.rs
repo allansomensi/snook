@@ -31,8 +31,10 @@ mod reactions;
 mod scene;
 mod settings;
 mod setup;
+mod shop;
 mod textures;
 mod ui;
+mod util;
 
 use macroquad::prelude::*;
 use snook_core::{Difficulty, Table};
@@ -195,6 +197,7 @@ enum Screen {
     LanLounge,
     Ranking,
     Profile,
+    Shop,
 }
 
 /// A LAN game: the server this computer hosts (if any) and the connection.
@@ -221,7 +224,12 @@ async fn main() {
 
     let mut config = Config::load();
     i18n::set_lang(config.language);
-    let mut scene = Scene::new(Table::default(), config.quality, config.focused_scene);
+    let mut scene = Scene::new(
+        Table::default(),
+        config.quality,
+        config.focused_scene,
+        &scene::Looks::of(&config.cloth, &config.balls),
+    );
     let mut retired: Vec<Scene> = Vec::new();
     let sounds = audio::Sounds::load().await;
     let mut menu = Menu::default();
@@ -240,6 +248,7 @@ async fn main() {
     let mut lan: Option<LanSession> = None;
     let mut ranking = Ranking::default();
     let mut profile = ProfileScreen::default();
+    let mut shop = shop::ShopScreen::default();
     // Where the profile and ranking go back to.
     let mut back_to_lounge = false;
     let mut settings_open = options.settings;
@@ -264,6 +273,12 @@ async fn main() {
             screen = Screen::Lan;
         }
         Some("setup") => screen = Screen::Setup(Setup::new(SetupKind::VsComputer)),
+        Some(tab @ ("shop" | "shop-coins" | "shop-vip")) => {
+            online.connect();
+            shop.open(&mut online);
+            shop.dev_tab(tab);
+            screen = Screen::Shop;
+        }
         Some("ranking") => {
             ranking.open(&mut online);
             screen = Screen::Ranking;
@@ -361,6 +376,27 @@ async fn main() {
         hud.aim_sensitivity = config.aim_sensitivity;
         hud.zoom = rig.zoom_level();
         controls.sensitivity = config.aim_sensitivity;
+        // New cloth or balls from the shop: rebuild the table.
+        if std::mem::take(&mut online.looks_changed) {
+            config.save();
+            scene = Scene::new(
+                Table::default(),
+                config.quality,
+                config.focused_scene,
+                &scene::Looks::of(&config.cloth, &config.balls),
+            );
+        }
+        // Offline, the people at the table play with this player's cue.
+        if let Some(m) = current.as_mut().filter(|m| !m.is_online()) {
+            for seat in 0..2 {
+                if m.controllers[seat] == game::Controller::Human {
+                    let look = (config.cue.clone(), config.chalk.clone());
+                    if m.cue_looks[seat] != look {
+                        m.cue_looks[seat] = look;
+                    }
+                }
+            }
+        }
         let mut cam = rig.update(dt, current.as_ref(), get_time() as f32);
         // Development aid: SNOOK_CAM="eye x,y,z,target x,y,z" fixes the camera.
         if let Some(v) = crate::dev::var("SNOOK_CAM")
@@ -421,7 +457,12 @@ async fn main() {
                 // queued this frame: drop it after the frame is shown.
                 retired.push(std::mem::replace(
                     &mut scene,
-                    Scene::new(Table::default(), config.quality, config.focused_scene),
+                    Scene::new(
+                        Table::default(),
+                        config.quality,
+                        config.focused_scene,
+                        &scene::Looks::of(&config.cloth, &config.balls),
+                    ),
                 ));
             }
             if config.language != before.language {
@@ -525,6 +566,11 @@ async fn main() {
                                     }
                                 }
                             }
+                            MenuAction::Shop => {
+                                shop.open(&mut online);
+                                back_to_lounge = false;
+                                next = Some(Screen::Shop);
+                            }
                             MenuAction::Settings => settings_open = true,
                             MenuAction::Quit => break,
                             MenuAction::None => {}
@@ -551,6 +597,11 @@ async fn main() {
                                 ranking.open(&mut online);
                                 back_to_lounge = true;
                                 next = Some(Screen::Ranking);
+                            }
+                            OnlineAction::Shop => {
+                                shop.open(&mut online);
+                                back_to_lounge = true;
+                                next = Some(Screen::Shop);
                             }
                             OnlineAction::None => {}
                         },
@@ -606,6 +657,16 @@ async fn main() {
                             }
                             RankingAction::None => {}
                         },
+                        Screen::Shop => match shop.draw(&mut ui, &mut online) {
+                            shop::ShopAction::Back => {
+                                next = Some(if back_to_lounge && online.signed_in() {
+                                    Screen::Online
+                                } else {
+                                    Screen::Menu
+                                })
+                            }
+                            shop::ShopAction::None => {}
+                        },
                         Screen::Profile => match profile.draw(&mut ui, &mut online) {
                             ProfileAction::Back => {
                                 next = Some(if back_to_lounge && online.signed_in() {
@@ -646,7 +707,12 @@ async fn main() {
                     config.msaa = config.msaa.min(q.default_msaa());
                     retired.push(std::mem::replace(
                         &mut scene,
-                        Scene::new(Table::default(), q, config.focused_scene),
+                        Scene::new(
+                            Table::default(),
+                            q,
+                            config.focused_scene,
+                            &scene::Looks::of(&config.cloth, &config.balls),
+                        ),
                     ));
                     toast = Some((
                         i18n::tw(

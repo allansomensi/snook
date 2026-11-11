@@ -15,6 +15,8 @@ pub mod admin;
 pub mod lan;
 pub mod limits;
 pub mod lounge;
+pub mod payments;
+pub mod shop;
 pub mod store;
 pub mod tournament;
 
@@ -100,6 +102,8 @@ pub struct Config {
     /// With `x-forwarded-for`: how many proxies append to it (the address is
     /// taken that many entries from the right).
     pub proxy_hops: usize,
+    /// Real-money payments (none when not configured).
+    pub stripe: Option<payments::StripeConfig>,
 }
 
 impl Default for Config {
@@ -112,6 +116,7 @@ impl Default for Config {
             admins: Vec::new(),
             client_ip_header: None,
             proxy_hops: 1,
+            stripe: None,
         }
     }
 }
@@ -128,6 +133,7 @@ pub struct Server {
     hashing: Semaphore,
     leaderboard: Mutex<Option<(Instant, Vec<LeaderboardEntry>)>>,
     connections: Mutex<HashMap<IpAddr, usize>>,
+    pub stripe: Option<payments::Stripe>,
 }
 
 /// Drops connections that send nothing (clients ping every ~15 s).
@@ -151,7 +157,9 @@ impl Server {
         };
         let _ = store.purge_sessions(now()).await;
         let (tx, rx) = mpsc::unbounded_channel();
+        let stripe = config.stripe.clone().map(payments::Stripe::new);
         Ok(Arc::new(Server {
+            stripe,
             store,
             lounge: Mutex::new(Lounge::new(config.rules.clone(), tx)),
             next_conn: AtomicU64::new(1),
@@ -282,6 +290,9 @@ pub fn router(server: Arc<Server>) -> Router {
         .route("/ws", get(ws_handler))
         .route("/api/status", get(api_status))
         .route("/api/leaderboard", get(api_leaderboard))
+        .route("/stripe/webhook", axum::routing::post(shop::webhook))
+        .route("/shop/thanks", get(shop::thanks))
+        .route("/shop/cancelled", get(shop::cancelled))
         .merge(admin::router())
         .with_state(server)
 }
@@ -689,6 +700,8 @@ async fn handle_socket(server: Arc<Server>, socket: WebSocket, ip: IpAddr) {
     let mut token_in_use: Option<String> = None;
     // ~40 messages a second sustained (aim updates are ~20), short bursts more.
     let mut flood = Bucket::new(120.0, 40.0);
+    // Shop actions (some open payment pages at the provider).
+    let mut shop_bucket = Bucket::new(6.0, 0.1);
     loop {
         let next = tokio::select! {
             m = tokio::time::timeout(IDLE_TIMEOUT, stream.next()) => m,
@@ -763,7 +776,10 @@ async fn handle_socket(server: Arc<Server>, socket: WebSocket, ip: IpAddr) {
                             let _ = server.store.touch(row.id, now()).await;
                             let s = server.clone();
                             let r = row.clone();
-                            tokio::spawn(async move { s.check_achievements(&r).await });
+                            tokio::spawn(async move {
+                                s.check_achievements(&r).await;
+                                shop::push_wallet(&s, &r).await;
+                            });
                             if let Ok(friends) = server.store.friends(row.id).await
                                 && friends.iter().any(|(_, st)| *st == FriendState::Incoming)
                             {
@@ -828,6 +844,20 @@ async fn handle_socket(server: Arc<Server>, socket: WebSocket, ip: IpAddr) {
             }
             msg if guest && is_account_msg(&msg) => {
                 send(ServerMsg::Error { message: "Guests don't have this.".into() })
+            }
+            msg @ (ClientMsg::Shop
+            | ClientMsg::BuyItem { .. }
+            | ClientMsg::Equip { .. }
+            | ClientMsg::BuyCoins { .. }
+            | ClientMsg::SubscribeVip
+            | ClientMsg::ManageVip) => {
+                // Opening payment pages costs a call to the provider: a few
+                // per minute at most.
+                if shop_bucket.take() {
+                    shop::handle(&server, &me, msg, &send).await;
+                } else {
+                    send(ServerMsg::Error { message: "Slow down a little.".into() });
+                }
             }
             ClientMsg::SetCountry { country } => {
                 let country = country.trim().to_uppercase();
@@ -925,6 +955,12 @@ fn is_account_msg(msg: &ClientMsg) -> bool {
             | ClientMsg::Block { .. }
             | ClientMsg::Unblock { .. }
             | ClientMsg::Report { .. }
+            | ClientMsg::Shop
+            | ClientMsg::BuyItem { .. }
+            | ClientMsg::Equip { .. }
+            | ClientMsg::BuyCoins { .. }
+            | ClientMsg::SubscribeVip
+            | ClientMsg::ManageVip
     )
 }
 

@@ -6,8 +6,9 @@ use std::sync::Mutex;
 use snook_proto::{LeaderboardEntry, Role};
 
 use super::{
-    AuditRow, FriendOutcome, FriendState, HistoryRow, MatchRecord, NewReport, NewUser, Overview,
-    ReportRow, SessionKind, StoreResult, TournamentRecord, User,
+    AuditRow, BuyOutcome, FriendOutcome, FriendState, HistoryRow, LedgerRow, MatchRecord,
+    NewReport, NewUser, Overview, Payment, ReportRow, SessionKind, StoreResult, TournamentRecord,
+    User, Wallet,
 };
 
 #[derive(Default)]
@@ -30,6 +31,10 @@ struct Inner {
     report_ids: Vec<(i64, i64)>,
     audit: Vec<AuditRow>,
     tournaments: Vec<TournamentRecord>,
+    wallets: HashMap<i64, Wallet>,
+    /// (user, delta, reason, reference, at)
+    ledger: Vec<(i64, i64, String, Option<String>, i64)>,
+    payments: Vec<Payment>,
 }
 
 impl Inner {
@@ -483,5 +488,144 @@ impl MemoryStore {
 
     pub fn audit_log(&self, limit: u32) -> StoreResult<Vec<AuditRow>> {
         Ok(self.lock().audit.iter().rev().take(limit as usize).cloned().collect())
+    }
+
+    // The shop.
+
+    pub fn wallet(&self, user_id: i64) -> StoreResult<Wallet> {
+        Ok(self.lock().wallets.get(&user_id).cloned().unwrap_or_default())
+    }
+
+    pub fn buy_item(
+        &self,
+        user_id: i64,
+        code: &str,
+        price: i64,
+        at: i64,
+    ) -> StoreResult<BuyOutcome> {
+        let mut s = self.lock();
+        let w = s.wallets.entry(user_id).or_default();
+        if w.owned.iter().any(|o| o == code) {
+            return Ok(BuyOutcome::AlreadyOwned);
+        }
+        if w.coins < price {
+            return Ok(BuyOutcome::NotEnoughCoins);
+        }
+        w.coins -= price;
+        w.owned.push(code.to_string());
+        s.ledger.push((user_id, -price, format!("buy {code}"), None, at));
+        Ok(BuyOutcome::Bought)
+    }
+
+    pub fn grant_item(
+        &self,
+        user_id: i64,
+        code: &str,
+        _source: &str,
+        _at: i64,
+    ) -> StoreResult<bool> {
+        let mut s = self.lock();
+        let w = s.wallets.entry(user_id).or_default();
+        if w.owned.iter().any(|o| o == code) {
+            return Ok(false);
+        }
+        w.owned.push(code.to_string());
+        Ok(true)
+    }
+
+    pub fn equip(&self, user_id: i64, category: &str, code: &str) -> StoreResult<()> {
+        let mut s = self.lock();
+        s.wallets
+            .entry(user_id)
+            .or_default()
+            .equipped
+            .insert(category.to_string(), code.to_string());
+        Ok(())
+    }
+
+    pub fn credit(
+        &self,
+        user_id: i64,
+        delta: i64,
+        reason: &str,
+        reference: Option<&str>,
+        at: i64,
+    ) -> StoreResult<bool> {
+        let mut s = self.lock();
+        if let Some(r) = reference
+            && s.ledger.iter().any(|l| l.3.as_deref() == Some(r))
+        {
+            return Ok(false);
+        }
+        s.wallets.entry(user_id).or_default().coins += delta;
+        s.ledger.push((user_id, delta, reason.to_string(), reference.map(str::to_string), at));
+        Ok(true)
+    }
+
+    pub fn set_vip(&self, user_id: i64, until: i64, force: bool) -> StoreResult<()> {
+        let mut s = self.lock();
+        let w = s.wallets.entry(user_id).or_default();
+        w.vip_until = if force { until } else { w.vip_until.max(until) };
+        Ok(())
+    }
+
+    pub fn set_stripe_customer(&self, user_id: i64, customer: &str) -> StoreResult<()> {
+        let mut s = self.lock();
+        s.wallets.entry(user_id).or_default().stripe_customer = Some(customer.to_string());
+        Ok(())
+    }
+
+    pub fn user_by_stripe_customer(&self, customer: &str) -> StoreResult<Option<i64>> {
+        let s = self.lock();
+        Ok(s.wallets
+            .iter()
+            .find(|(_, w)| w.stripe_customer.as_deref() == Some(customer))
+            .map(|(id, _)| *id))
+    }
+
+    pub fn record_payment(&self, p: &Payment) -> StoreResult<bool> {
+        let mut s = self.lock();
+        if s.payments.iter().any(|x| x.id == p.id) {
+            return Ok(false);
+        }
+        s.payments.push(p.clone());
+        Ok(true)
+    }
+
+    pub fn payment(&self, id: &str) -> StoreResult<Option<Payment>> {
+        Ok(self.lock().payments.iter().find(|p| p.id == id).cloned())
+    }
+
+    pub fn refund_payment(&self, id: &str) -> StoreResult<bool> {
+        let mut s = self.lock();
+        match s.payments.iter_mut().find(|p| p.id == id) {
+            Some(p) if !p.refunded => {
+                p.refunded = true;
+                Ok(true)
+            }
+            _ => Ok(false),
+        }
+    }
+
+    pub fn ledger(&self, user_id: i64, limit: u32) -> StoreResult<Vec<LedgerRow>> {
+        let s = self.lock();
+        Ok(s.ledger
+            .iter()
+            .rev()
+            .filter(|l| l.0 == user_id)
+            .take(limit as usize)
+            .map(|l| LedgerRow { delta: l.1, reason: l.2.clone(), reference: l.3.clone(), at: l.4 })
+            .collect())
+    }
+
+    pub fn payments_of(&self, user_id: i64, limit: u32) -> StoreResult<Vec<Payment>> {
+        let s = self.lock();
+        Ok(s.payments
+            .iter()
+            .rev()
+            .filter(|p| p.user_id == user_id)
+            .take(limit as usize)
+            .cloned()
+            .collect())
     }
 }

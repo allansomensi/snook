@@ -870,7 +870,19 @@ impl Ui {
         size: f32,
         max_w: f32,
     ) -> f32 {
-        self.name_with_flag(&p.username, &p.country, name_color(p), x, y, size, max_w)
+        let crown = if p.vip { size + 4.0 } else { 0.0 };
+        let w =
+            self.name_with_flag(&p.username, &p.country, name_color(p), x, y, size, max_w - crown);
+        if p.vip {
+            // VIP members: a small gold crown after the name.
+            crate::icons::draw(
+                crate::icons::Icon::Crown,
+                vec2(x + w + 4.0 + size * 0.45, y + size * 0.55),
+                size * 0.8,
+                GOLD,
+            );
+        }
+        w + crown
     }
 
     /// A flag and a name in `color`. Returns the width used.

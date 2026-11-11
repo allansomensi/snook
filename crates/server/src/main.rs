@@ -13,6 +13,10 @@
 //! | `SNOOK_PROXY_HOPS` | `1` | proxies that append to `X-Forwarded-For` |
 //! | `SNOOK_MOTD` | a welcome line | message shown in the lounge |
 //! | `SNOOK_SHOT_CLOCK` | `30` | seconds per shot |
+//! | `SNOOK_STRIPE_SECRET` | — | Stripe secret key (payments; see `payments.rs`) |
+//! | `SNOOK_STRIPE_WEBHOOK_SECRET` | — | Stripe webhook signing secret |
+//! | `SNOOK_STRIPE_PRICES` | — | `code=price_id\|label;…` for coin packs and `vip_monthly` |
+//! | `SNOOK_PUBLIC_URL` | — | the server's public address (payment return pages) |
 //! | `RUST_LOG` | `info` | log filter |
 
 use std::time::Duration;
@@ -62,7 +66,12 @@ async fn main() {
             .unwrap_or_default(),
         client_ip_header: env("SNOOK_CLIENT_IP_HEADER").map(|h| h.to_lowercase()),
         proxy_hops: env("SNOOK_PROXY_HOPS").and_then(|v| v.parse().ok()).unwrap_or(1),
+        stripe: snook_server::payments::StripeConfig::from_env(),
     };
+    match &config.stripe {
+        Some(s) => tracing::info!("payments on ({} prices)", s.prices.len()),
+        None => tracing::info!("payments off (SNOOK_STRIPE_* not set)"),
+    }
     if in_memory {
         tracing::warn!("running in memory: accounts and games are lost when the server stops");
     }

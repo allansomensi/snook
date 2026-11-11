@@ -31,6 +31,12 @@ pub enum Icon {
     Play,
     /// Watching a game.
     Eye,
+    /// The shop (a shopping bag).
+    Shop,
+    /// A coin.
+    Coin,
+    /// The VIP crown.
+    Crown,
 }
 
 fn arc(c: Vec2, r: f32, from: f32, to: f32, w: f32, color: Color) {
@@ -250,6 +256,35 @@ pub fn draw(icon: Icon, c: Vec2, s: f32, color: Color) {
             }
         }
         Icon::Play => draw_triangle(p(-0.45, -0.7), p(-0.45, 0.7), p(0.7, 0.0), color),
+        Icon::Shop => {
+            // Bag body and a handle.
+            draw_rectangle(c.x - 0.62 * h, c.y - 0.25 * h, 1.24 * h, 1.05 * h, color);
+            arc(
+                c - vec2(0.0, 0.25 * h),
+                0.36 * h,
+                std::f32::consts::PI,
+                std::f32::consts::TAU,
+                w,
+                color,
+            );
+        }
+        Icon::Coin => {
+            draw_circle(c.x, c.y, 0.82 * h, color);
+            draw_circle(
+                c.x,
+                c.y,
+                0.58 * h,
+                Color::new(color.r * 0.72, color.g * 0.62, color.b * 0.3, color.a),
+            );
+            draw_circle(c.x, c.y, 0.42 * h, color);
+        }
+        Icon::Crown => {
+            let y0 = c.y + 0.45 * h;
+            draw_rectangle(c.x - 0.7 * h, y0 - 0.22 * h, 1.4 * h, 0.3 * h, color);
+            draw_triangle(p(-0.7, 0.25), p(-0.7, -0.55), p(-0.25, 0.25), color);
+            draw_triangle(p(-0.35, 0.25), p(0.0, -0.75), p(0.35, 0.25), color);
+            draw_triangle(p(0.7, 0.25), p(0.7, -0.55), p(0.25, 0.25), color);
+        }
         Icon::Eye => {
             // Almond outline (two arcs) and the iris.
             let r = 1.15 * h;

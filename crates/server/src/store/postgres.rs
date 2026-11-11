@@ -5,8 +5,9 @@ use sqlx::postgres::{PgPool, PgPoolOptions, PgRow};
 use sqlx::{Row, query};
 
 use super::{
-    AuditRow, FriendOutcome, FriendState, HistoryRow, MatchRecord, NewReport, NewUser, Overview,
-    ReportRow, SessionKind, StoreError, StoreResult, TournamentRecord, User,
+    AuditRow, BuyOutcome, FriendOutcome, FriendState, HistoryRow, LedgerRow, MatchRecord,
+    NewReport, NewUser, Overview, Payment, ReportRow, SessionKind, StoreError, StoreResult,
+    TournamentRecord, User, Wallet,
 };
 
 pub struct PgStore {
@@ -767,5 +768,258 @@ impl PgStore {
             })
             .collect::<Result<_, sqlx::Error>>()
             .map_err(Into::into)
+    }
+    // The shop.
+
+    pub async fn wallet(&self, user_id: i64) -> StoreResult<Wallet> {
+        let mut w = Wallet::default();
+        if let Some(r) =
+            query("SELECT coins, vip_until, stripe_customer FROM wallets WHERE user_id = $1")
+                .bind(user_id)
+                .fetch_optional(&self.pool)
+                .await?
+        {
+            w.coins = r.get("coins");
+            w.vip_until = r.get("vip_until");
+            w.stripe_customer = r.get("stripe_customer");
+        }
+        w.owned = query("SELECT code FROM owned_items WHERE user_id = $1 ORDER BY acquired_at")
+            .bind(user_id)
+            .fetch_all(&self.pool)
+            .await?
+            .iter()
+            .map(|r| r.get("code"))
+            .collect();
+        w.equipped = query("SELECT category, code FROM equipped WHERE user_id = $1")
+            .bind(user_id)
+            .fetch_all(&self.pool)
+            .await?
+            .iter()
+            .map(|r| (r.get("category"), r.get("code")))
+            .collect();
+        Ok(w)
+    }
+
+    pub async fn buy_item(
+        &self,
+        user_id: i64,
+        code: &str,
+        price: i64,
+        at: i64,
+    ) -> StoreResult<BuyOutcome> {
+        let mut tx = self.pool.begin().await?;
+        let added = query(
+            "INSERT INTO owned_items (user_id, code, acquired_at, source) VALUES ($1, $2, $3, 'coins')
+             ON CONFLICT DO NOTHING",
+        )
+        .bind(user_id)
+        .bind(code)
+        .bind(at)
+        .execute(&mut *tx)
+        .await?
+        .rows_affected();
+        if added == 0 {
+            return Ok(BuyOutcome::AlreadyOwned);
+        }
+        // Takes the coins only if there are enough (never below zero).
+        let paid =
+            query("UPDATE wallets SET coins = coins - $2 WHERE user_id = $1 AND coins >= $2")
+                .bind(user_id)
+                .bind(price)
+                .execute(&mut *tx)
+                .await?
+                .rows_affected();
+        if paid == 0 {
+            return Ok(BuyOutcome::NotEnoughCoins); // Rolled back on drop.
+        }
+        query("INSERT INTO coin_ledger (user_id, delta, reason, at) VALUES ($1, $2, $3, $4)")
+            .bind(user_id)
+            .bind(-price)
+            .bind(format!("buy {code}"))
+            .bind(at)
+            .execute(&mut *tx)
+            .await?;
+        tx.commit().await?;
+        Ok(BuyOutcome::Bought)
+    }
+
+    pub async fn grant_item(
+        &self,
+        user_id: i64,
+        code: &str,
+        source: &str,
+        at: i64,
+    ) -> StoreResult<bool> {
+        let added = query(
+            "INSERT INTO owned_items (user_id, code, acquired_at, source) VALUES ($1, $2, $3, $4)
+             ON CONFLICT DO NOTHING",
+        )
+        .bind(user_id)
+        .bind(code)
+        .bind(at)
+        .bind(source)
+        .execute(&self.pool)
+        .await?
+        .rows_affected();
+        Ok(added > 0)
+    }
+
+    pub async fn equip(&self, user_id: i64, category: &str, code: &str) -> StoreResult<()> {
+        query(
+            "INSERT INTO equipped (user_id, category, code) VALUES ($1, $2, $3)
+             ON CONFLICT (user_id, category) DO UPDATE SET code = EXCLUDED.code",
+        )
+        .bind(user_id)
+        .bind(category)
+        .bind(code)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    pub async fn credit(
+        &self,
+        user_id: i64,
+        delta: i64,
+        reason: &str,
+        reference: Option<&str>,
+        at: i64,
+    ) -> StoreResult<bool> {
+        let mut tx = self.pool.begin().await?;
+        let inserted = query(
+            "INSERT INTO coin_ledger (user_id, delta, reason, reference, at) VALUES ($1, $2, $3, $4, $5)
+             ON CONFLICT (reference) DO NOTHING",
+        )
+        .bind(user_id)
+        .bind(delta)
+        .bind(reason)
+        .bind(reference)
+        .bind(at)
+        .execute(&mut *tx)
+        .await?
+        .rows_affected();
+        if inserted == 0 {
+            return Ok(false);
+        }
+        query(
+            "INSERT INTO wallets (user_id, coins) VALUES ($1, $2)
+             ON CONFLICT (user_id) DO UPDATE SET coins = wallets.coins + EXCLUDED.coins",
+        )
+        .bind(user_id)
+        .bind(delta)
+        .execute(&mut *tx)
+        .await?;
+        tx.commit().await?;
+        Ok(true)
+    }
+
+    pub async fn set_vip(&self, user_id: i64, until: i64, force: bool) -> StoreResult<()> {
+        let sql = if force {
+            "INSERT INTO wallets (user_id, vip_until) VALUES ($1, $2)
+             ON CONFLICT (user_id) DO UPDATE SET vip_until = EXCLUDED.vip_until"
+        } else {
+            "INSERT INTO wallets (user_id, vip_until) VALUES ($1, $2)
+             ON CONFLICT (user_id) DO UPDATE SET vip_until = GREATEST(wallets.vip_until, EXCLUDED.vip_until)"
+        };
+        query(sql).bind(user_id).bind(until).execute(&self.pool).await?;
+        Ok(())
+    }
+
+    pub async fn set_stripe_customer(&self, user_id: i64, customer: &str) -> StoreResult<()> {
+        query(
+            "INSERT INTO wallets (user_id, stripe_customer) VALUES ($1, $2)
+             ON CONFLICT (user_id) DO UPDATE SET stripe_customer = EXCLUDED.stripe_customer",
+        )
+        .bind(user_id)
+        .bind(customer)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    pub async fn user_by_stripe_customer(&self, customer: &str) -> StoreResult<Option<i64>> {
+        let row = query("SELECT user_id FROM wallets WHERE stripe_customer = $1")
+            .bind(customer)
+            .fetch_optional(&self.pool)
+            .await?;
+        Ok(row.map(|r| r.get("user_id")))
+    }
+
+    pub async fn record_payment(&self, p: &Payment) -> StoreResult<bool> {
+        let added = query(
+            "INSERT INTO payments (id, user_id, kind, coins, amount, currency, at, refunded)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8) ON CONFLICT DO NOTHING",
+        )
+        .bind(&p.id)
+        .bind(p.user_id)
+        .bind(&p.kind)
+        .bind(p.coins)
+        .bind(p.amount)
+        .bind(&p.currency)
+        .bind(p.at)
+        .bind(p.refunded)
+        .execute(&self.pool)
+        .await?
+        .rows_affected();
+        Ok(added > 0)
+    }
+
+    pub async fn payment(&self, id: &str) -> StoreResult<Option<Payment>> {
+        let row = query("SELECT * FROM payments WHERE id = $1")
+            .bind(id)
+            .fetch_optional(&self.pool)
+            .await?;
+        Ok(row.map(|r| payment_row(&r)))
+    }
+
+    pub async fn refund_payment(&self, id: &str) -> StoreResult<bool> {
+        let n = query("UPDATE payments SET refunded = TRUE WHERE id = $1 AND NOT refunded")
+            .bind(id)
+            .execute(&self.pool)
+            .await?
+            .rows_affected();
+        Ok(n > 0)
+    }
+
+    pub async fn ledger(&self, user_id: i64, limit: u32) -> StoreResult<Vec<LedgerRow>> {
+        let rows = query(
+            "SELECT delta, reason, reference, at FROM coin_ledger WHERE user_id = $1
+             ORDER BY id DESC LIMIT $2",
+        )
+        .bind(user_id)
+        .bind(limit as i64)
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows
+            .iter()
+            .map(|r| LedgerRow {
+                delta: r.get("delta"),
+                reason: r.get("reason"),
+                reference: r.get("reference"),
+                at: r.get("at"),
+            })
+            .collect())
+    }
+
+    pub async fn payments_of(&self, user_id: i64, limit: u32) -> StoreResult<Vec<Payment>> {
+        let rows = query("SELECT * FROM payments WHERE user_id = $1 ORDER BY at DESC LIMIT $2")
+            .bind(user_id)
+            .bind(limit as i64)
+            .fetch_all(&self.pool)
+            .await?;
+        Ok(rows.iter().map(payment_row).collect())
+    }
+}
+
+fn payment_row(r: &PgRow) -> Payment {
+    Payment {
+        id: r.get("id"),
+        user_id: r.get("user_id"),
+        kind: r.get("kind"),
+        coins: r.get("coins"),
+        amount: r.get("amount"),
+        currency: r.get("currency"),
+        at: r.get("at"),
+        refunded: r.get("refunded"),
     }
 }

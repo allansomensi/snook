@@ -9,13 +9,15 @@ license.workspace = true
 [[bin]]
 name = "snook-server"
 path = "src/main.rs"
-required-features = ["postgres"]
+required-features = ["postgres", "payments"]
 
 [features]
-default = ["postgres"]
+default = ["postgres", "payments"]
 # PostgreSQL storage (production). Without it the server keeps everything in
 # memory, which is what the game uses to host LAN games.
 postgres = ["dep:sqlx"]
+# Real-money payments through Stripe (the game's built-in LAN server has none).
+payments = ["dep:reqwest", "dep:rustls"]
 
 [dependencies]
 snook_core = { path = "../core" }
@@ -28,6 +30,10 @@ tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time"
 futures-util = "0.3"
 argon2 = "0.5"
 sha2 = "0.10"
+hmac = "0.12"
+# Payments (Stripe's API): rustls with the ring provider, like the database.
+reqwest = { version = "0.13", optional = true, default-features = false, features = ["rustls-no-provider", "form", "json"] }
+rustls = { version = "0.23", optional = true, default-features = false, features = ["ring", "std", "tls12"] }
 rand = "0.8"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }

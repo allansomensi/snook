@@ -73,6 +73,15 @@ shooter                     server                         opponent
   is not sent to spectators. Everyone at the table gets
   `spectators { count }`. A spectator's `react` arrives as
   `reaction { seat: 2 }`, through a limit shared by the whole crowd.
+- The shop: `shop` answers `shop_info` (what is sold for money) and
+  `wallet` (coins, VIP time, owned and equipped items; also pushed after
+  signing in and on every change). `buy_item { code }` and `equip { code }`
+  are checked against `crates/proto/src/shop.rs`; `buy_coins { pack }`,
+  `subscribe_vip` and `manage_vip` answer `payment_page { url }` (Stripe).
+  Payments arrive through `POST /stripe/webhook` (see
+  `crates/server/src/shop.rs`).
+- `queue_join { rated }` / `queue_leave`: "Play now"; the server sends
+  `queue { searching, waited_secs, range }` and then `match_started`.
 - `react { code }` sends a reaction to the table (`reaction { seat, code }`
   to both players). Codes and what unlocks each are in
   `crates/proto/src/reactions.rs`; the server drops locked ones and allows a

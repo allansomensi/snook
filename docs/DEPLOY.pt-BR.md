@@ -160,6 +160,63 @@ painel). Para uma cópia sua:
 pg_dump "postgresql://usuario:senha@ep-xxxx.us-east-1.aws.neon.tech/neondb?sslmode=require" -Fc -f snook-$(date +%F).dump
 ```
 
+## 9. Loja: moedas e VIP com dinheiro real (Stripe)
+
+Sem esta etapa a loja funciona com itens grátis, de conquista e VIP dados
+pelo painel, mas não vende moedas nem VIP. Os pagamentos usam a página
+segura da Stripe (cartão, Pix, boleto): o jogo nunca vê dados de cartão.
+
+1. Crie uma conta em https://stripe.com (Brasil é suportado) e complete o
+   cadastro da empresa ou pessoa física para receber pagamentos.
+2. Comece no **modo de teste** (chave `sk_test_…`), teste tudo com o cartão
+   `4242 4242 4242 4242`, e só então repita com as chaves de produção.
+3. **Payment methods:** ative cartão e, se quiser, **Pix** e **boleto**.
+4. **Products → Add product**, um produto para cada item abaixo, com preço
+   em BRL:
+   - `coins_500`, `coins_1200`, `coins_2800`, `coins_7000`: preço
+     **único** (one-off). Sugestão: R$ 4,90 · 9,90 · 19,90 · 44,90.
+   - `vip_monthly`: preço **recorrente mensal**. Sugestão: R$ 14,90.
+   Copie o **ID do preço** de cada um (começa com `price_`).
+5. **Settings → Billing → Customer portal:** ative o portal e permita
+   cancelar a assinatura (é por ele que o jogador gerencia o VIP).
+6. **Developers → Webhooks → Add endpoint:**
+   - URL: `https://snook-server.onrender.com/stripe/webhook`
+   - Eventos: `checkout.session.completed`,
+     `checkout.session.async_payment_succeeded`, `invoice.paid`,
+     `customer.subscription.deleted`, `charge.refunded`,
+     `charge.dispute.created`.
+   Copie o **Signing secret** (`whsec_…`).
+7. No **Render → snook-server → Environment**, adicione:
+
+   | Variável | Valor |
+   |---|---|
+   | `SNOOK_STRIPE_SECRET` | a chave secreta (`sk_test_…` ou `sk_live_…`) |
+   | `SNOOK_STRIPE_WEBHOOK_SECRET` | o `whsec_…` do passo 6 |
+   | `SNOOK_PUBLIC_URL` | `https://snook-server.onrender.com` |
+   | `SNOOK_STRIPE_PRICES` | `coins_500=price_A\|R$ 4,90;coins_1200=price_B\|R$ 9,90;coins_2800=price_C\|R$ 19,90;coins_7000=price_D\|R$ 44,90;vip_monthly=price_V\|R$ 14,90/mês` |
+
+   O texto depois de `|` é o preço mostrado no jogo: mantenha igual ao da
+   Stripe. Salve: o servidor reinicia e o log mostra `payments on (5 prices)`.
+8. No jogo: **Loja → Moedas → Comprar**. Paga no navegador; as moedas
+   chegam em segundos. No painel `/admin`, a ficha do jogador mostra a
+   carteira, os pagamentos e o extrato.
+
+Como funciona por dentro (e por que é seguro):
+- Preço, saldo e posse de itens só existem no servidor; o jogo apenas pede.
+- O webhook é aceito só com a assinatura da Stripe válida e recente.
+- Cada crédito tem a referência do pagamento: se a Stripe repetir o aviso,
+  nada é creditado duas vezes.
+- Estorno ou contestação tiram as moedas de volta (o saldo pode ficar
+  negativo, e então nada pode ser comprado até voltar ao positivo).
+- VIP: cada mensalidade paga estende o VIP até o fim do período (+ algumas
+  horas de folga) e dá as moedas do mês. Cancelado, vale até o fim do mês pago.
+
+**Lojas de aplicativos:** a Steam e a Microsoft Store exigem os sistemas de
+pagamento delas para compras dentro do jogo. Para publicar lá, desligue a
+venda pela Stripe nessas versões (sem as variáveis acima num servidor
+separado) ou integre o pagamento da loja. No site próprio, itch.io e
+GitHub, a Stripe é permitida.
+
 ## Problemas comuns
 
 | Sintoma | Causa provável |

@@ -12,6 +12,8 @@ pub use memory::MemoryStore;
 #[cfg(feature = "postgres")]
 pub use postgres::PgStore;
 
+use std::collections::BTreeMap;
+
 use snook_proto::{LeaderboardEntry, Role, Stats};
 
 #[derive(Debug, Clone)]
@@ -180,6 +182,49 @@ pub struct ReportRow {
     pub created_at: i64,
     pub resolved_by: Option<String>,
     pub resolution: Option<String>,
+}
+
+/// A player's coins, VIP time, cosmetics and payment customer.
+#[derive(Debug, Clone, Default, PartialEq, serde::Serialize)]
+pub struct Wallet {
+    pub coins: i64,
+    /// VIP until this time (Unix seconds; 0 = never).
+    pub vip_until: i64,
+    pub owned: Vec<String>,
+    /// Category code -> equipped item code.
+    pub equipped: BTreeMap<String, String>,
+    pub stripe_customer: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum BuyOutcome {
+    Bought,
+    AlreadyOwned,
+    NotEnoughCoins,
+}
+
+/// A payment received (coins or a VIP month).
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
+pub struct Payment {
+    /// The provider's id (payment intent or invoice).
+    pub id: String,
+    pub user_id: i64,
+    /// "coins" or "vip".
+    pub kind: String,
+    pub coins: i64,
+    /// In the currency's smallest unit (cents).
+    pub amount: i64,
+    pub currency: String,
+    pub at: i64,
+    pub refunded: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
+pub struct LedgerRow {
+    pub delta: i64,
+    pub reason: String,
+    pub reference: Option<String>,
+    pub at: i64,
 }
 
 #[derive(Debug, Clone, serde::Serialize)]
@@ -405,6 +450,74 @@ impl Store {
     }
     pub async fn audit_log(&self, limit: u32) -> StoreResult<Vec<AuditRow>> {
         dispatch!(self, s => s.audit_log(limit))
+    }
+
+    // The shop.
+
+    pub async fn wallet(&self, user_id: i64) -> StoreResult<Wallet> {
+        dispatch!(self, s => s.wallet(user_id))
+    }
+    /// Takes `price` coins and gives the item, atomically.
+    pub async fn buy_item(
+        &self,
+        user_id: i64,
+        code: &str,
+        price: i64,
+        at: i64,
+    ) -> StoreResult<BuyOutcome> {
+        dispatch!(self, s => s.buy_item(user_id, code, price, at))
+    }
+    /// Gives an item for free (staff, promotions); false if already owned.
+    pub async fn grant_item(
+        &self,
+        user_id: i64,
+        code: &str,
+        source: &str,
+        at: i64,
+    ) -> StoreResult<bool> {
+        dispatch!(self, s => s.grant_item(user_id, code, source, at))
+    }
+    pub async fn equip(&self, user_id: i64, category: &str, code: &str) -> StoreResult<()> {
+        dispatch!(self, s => s.equip(user_id, category, code))
+    }
+    /// Adds (or removes) coins. With a `reference`, the same change is only
+    /// ever applied once; returns whether it was applied now.
+    pub async fn credit(
+        &self,
+        user_id: i64,
+        delta: i64,
+        reason: &str,
+        reference: Option<&str>,
+        at: i64,
+    ) -> StoreResult<bool> {
+        dispatch!(self, s => s.credit(user_id, delta, reason, reference, at))
+    }
+    /// VIP until `until` (never shortens it unless `force`).
+    pub async fn set_vip(&self, user_id: i64, until: i64, force: bool) -> StoreResult<()> {
+        dispatch!(self, s => s.set_vip(user_id, until, force))
+    }
+    pub async fn set_stripe_customer(&self, user_id: i64, customer: &str) -> StoreResult<()> {
+        dispatch!(self, s => s.set_stripe_customer(user_id, customer))
+    }
+    pub async fn user_by_stripe_customer(&self, customer: &str) -> StoreResult<Option<i64>> {
+        dispatch!(self, s => s.user_by_stripe_customer(customer))
+    }
+    /// Records a payment; false if it was already recorded.
+    pub async fn record_payment(&self, p: &Payment) -> StoreResult<bool> {
+        dispatch!(self, s => s.record_payment(p))
+    }
+    pub async fn payment(&self, id: &str) -> StoreResult<Option<Payment>> {
+        dispatch!(self, s => s.payment(id))
+    }
+    /// Marks a payment refunded; false if it already was (or is unknown).
+    pub async fn refund_payment(&self, id: &str) -> StoreResult<bool> {
+        dispatch!(self, s => s.refund_payment(id))
+    }
+    pub async fn ledger(&self, user_id: i64, limit: u32) -> StoreResult<Vec<LedgerRow>> {
+        dispatch!(self, s => s.ledger(user_id, limit))
+    }
+    pub async fn payments_of(&self, user_id: i64, limit: u32) -> StoreResult<Vec<Payment>> {
+        dispatch!(self, s => s.payments_of(user_id, limit))
     }
 }
 

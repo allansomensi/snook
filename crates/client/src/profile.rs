@@ -45,7 +45,7 @@ fn age(created_at: i64) -> String {
     }
 }
 
-fn date(at: i64) -> String {
+pub fn date(at: i64) -> String {
     // Days since the epoch → a civil date (proleptic Gregorian).
     let days = at.div_euclid(86_400);
     let z = days + 719_468;

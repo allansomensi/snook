@@ -21,20 +21,38 @@ pub fn uv_to_dir(u: f32, v: f32) -> Vec3 {
     Vec3::new(theta.sin() * phi.cos(), theta.cos(), theta.sin() * phi.sin())
 }
 
-/// Ball colour in sRGB.
+/// The colours of a ball set (see `snook_proto::shop`).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Palette {
+    pub colors: [[u8; 3]; 7],
+    pub eight: [u8; 3],
+    pub ivory: [u8; 3],
+}
+
+impl Palette {
+    /// The palette of a shop ball set (the classic one if unknown).
+    pub fn of(code: &str) -> Palette {
+        let item =
+            snook_proto::shop::item(code).or_else(|| snook_proto::shop::item("balls_classic"));
+        match item.map(|i| i.look) {
+            Some(snook_proto::shop::Look::Balls { colors, eight, ivory }) => {
+                Palette { colors, eight, ivory }
+            }
+            _ => Palette { colors: [[255, 204, 10]; 7], eight: [22, 22, 24], ivory: IVORY },
+        }
+    }
+}
+
+/// Ball colour in sRGB (classic set).
 pub fn ball_color(id: BallId) -> [u8; 3] {
+    ball_color_in(id, &Palette::of("balls_classic"))
+}
+
+pub fn ball_color_in(id: BallId, p: &Palette) -> [u8; 3] {
     match id.0 {
-        0 => [246, 242, 228],
-        8 => [22, 22, 24],
-        n => match (n - 1) % 8 {
-            0 => [255, 204, 10],
-            1 => [18, 58, 205],
-            2 => [228, 28, 24],
-            3 => [108, 36, 168],
-            4 => [255, 118, 12],
-            5 => [12, 142, 58],
-            _ => [142, 26, 28],
-        },
+        0 => p.ivory,
+        8 => p.eight,
+        n => p.colors[((n - 1) % 8).min(6) as usize],
     }
 }
 
@@ -76,8 +94,9 @@ fn number_ink(number: u8, a: f32, b: f32) -> bool {
 
 /// Colour of a ball's surface in direction `p` (mesh-local, unit length).
 /// Numbers sit on local ±Z; stripes run around the band |x| < 0.5.
-fn ball_surface(id: BallId, p: Vec3) -> [u8; 3] {
-    let color = ball_color(id);
+fn ball_surface(id: BallId, p: Vec3, pal: &Palette) -> [u8; 3] {
+    let color = ball_color_in(id, pal);
+    let ivory = pal.ivory;
     if id == BallId::CUE {
         let dots = [Vec3::X, -Vec3::X, Vec3::Y, -Vec3::Y, Vec3::Z, -Vec3::Z];
         return if dots.iter().any(|d| p.dot(*d) > 0.996) { [190, 30, 30] } else { color };
@@ -97,17 +116,17 @@ fn ball_surface(id: BallId, p: Vec3) -> [u8; 3] {
                 || number_ink(id.0, a + bold, b)
                 || number_ink(id.0, a, b - bold)
                 || number_ink(id.0, a + bold, b - bold);
-            return if ink { INK } else { IVORY };
+            return if ink { INK } else { ivory };
         }
     }
     match id.kind() {
-        BallKind::Stripe if p.x.abs() > 0.5 => IVORY,
+        BallKind::Stripe if p.x.abs() > 0.5 => ivory,
         _ => color,
     }
 }
 
 /// Equirectangular texture for a numbered ball, `width` pixels wide.
-pub fn ball(id: BallId, width: u16) -> Pixels {
+pub fn ball(id: BallId, width: u16, palette: &Palette) -> Pixels {
     let w_px = width;
     let h_px = width / 2;
     const SS: u32 = 2;
@@ -119,7 +138,7 @@ pub fn ball(id: BallId, width: u16) -> Pixels {
                 for sx in 0..SS {
                     let u = (x as f32 + (sx as f32 + 0.5) / SS as f32) / w_px as f32;
                     let v = (y as f32 + (sy as f32 + 0.5) / SS as f32) / h_px as f32;
-                    let c = ball_surface(id, uv_to_dir(u, v));
+                    let c = ball_surface(id, uv_to_dir(u, v), palette);
                     for k in 0..3 {
                         acc[k] += c[k] as u32;
                     }
@@ -186,11 +205,16 @@ fn image(size: u16, f: impl Fn(f32, f32) -> [u8; 3]) -> Pixels {
 
 /// Billiard cloth: a deep tournament green, almost uniform, with very gentle
 /// large-scale variation and a fine nap that shows up close.
-pub fn felt() -> Pixels {
-    image(512, |u, v| {
+/// Cloth of the given base colour (sRGB): soft mottling and a fine nap.
+pub fn felt(base: [u8; 3]) -> Pixels {
+    // The classic green [24, 96, 48] maps to the original tones.
+    let b = base.map(|c| c as f32 / 255.0);
+    let dark = [b[0] * 0.90, b[1] * 0.95, b[2] * 0.90];
+    let light = [b[0] * 1.06, b[1] * 1.06, b[2] * 1.02];
+    image(512, move |u, v| {
         let n = fbm(u * 4.0, v * 4.0, 4, 3, 3);
         let nap = fbm(u * 96.0, v * 96.0, 96, 7, 2) - 0.5;
-        let c = lerp3([0.085, 0.36, 0.17], [0.10, 0.40, 0.19], n);
+        let c = lerp3(dark, light, n);
         let k = 1.0 + nap * 0.07;
         c.map(|x| (x as f32 * k).round().clamp(0.0, 255.0) as u8)
     })
@@ -284,20 +308,30 @@ mod tests {
 
     #[test]
     fn ball_layout() {
-        assert_eq!(ball_surface(BallId(3), Vec3::new(0.33, 0.33, 0.88).normalize()), IVORY);
+        let classic = Palette::of("balls_classic");
         assert_eq!(
-            ball_surface(BallId(3), Vec3::Z),
+            ball_surface(BallId(3), Vec3::new(0.33, 0.33, 0.88).normalize(), &classic),
+            IVORY
+        );
+        assert_eq!(
+            ball_surface(BallId(3), Vec3::Z, &Palette::of("balls_classic")),
             INK,
             "the number is in the middle of the spot"
         );
-        assert_eq!(ball_surface(BallId(11), Vec3::X), IVORY);
-        assert_eq!(ball_surface(BallId(11), Vec3::Y), ball_color(BallId(11)));
-        assert_eq!(ball_surface(BallId(3), Vec3::X), ball_color(BallId(3)));
+        assert_eq!(ball_surface(BallId(11), Vec3::X, &Palette::of("balls_classic")), IVORY);
+        assert_eq!(
+            ball_surface(BallId(11), Vec3::Y, &Palette::of("balls_classic")),
+            ball_color(BallId(11))
+        );
+        assert_eq!(
+            ball_surface(BallId(3), Vec3::X, &Palette::of("balls_classic")),
+            ball_color(BallId(3))
+        );
     }
 
     #[test]
     fn textures_have_expected_size_and_tile() {
-        let f = felt();
+        let f = felt([24, 96, 48]);
         assert_eq!(f.rgba.len(), 512 * 512 * 4);
         // Tileable noise: first and last columns are close.
         let px = |x: usize, y: usize| f.rgba[(y * 512 + x) * 4 + 1] as i32;

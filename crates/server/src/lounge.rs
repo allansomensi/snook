@@ -107,6 +107,8 @@ pub struct Session {
     reaction_bucket: Bucket,
     /// The player whose games this one is watching.
     watching: Option<String>,
+    /// VIP badge, cue and chalk (from the wallet).
+    pub look: Look,
 }
 
 struct Room {
@@ -219,7 +221,25 @@ pub fn player_info(user: &User, guest: bool, status: PlayerStatus) -> PlayerInfo
         country: user.country.clone(),
         role: user.role,
         guest,
+        vip: false,
+        cue: String::new(),
+        chalk: String::new(),
     }
+}
+
+/// What others see of a player's shop items.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct Look {
+    pub vip: bool,
+    pub cue: String,
+    pub chalk: String,
+}
+
+fn dressed(mut info: PlayerInfo, look: &Look) -> PlayerInfo {
+    info.vip = look.vip;
+    info.cue = look.cue.clone();
+    info.chalk = look.chalk.clone();
+    info
 }
 
 /// What the admin panel shows about the live server.
@@ -292,7 +312,9 @@ impl Lounge {
     }
 
     fn info(&self, k: &str) -> Option<PlayerInfo> {
-        self.sessions.get(k).map(|s| player_info(&s.user, s.guest, self.status(k)))
+        self.sessions
+            .get(k)
+            .map(|s| dressed(player_info(&s.user, s.guest, self.status(k)), &s.look))
     }
 
     fn announce(&self, k: &str) {
@@ -390,6 +412,7 @@ impl Lounge {
                 achievements: Vec::new(),
                 reaction_bucket: Bucket::new(3.0, 0.5),
                 watching: None,
+                look: Look::default(),
             },
         );
         let players: Vec<PlayerInfo> = self.sessions.keys().filter_map(|k| self.info(k)).collect();
@@ -650,6 +673,12 @@ impl Lounge {
             | ClientMsg::SetCountry { .. }
             | ClientMsg::Friends
             | ClientMsg::Spectate { .. }
+            | ClientMsg::Shop
+            | ClientMsg::BuyItem { .. }
+            | ClientMsg::Equip { .. }
+            | ClientMsg::BuyCoins { .. }
+            | ClientMsg::SubscribeVip
+            | ClientMsg::ManageVip
             | ClientMsg::FriendRequest { .. }
             | ClientMsg::FriendAnswer { .. }
             | ClientMsg::FriendRemove { .. }
@@ -734,6 +763,16 @@ impl Lounge {
             if !blocked {
                 self.send(&p, ServerMsg::MatchChat { line: line.clone() });
             }
+        }
+    }
+
+    /// Sets what others see of `name`'s shop items (and tells everyone).
+    pub fn set_look(&mut self, name: &str, look: Look) {
+        let k = key(name);
+        let Some(s) = self.sessions.get_mut(&k) else { return };
+        if s.look != look {
+            s.look = look;
+            self.announce(&k);
         }
     }
 
@@ -2002,7 +2041,7 @@ impl Room {
         spectating: bool,
     ) -> ServerMsg {
         let player = |s: usize| match sessions.get(&self.keys[s]) {
-            Some(x) => player_info(&x.user, x.guest, PlayerStatus::Playing),
+            Some(x) => dressed(player_info(&x.user, x.guest, PlayerStatus::Playing), &x.look),
             None => player_info(&self.users[s], self.guests[s], PlayerStatus::Playing),
         };
         let left = self.deadline.saturating_duration_since(Instant::now()).as_secs_f32();

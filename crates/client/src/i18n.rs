@@ -209,6 +209,102 @@ fn portuguese(en: &str) -> Option<&'static str> {
         "On the 8-ball: {pocket} pocket" => "Na bola 8: caçapa {pocket}",
         "Show ping (online)" => "Mostrar ping (online)",
         "Reactions" => "Reações",
+        "Shop" => "Loja",
+        "Cloth" => "Panos",
+        "Cues" => "Tacos",
+        "Chalk" => "Giz",
+        "Balls" => "Bolas",
+        "Coins" => "Moedas",
+        "coins" => "moedas",
+        "Sign in to buy and use items. Here is what there is:" => {
+            "Entre para comprar e usar itens. Veja o que há:"
+        }
+        "In use" => "Em uso",
+        "Use" => "Usar",
+        "Buy for {n}?" => "Comprar por {n}?",
+        "{n} coins" => "{n} moedas",
+        "Not enough coins: get more in the Coins tab." => {
+            "Moedas insuficientes: consiga mais na aba Moedas."
+        }
+        "VIP only" => "Só VIP",
+        "Achievement: {a}" => "Conquista: {a}",
+        "free" => "grátis",
+        "yours" => "seu",
+        "for coins" => "por moedas",
+        "achievement" => "conquista",
+        "Coins can't be bought on this server yet." => {
+            "Ainda não dá para comprar moedas neste servidor."
+        }
+        "+{n} bonus" => "+{n} de bônus",
+        "Payment opens in your browser (card, Pix…), on Stripe's secure page." => {
+            "O pagamento abre no navegador (cartão, Pix…), na página segura da Stripe."
+        }
+        "Coins arrive in a moment; they are only used for items in the game." => {
+            "As moedas chegam em instantes; servem só para itens do jogo."
+        }
+        "Exclusive items: {list}" => "Itens exclusivos: {list}",
+        "{n} coins every month" => "{n} moedas todo mês",
+        "A crown by your name, everywhere" => "Uma coroa ao lado do seu nome, em todo lugar",
+        "Cancel whenever you want: VIP lasts until the end of the paid month" => {
+            "Cancele quando quiser: o VIP vale até o fim do mês pago"
+        }
+        "You are VIP until {d}." => "Você é VIP até {d}.",
+        "Manage subscription" => "Gerenciar assinatura",
+        "Become VIP · {p}" => "Seja VIP · {p}",
+        "VIP can't be bought on this server yet." => {
+            "Ainda não dá para assinar o VIP neste servidor."
+        }
+        "The payment page opened in your browser." => {
+            "A página de pagamento abriu no seu navegador."
+        }
+        "Could not open the browser." => "Não foi possível abrir o navegador.",
+        "Tournament green" => "Verde torneio",
+        "Electric blue" => "Azul elétrico",
+        "Burgundy" => "Bordô",
+        "Charcoal" => "Grafite",
+        "Teal" => "Verde-azulado",
+        "Royal purple" => "Roxo real",
+        "Camel" => "Caramelo",
+        "Midnight" => "Meia-noite",
+        "Champion's red" => "Vermelho campeão",
+        "Classic" => "Clássico",
+        "Rosewood" => "Pau-rosa",
+        "Ebony & silver" => "Ébano e prata",
+        "Carbon" => "Carbono",
+        "Ivory inlay" => "Marchetado de marfim",
+        "Crown" => "Coroa",
+        "Jewels" => "Joias",
+        "Blue chalk" => "Giz azul",
+        "Green chalk" => "Giz verde",
+        "Red chalk" => "Giz vermelho",
+        "Purple chalk" => "Giz roxo",
+        "Gold chalk" => "Giz dourado",
+        "Vintage" => "Vintage",
+        "Pastel" => "Pastel",
+        "Neon" => "Neon",
+        "Purchase complete." => "Compra concluída.",
+        "You already have this item." => "Você já tem este item.",
+        "Not enough coins." => "Moedas insuficientes.",
+        "The purchase failed; no coins were taken." => {
+            "A compra falhou; nenhuma moeda foi descontada."
+        }
+        "No such item." => "Item inexistente.",
+        "This item can't be bought with coins." => "Este item não é vendido por moedas.",
+        "You don't have this item." => "Você não tem este item.",
+        "Purchases are not available." => "Compras indisponíveis.",
+        "This pack is not on sale." => "Este pacote não está à venda.",
+        "The payment page could not be opened. Try again in a moment." => {
+            "Não foi possível abrir a página de pagamento. Tente de novo em instantes."
+        }
+        "You are already VIP." => "Você já é VIP.",
+        "There is no subscription to manage." => "Não há assinatura para gerenciar.",
+        "The page could not be opened. Try again in a moment." => {
+            "Não foi possível abrir a página. Tente de novo em instantes."
+        }
+        "Coins added to your wallet." => "Moedas adicionadas à sua carteira.",
+        "Welcome to VIP!" => "Bem-vindo ao VIP!",
+        "Slow down a little." => "Vá com calma.",
+        "VIP" => "VIP",
         "Play now" => "Jogar agora",
         "Find an opponent of your level automatically" => {
             "Encontra automaticamente um adversário do seu nível"

@@ -48,6 +48,7 @@ pub enum OnlineAction {
     Leave,
     Profile(String),
     Ranking,
+    Shop,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -74,8 +75,36 @@ pub struct FriendsData {
     pub blocked: Vec<String>,
 }
 
+/// The player's shop state, as the server last sent it.
+#[derive(Debug, Clone, Default)]
+pub struct WalletView {
+    pub coins: i64,
+    pub vip_until: i64,
+    pub owned: Vec<String>,
+    pub equipped: Vec<(String, String)>,
+}
+
+impl WalletView {
+    pub fn is_vip(&self) -> bool {
+        self.vip_until > crate::game::unix_now()
+    }
+}
+
+/// What the server sells for money (empty when it takes no payments).
+#[derive(Debug, Clone, Default)]
+pub struct ShopOffers {
+    pub payments: bool,
+    pub packs: Vec<snook_proto::PackOffer>,
+    pub vip_price: String,
+    pub vip_coins: u32,
+}
+
 pub struct Online {
     conn: Option<Connection>,
+    pub wallet: Option<WalletView>,
+    pub offers: Option<ShopOffers>,
+    /// Set when the items in use changed (the table must be redrawn).
+    pub looks_changed: bool,
     /// This account's achievements (for the reactions they unlock).
     achievements: Vec<String>,
     pub stage: Stage,
@@ -193,6 +222,9 @@ impl Online {
             profile: None,
             unread_friend_requests: false,
             queue: None,
+            wallet: None,
+            offers: None,
+            looks_changed: false,
             achievements: Vec::new(),
             rtt: None,
             ping_sent: None,
@@ -567,6 +599,35 @@ impl Online {
                 Some(m) if m.is_online() => m.handle_server(ServerMsg::Error { message }),
                 _ => self.toast(crate::i18n::server_text(&message), false),
             },
+            ServerMsg::Wallet { coins, vip_until, owned, equipped } => {
+                let wallet = WalletView { coins, vip_until, owned, equipped };
+                // The items in use, as the server allows them now.
+                for c in snook_proto::shop::Category::ALL {
+                    let code = self.effective(&wallet, c).to_string();
+                    let slot = match c {
+                        snook_proto::shop::Category::Cloth => &mut config.cloth,
+                        snook_proto::shop::Category::Cue => &mut config.cue,
+                        snook_proto::shop::Category::Chalk => &mut config.chalk,
+                        snook_proto::shop::Category::Balls => &mut config.balls,
+                    };
+                    if *slot != code {
+                        *slot = code;
+                        self.looks_changed = true;
+                        save = true;
+                    }
+                }
+                self.wallet = Some(wallet);
+            }
+            ServerMsg::ShopInfo { payments, packs, vip_price, vip_coins } => {
+                self.offers = Some(ShopOffers { payments, packs, vip_price, vip_coins });
+            }
+            ServerMsg::PaymentPage { url } => {
+                if crate::util::open_url(&url) {
+                    self.toast(t("The payment page opened in your browser."), false);
+                } else {
+                    self.toast(t("Could not open the browser."), true);
+                }
+            }
             ServerMsg::Queue { searching, rated, waited_secs, range } => {
                 self.queue =
                     searching.then(|| (rated, waited_secs, range, std::time::Instant::now()));
@@ -598,6 +659,26 @@ impl Online {
     }
 
     /// Called when the player leaves the table to go back to the lounge.
+    /// The item used in `category` (what is equipped, if still allowed).
+    pub fn effective(&self, w: &WalletView, category: snook_proto::shop::Category) -> &'static str {
+        use snook_proto::shop;
+        w.equipped
+            .iter()
+            .find(|(c, _)| c == category.code())
+            .and_then(|(_, code)| shop::item(code))
+            .filter(|i| {
+                i.category == category && shop::can_use(i, &w.owned, &self.achievements, w.is_vip())
+            })
+            .map(|i| i.code)
+            .unwrap_or_else(|| category.default_item())
+    }
+
+    /// Whether this player may use `item` now.
+    pub fn can_use(&self, item: &snook_proto::shop::Item) -> bool {
+        let w = self.wallet.clone().unwrap_or_default();
+        snook_proto::shop::can_use(item, &w.owned, &self.achievements, w.is_vip())
+    }
+
     /// Starts watching a friend's game.
     pub fn spectate(&mut self, name: &str) {
         self.send(ClientMsg::Spectate { username: name.to_string() });
@@ -923,6 +1004,23 @@ impl Online {
                 true,
             ) {
                 action = OnlineAction::Ranking;
+            }
+            // The coins, which open the shop.
+            let coins = self.wallet.as_ref().map(|w| w.coins).unwrap_or(0).to_string();
+            let cw = ui.text_size(&coins, 14.0, true).x + 44.0;
+            right -= cw + 6.0;
+            let chip = Rect::new(right, header.y + 9.0, cw, 34.0);
+            let hover = ui.hovering(chip);
+            ui.block(chip);
+            rrect(chip, 8.0, Color::new(1.0, 1.0, 1.0, if hover { 0.10 } else { 0.04 }));
+            rrect_lines(chip, 8.0, 1.2, if hover { GOLD } else { BORDER });
+            crate::icons::draw(Icon::Coin, vec2(chip.x + 16.0, chip.y + 17.0), 18.0, GOLD);
+            ui.text(&coins, chip.x + 30.0, chip.y + 9.0, 14.0, CREAM, true);
+            if hover {
+                ui.tooltip(t("Shop"), chip);
+            }
+            if ui.clicked(chip) {
+                action = OnlineAction::Shop;
             }
         }
         // Who am I.

@@ -250,6 +250,23 @@ function passwordDialog(name) {
       el("button", { onclick: closeModal }, "Cancel")));
 }
 
+function shopDialog(name) {
+  const kind = el("select", {}, [["coins", "Give / remove coins"], ["item", "Give an item"], ["vip", "Give VIP days"]]
+    .map(([v, l]) => el("option", { value: v }, l)));
+  const amount = el("input", { placeholder: "Coins (negative removes) · item code · days" });
+  const reason = el("input", { placeholder: "Reason (kept in the audit log)", maxlength: "300" });
+  modal(el("h2", {}, "Shop: " + name), kind, amount, reason, el("div", { class: "actions" },
+    el("button", { class: "primary", onclick: () => {
+      const v = amount.value.trim();
+      const body = { reason: reason.value };
+      if (kind.value === "coins") body.coins = Number(v);
+      if (kind.value === "item") body.item = v;
+      if (kind.value === "vip") body.days = Number(v);
+      act(name, kind.value, body);
+    } }, "Apply"),
+    el("button", { onclick: closeModal }, "Cancel")));
+}
+
 async function showUser(name) {
   view = "users";
   document.querySelectorAll("nav button").forEach((b) => b.classList.toggle("active", b.dataset.view === "users"));
@@ -282,7 +299,18 @@ async function showUser(name) {
         u.online ? el("button", { onclick: () => act(u.username, "kick", { reason: prompt("Reason (optional)") || "" }) }, "Disconnect") : null,
         el("button", { onclick: () => act(u.username, "logout-all") }, "Sign out everywhere"),
         isAdmin ? el("button", { onclick: () => roleDialog(u.username) }, "Role…") : null,
-        isAdmin ? el("button", { onclick: () => passwordDialog(u.username) }, "Reset password…") : null)),
+        isAdmin ? el("button", { onclick: () => passwordDialog(u.username) }, "Reset password…") : null,
+        isAdmin ? el("button", { onclick: () => shopDialog(u.username) }, "Shop…") : null)),
+    el("h2", {}, "Wallet"),
+    el("p", {}, el("b", {}, d.wallet.coins + " coins"), " · VIP ",
+      d.wallet.vip_until > now ? "until " + fmtDate(d.wallet.vip_until) : "no",
+      " · items: " + (d.wallet.owned.join(", ") || "none")),
+    d.payments.length ? table(["When", "Kind", "Coins", "Amount", "Refunded", "Id"], d.payments.map((p) => el("tr", {},
+      el("td", {}, fmtDate(p.at)), el("td", {}, p.kind), el("td", {}, p.coins),
+      el("td", {}, (p.amount / 100).toFixed(2) + " " + p.currency.toUpperCase()), el("td", {}, p.refunded ? "yes" : ""),
+      el("td", {}, p.id)))) : el("p", { class: "muted" }, "No payments."),
+    d.ledger.length ? table(["When", "Coins", "Why"], d.ledger.map((l) => el("tr", {},
+      el("td", {}, fmtDate(l.at)), el("td", {}, (l.delta > 0 ? "+" : "") + l.delta), el("td", {}, l.reason)))) : null,
     el("h2", {}, "Reports about this player (" + d.reports.length + ")"),
     reports.length ? reports : el("p", { class: "muted" }, "None."),
     el("h2", {}, "Recent games"),

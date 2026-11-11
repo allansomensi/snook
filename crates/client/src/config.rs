@@ -126,6 +126,12 @@ pub struct Config {
     pub shot_clock: u32,
     /// Name used on local network games.
     pub lan_name: String,
+    /// Shop items in use (as the server last confirmed them), so offline
+    /// games look the same: cloth, cue, chalk and ball set.
+    pub cloth: String,
+    pub cue: String,
+    pub chalk: String,
+    pub balls: String,
 }
 
 impl Default for Config {
@@ -157,6 +163,10 @@ impl Default for Config {
             difficulty: 1,
             shot_clock: 0,
             lan_name: String::new(),
+            cloth: "cloth_green".into(),
+            cue: "cue_classic".into(),
+            chalk: "chalk_blue".into(),
+            balls: "balls_classic".into(),
         }
     }
 }
@@ -232,6 +242,18 @@ impl Config {
                         v.parse::<u32>().ok().filter(|s| [0, 30, 60].contains(s)).unwrap_or(0)
                 }
                 "lan_name" => c.lan_name = v.chars().take(16).collect(),
+                // Only real items of the right kind (a typo means the default).
+                "cloth" | "cue" | "chalk" | "balls" => {
+                    let fits = snook_proto::shop::item(v).is_some_and(|i| i.category.code() == k);
+                    if fits {
+                        match k {
+                            "cloth" => c.cloth = v.to_string(),
+                            "cue" => c.cue = v.to_string(),
+                            "chalk" => c.chalk = v.to_string(),
+                            _ => c.balls = v.to_string(),
+                        }
+                    }
+                }
                 _ => {}
             }
         }
@@ -242,7 +264,7 @@ impl Config {
         format!(
             "# Snook settings\nplayer_name = {}\nsecond_player_name = {}\nguide = {}\nshow_help = {}\nshot_camera = {}\ncamera_follow = {}\ngraphics_checked = {}\nlanguage = {}\nvignette = {}\nfocused_scene = {}\nshow_fps = {}\nshow_ping = {}\naim_sensitivity = {:.2}\nui_size = {:.2}\n\
              quality = {}\nmsaa = {}\nfullscreen = {}\nvolume = {:.2}\nserver = {}\nusername = {}\ntoken = {}\n\
-             difficulty = {}\nshot_clock = {}\nlan_name = {}\n",
+             difficulty = {}\nshot_clock = {}\nlan_name = {}\ncloth = {}\ncue = {}\nchalk = {}\nballs = {}\n",
             self.player_name,
             self.second_player_name,
             self.guide.name(),
@@ -266,7 +288,11 @@ impl Config {
             self.token,
             self.difficulty,
             self.shot_clock,
-            self.lan_name
+            self.lan_name,
+            self.cloth,
+            self.cue,
+            self.chalk,
+            self.balls
         )
     }
 

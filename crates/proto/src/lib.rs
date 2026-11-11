@@ -11,6 +11,7 @@
 mod achievements;
 mod countries;
 mod reactions;
+pub mod shop;
 
 pub use achievements::{ACHIEVEMENTS, Achievement, Stat, Stats, month_day};
 pub use countries::{COUNTRIES, FLAG_COLUMNS, FLAG_H, FLAG_W};
@@ -20,11 +21,20 @@ use glam::DVec2;
 use serde::{Deserialize, Serialize};
 use snook_core::{EightBallGame, GameOverReason, PocketId, Shot, ShotReport};
 
+/// A coin pack on sale, with its price as shown to players.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct PackOffer {
+    pub code: String,
+    pub coins: u32,
+    pub bonus: u32,
+    pub price: String,
+}
+
 /// The `seat` of a reaction sent by a spectator.
 pub const SPECTATOR_SEAT: usize = 2;
 
 /// Bumped whenever messages change incompatibly.
-pub const PROTOCOL_VERSION: u32 = 9;
+pub const PROTOCOL_VERSION: u32 = 10;
 
 /// Username rules: 3–16 characters, letters, digits and underscores.
 pub fn valid_username(name: &str) -> bool {
@@ -201,6 +211,15 @@ pub struct PlayerInfo {
     /// A guest on a LAN server (no account, no rating).
     #[serde(default)]
     pub guest: bool,
+    /// A VIP member (a small badge by the name).
+    #[serde(default)]
+    pub vip: bool,
+    /// The cue and chalk they play with (shop codes; empty: the defaults),
+    /// so the opponent sees them too.
+    #[serde(default)]
+    pub cue: String,
+    #[serde(default)]
+    pub chalk: String,
 }
 
 impl PlayerInfo {
@@ -444,6 +463,24 @@ pub enum ClientMsg {
     React {
         code: String,
     },
+    /// The shop: the offers and this player's wallet.
+    Shop,
+    /// Buys a cosmetic item with coins.
+    BuyItem {
+        code: String,
+    },
+    /// Uses an item (one per category).
+    Equip {
+        code: String,
+    },
+    /// Starts paying for a coin pack: the server answers with a payment page.
+    BuyCoins {
+        pack: String,
+    },
+    /// Starts the VIP subscription (a payment page).
+    SubscribeVip,
+    /// Opens the page that manages (or cancels) the subscription.
+    ManageVip,
     /// "Play now": wait for an opponent of a similar rating.
     QueueJoin {
         rated: bool,
@@ -696,6 +733,28 @@ pub enum ServerMsg {
         seat: usize,
         code: String,
     },
+    /// What can be bought for real money. `payments` is false when the
+    /// server takes no payments (then coin packs and VIP are not offered).
+    ShopInfo {
+        payments: bool,
+        packs: Vec<PackOffer>,
+        /// The VIP price as shown to players (e.g. "R$ 14,90/mês").
+        vip_price: String,
+        vip_coins: u32,
+    },
+    /// This player's coins, VIP time, items and what they use (after
+    /// signing in and whenever it changes).
+    Wallet {
+        coins: i64,
+        vip_until: i64,
+        owned: Vec<String>,
+        /// (category, item) pairs.
+        equipped: Vec<(String, String)>,
+    },
+    /// A payment page to open in the browser.
+    PaymentPage {
+        url: String,
+    },
     /// The player's place in the "Play now" queue (sent when it changes and
     /// every few seconds while searching). `range` is how far from their
     /// rating an opponent may be by now.
@@ -860,6 +919,9 @@ mod tests {
             country: "BR".into(),
             role: Role::Player,
             guest: false,
+            vip: false,
+            cue: String::new(),
+            chalk: String::new(),
         };
         let msg = ServerMsg::MatchStarted {
             match_id: 7,

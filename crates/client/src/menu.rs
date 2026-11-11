@@ -18,6 +18,7 @@ pub enum MenuAction {
     Lan,
     Ranking,
     Profile,
+    Shop,
     Settings,
     Quit,
 }
@@ -147,6 +148,7 @@ impl Menu {
         let icons = [
             (Icon::Trophy, t("World ranking"), MenuAction::Ranking),
             (Icon::Person, t("Profile"), MenuAction::Profile),
+            (Icon::Shop, t("Shop"), MenuAction::Shop),
             (Icon::Gear, t("Settings"), MenuAction::Settings),
             (Icon::Power, t("Quit"), MenuAction::Quit),
         ];

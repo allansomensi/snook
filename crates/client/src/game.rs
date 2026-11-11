@@ -148,6 +148,8 @@ impl ShotStats {
 }
 
 pub struct Match {
+    /// Each player's cue and chalk (shop codes).
+    pub cue_looks: [(String, String); 2],
     /// Each player's numbers this game.
     pub stats: [ShotStats; 2],
     /// The shot being shown was taken with the cue ball in hand.
@@ -275,6 +277,7 @@ impl Match {
             log: Vec::new(),
             last_report: None,
             stats: [ShotStats::default(); 2],
+            cue_looks: Default::default(),
             shot_in_hand: false,
             guide: settings.guide,
             games_played: 0,
@@ -318,6 +321,10 @@ impl Match {
             };
         }
         let mut m = Match {
+            cue_looks: [
+                (players[0].cue.clone(), players[0].chalk.clone()),
+                (players[1].cue.clone(), players[1].chalk.clone()),
+            ],
             game,
             names: [players[0].username.clone(), players[1].username.clone()],
             controllers,
@@ -1019,6 +1026,14 @@ fn announce_into(
 }
 
 /// A random seed from the clock.
+/// Seconds since 1970 (0 if the clock is broken).
+pub fn unix_now() -> i64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs() as i64)
+        .unwrap_or(0)
+}
+
 pub fn clock_seed() -> u64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -1408,6 +1423,9 @@ mod tests {
             country: String::new(),
             role: snook_proto::Role::Player,
             guest: false,
+            vip: false,
+            cue: String::new(),
+            chalk: String::new(),
         };
         [p("me"), p("them")]
     }

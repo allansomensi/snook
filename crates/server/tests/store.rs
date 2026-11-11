@@ -6,8 +6,8 @@
 use snook_core::GameOverReason;
 use snook_proto::Role;
 use snook_server::store::{
-    FriendOutcome, FriendState, MatchRecord, NewReport, NewUser, SessionKind, Store,
-    TournamentRecord,
+    BuyOutcome, FriendOutcome, FriendState, MatchRecord, NewReport, NewUser, Payment, SessionKind,
+    Store, TournamentRecord,
 };
 
 fn new_user<'a>(name: &'a str) -> NewUser<'a> {
@@ -72,6 +72,50 @@ async fn exercise(store: Store) {
     assert_eq!(lb[0].username, "Alice");
     assert_eq!(lb[0].country, "BR");
     assert_eq!(store.rank_of(b.id).await.unwrap(), Some(2));
+
+    // The shop: credits are applied once per reference, purchases never
+    // go below zero, refunds are recorded once.
+    assert_eq!(store.wallet(a.id).await.unwrap().coins, 0);
+    assert_eq!(
+        store.buy_item(a.id, "cloth_blue", 400, t).await.unwrap(),
+        BuyOutcome::NotEnoughCoins
+    );
+    assert!(store.credit(a.id, 500, "pack", Some("pay:pi_1"), t).await.unwrap());
+    assert!(!store.credit(a.id, 500, "pack", Some("pay:pi_1"), t).await.unwrap(), "same reference");
+    assert_eq!(store.wallet(a.id).await.unwrap().coins, 500);
+    assert_eq!(store.buy_item(a.id, "cloth_blue", 400, t).await.unwrap(), BuyOutcome::Bought);
+    assert_eq!(store.buy_item(a.id, "cloth_blue", 400, t).await.unwrap(), BuyOutcome::AlreadyOwned);
+    store.equip(a.id, "cloth", "cloth_blue").await.unwrap();
+    store.equip(a.id, "cloth", "cloth_green").await.unwrap();
+    let w = store.wallet(a.id).await.unwrap();
+    assert_eq!((w.coins, w.owned.clone()), (100, vec!["cloth_blue".to_string()]));
+    assert_eq!(w.equipped.get("cloth").map(String::as_str), Some("cloth_green"));
+    store.set_vip(a.id, t + 100, false).await.unwrap();
+    store.set_vip(a.id, t + 50, false).await.unwrap();
+    assert_eq!(store.wallet(a.id).await.unwrap().vip_until, t + 100, "never shortened");
+    store.set_vip(a.id, t, true).await.unwrap();
+    assert_eq!(store.wallet(a.id).await.unwrap().vip_until, t);
+    store.set_stripe_customer(a.id, "cus_1").await.unwrap();
+    assert_eq!(store.user_by_stripe_customer("cus_1").await.unwrap(), Some(a.id));
+    let p = Payment {
+        id: "pi_1".into(),
+        user_id: a.id,
+        kind: "coins".into(),
+        coins: 500,
+        amount: 490,
+        currency: "brl".into(),
+        at: t,
+        refunded: false,
+    };
+    assert!(store.record_payment(&p).await.unwrap());
+    assert!(!store.record_payment(&p).await.unwrap());
+    assert!(store.refund_payment("pi_1").await.unwrap());
+    assert!(!store.refund_payment("pi_1").await.unwrap());
+    assert!(store.payment("pi_1").await.unwrap().unwrap().refunded);
+    assert!(store.grant_item(a.id, "cue_ebony", "staff", t).await.unwrap());
+    assert!(!store.grant_item(a.id, "cue_ebony", "staff", t).await.unwrap());
+    assert_eq!(store.ledger(a.id, 10).await.unwrap().len(), 2);
+    assert_eq!(store.payments_of(a.id, 10).await.unwrap().len(), 1);
 
     // Achievements.
     let new = store.add_achievements(a.id, &["wins_1", "games_1"], t).await.unwrap();

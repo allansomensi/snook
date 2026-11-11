@@ -277,10 +277,13 @@ async fn user_detail(
 ) -> ApiResult {
     staff(&server, &headers).await?;
     let u = find(&server, &name).await?;
-    let (history, reports, achievements) = tokio::join!(
+    let (history, reports, achievements, wallet, ledger, payments) = tokio::join!(
         server.store.history(u.id, 50),
         server.store.reports_about(u.id, 50),
         server.store.achievements(u.id),
+        server.store.wallet(u.id),
+        server.store.ledger(u.id, 50),
+        server.store.payments_of(u.id, 50),
     );
     let online = server.with(|l| l.is_online(&u.username));
     let history: Vec<Value> = history?
@@ -297,6 +300,9 @@ async fn user_detail(
         "history": history,
         "reports": reports?,
         "achievements": achievements?,
+        "wallet": wallet?,
+        "ledger": ledger?,
+        "payments": payments?,
     })))
 }
 
@@ -312,6 +318,14 @@ struct ActionBody {
     role: Option<Role>,
     #[serde(default)]
     password: String,
+    /// Coins to add (negative: remove), for "coins".
+    #[serde(default)]
+    coins: Option<i64>,
+    /// Item code, for "item"; days, for "vip".
+    #[serde(default)]
+    item: String,
+    #[serde(default)]
+    days: Option<u32>,
 }
 
 async fn user_action(
@@ -410,6 +424,38 @@ async fn user_action(
             server.store.delete_user_sessions(target.id).await?;
             server.with(|l| l.kick(&target.username, "Your password was changed. Sign in again."));
             log(&server, &s, "password-reset", &target.username, "").await;
+        }
+        // Shop support (refund goodwill, contest prizes…): administrators only,
+        // always with a reason, always in the audit log.
+        "coins" => {
+            require_admin(&s)?;
+            let coins = body.coins.filter(|c| *c != 0 && c.abs() <= 1_000_000);
+            let coins = coins.ok_or_else(|| err(StatusCode::BAD_REQUEST, "Give a coin amount."))?;
+            if reason.is_empty() {
+                return Err(err(StatusCode::BAD_REQUEST, "Give a reason."));
+            }
+            server.store.credit(target.id, coins, &format!("staff: {reason}"), None, t).await?;
+            crate::shop::push_wallet(&server, &target).await;
+            log(&server, &s, "coins", &target.username, &format!("{coins:+}: {reason}")).await;
+        }
+        "item" => {
+            require_admin(&s)?;
+            if snook_proto::shop::item(&body.item).is_none() {
+                return Err(err(StatusCode::BAD_REQUEST, "No such item."));
+            }
+            server.store.grant_item(target.id, &body.item, "staff", t).await?;
+            crate::shop::push_wallet(&server, &target).await;
+            log(&server, &s, "item", &target.username, &format!("{}: {reason}", body.item)).await;
+        }
+        "vip" => {
+            require_admin(&s)?;
+            let days = body.days.filter(|d| *d > 0 && *d <= 366);
+            let days = days.ok_or_else(|| err(StatusCode::BAD_REQUEST, "Give 1–366 days."))?;
+            let w = server.store.wallet(target.id).await?;
+            let until = w.vip_until.max(t) + days as i64 * 86_400;
+            server.store.set_vip(target.id, until, false).await?;
+            crate::shop::push_wallet(&server, &target).await;
+            log(&server, &s, "vip", &target.username, &format!("+{days} days: {reason}")).await;
         }
         _ => return Err(err(StatusCode::NOT_FOUND, "Unknown action.")),
     }

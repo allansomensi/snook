@@ -489,7 +489,10 @@ fn ray_ball(start: DVec2, dir: DVec2, other: DVec2, r: f64) -> Option<f64> {
 
 /// Builds the cue and the markings for this frame.
 pub fn overlay(m: &Match, scene: &Scene, time: f32) -> Overlay {
-    let mut out = Overlay::default();
+    let mut out = Overlay {
+        cue_look: m.cue_looks[m.game.current_player() % 2].clone(),
+        ..Default::default()
+    };
     let table = &scene.table;
     let r = table.spec.ball_radius;
     let cue = m.game.ball(BallId::CUE).xy();

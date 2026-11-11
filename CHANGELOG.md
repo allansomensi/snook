@@ -16,6 +16,16 @@ First public version.
   place the caret, keys repeat when held.
 
 ### Online
+- The shop: cloth colours, cues, chalk and ball sets. Some are free, some
+  come with achievements, some are bought with coins, some are VIP. Coins
+  and the monthly VIP are paid through Stripe (card, Pix, boleto) on its
+  hosted page; the server keeps the only wallet, credits each payment once,
+  takes refunds back, and logs every staff change. Players see each other's
+  cue and chalk, and a crown by VIP names.
+- Play now: a queue that pairs players by rating, widening with time.
+- End-of-game numbers: potting success, balls made, best run, fouls, ball
+  in hand.
+- Friends see when the other was last online.
 - Watch a friend's game: an eye next to them in Friends (or in the players
   list) opens it; the players see an eye with how many are watching.
   Spectators follow the friend into the rematch, can't read the players'

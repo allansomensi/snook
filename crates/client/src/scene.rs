@@ -52,6 +52,8 @@ pub struct Scene {
     shadow: Texture2D,
     lamps: [Vec3; LAMP_COUNT],
     sinking: HashMap<BallId, (f32, Vec3)>,
+    /// Cue meshes by (cue, chalk) design.
+    cues: HashMap<(String, String), gfx::Model>,
     pub lamp_visible: bool,
     lamp_count: u32,
     /// Dark stage around the table (see `Scene::new`).
@@ -70,7 +72,7 @@ fn upload(p: textures::Pixels, repeat: bool) -> Texture2D {
 
 impl Scene {
     /// `focused`: a dark stage around the table instead of the whole bar.
-    pub fn new(table: Table, quality: Quality, focused: bool) -> Self {
+    pub fn new(table: Table, quality: Quality, focused: bool, looks: &Looks) -> Self {
         let detailed_room = quality != Quality::Low;
         let (ball_tex, ball_segments) = match quality {
             Quality::Low => (512, 24),
@@ -79,7 +81,7 @@ impl Scene {
             Quality::Ultra => (1024, 64),
         };
         let white = gfx::white_texture();
-        let felt = upload(textures::felt(), true);
+        let felt = upload(textures::felt(looks.cloth), true);
         // Dark mahogany rails and body.
         let rail_wood =
             upload(textures::fine_wood([0.17, 0.075, 0.045], [0.05, 0.022, 0.014], 11), true);
@@ -720,19 +722,11 @@ impl Scene {
         let r = spec.ball_radius as f32;
         let balls = BallId::all()
             .map(|id| {
-                let tex = upload(textures::ball(id, ball_tex), false);
+                let tex = upload(textures::ball(id, ball_tex, &looks.balls), false);
                 gfx::sphere_mesh(r, &tex, ball_segments)
             })
             .collect();
-        let mut cue = MeshBuilder::default();
-        cue.frustum(-0.004, 0.0060, 0.0, 0.0061, 12, rgb(40, 80, 150)); // tip
-        cue.frustum(0.0, 0.0062, 0.018, 0.0063, 12, rgb(240, 238, 228)); // ferrule
-        cue.frustum(0.018, 0.0063, 0.80, 0.0105, 16, rgb(222, 190, 135)); // maple shaft
-        cue.frustum(0.80, 0.0105, 1.10, 0.0125, 16, rgb(35, 20, 12)); // ebony forearm
-        cue.frustum(1.10, 0.0125, 1.35, 0.0138, 16, rgb(20, 20, 24)); // wrap
-        cue.frustum(1.35, 0.0138, 1.47, 0.0148, 16, rgb(35, 20, 12)); // butt
-        cue.frustum(1.47, 0.0148, 1.48, 0.0, 16, rgb(240, 238, 228)); // cap
-        let cue = cue.build(&white);
+        let cue = cue_mesh("cue_classic", "chalk_blue", &white);
         let ghost = gfx::sphere_mesh_tinted(r, &white, 32, Color::new(1.0, 1.0, 1.0, 0.28));
 
         let lamps = [
@@ -759,6 +753,7 @@ impl Scene {
             shadow,
             lamps,
             sinking: HashMap::new(),
+            cues: HashMap::new(),
             lamp_visible: !focused,
             lamp_count: if quality == Quality::Low { 1 } else { 3 },
             focus: if focused { 1.0 } else { 0.0 },
@@ -814,9 +809,15 @@ impl Scene {
         }
         self.draw_balls(balls, dt);
         if let Some(cue) = &overlay.cue {
+            // The shooter's own cue and chalk (built once per design).
+            let key = (overlay.cue_look.0.clone(), overlay.cue_look.1.clone());
+            if !key.0.is_empty() && !self.cues.contains_key(&key) {
+                let mesh = cue_mesh(&key.0, &key.1, &self.white);
+                self.cues.insert(key.clone(), mesh);
+            }
             self.materials.use_lit(Surface::WOOD);
             let model = Mat4::from_rotation_translation(cue.rotation, cue.tip);
-            self.cue.draw_at(model);
+            self.cues.get(&key).unwrap_or(&self.cue).draw_at(model);
         }
         self.draw_guides(&overlay.guides, cam.eye);
         if let Some(p) = overlay.ghost {
@@ -986,6 +987,55 @@ impl Scene {
     }
 }
 
+/// What the shop changes on the table itself.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Looks {
+    pub cloth: [u8; 3],
+    pub balls: textures::Palette,
+}
+
+impl Looks {
+    /// From the codes of the equipped cloth and ball set.
+    pub fn of(cloth: &str, balls: &str) -> Looks {
+        let cloth = match snook_proto::shop::item(cloth).map(|i| i.look) {
+            Some(snook_proto::shop::Look::Cloth(c)) => c,
+            _ => [24, 96, 48],
+        };
+        Looks { cloth, balls: textures::Palette::of(balls) }
+    }
+}
+
+impl Default for Looks {
+    fn default() -> Self {
+        Looks::of("cloth_green", "balls_classic")
+    }
+}
+
+/// A cue of the given design, chalked with `chalk` (shop codes).
+pub fn cue_mesh(cue: &str, chalk: &str, white: &Texture2D) -> gfx::Model {
+    use snook_proto::shop::{Look, item};
+    let (butt, accent, ring) = match item(cue).map(|i| i.look) {
+        Some(Look::Cue { butt, accent, ring }) => (butt, accent, ring),
+        _ => ([35, 20, 12], [20, 20, 24], [240, 238, 228]),
+    };
+    let chalk = match item(chalk).map(|i| i.look) {
+        Some(Look::Chalk(c)) => c,
+        _ => [40, 80, 150],
+    };
+    let c = |v: [u8; 3]| rgb(v[0], v[1], v[2]);
+    let mut m = MeshBuilder::default();
+    m.frustum(-0.004, 0.0060, 0.0, 0.0061, 12, c(chalk)); // tip, chalked
+    m.frustum(0.0, 0.0062, 0.018, 0.0063, 12, rgb(240, 238, 228)); // ferrule
+    m.frustum(0.018, 0.0063, 0.80, 0.0105, 16, rgb(222, 190, 135)); // maple shaft
+    m.frustum(0.80, 0.0105, 0.815, 0.0106, 16, c(ring)); // joint ring
+    m.frustum(0.815, 0.0106, 1.10, 0.0125, 16, c(butt)); // forearm
+    m.frustum(1.10, 0.0125, 1.115, 0.0126, 16, c(ring)); // ring
+    m.frustum(1.115, 0.0126, 1.35, 0.0138, 16, c(accent)); // wrap
+    m.frustum(1.35, 0.0138, 1.47, 0.0148, 16, c(butt)); // butt
+    m.frustum(1.47, 0.0148, 1.48, 0.0, 16, c(ring)); // cap
+    m.build(white)
+}
+
 pub struct CuePose {
     pub tip: Vec3,
     pub rotation: Quat,
@@ -1001,6 +1051,8 @@ pub enum Guide {
 #[derive(Default)]
 pub struct Overlay {
     pub cue: Option<CuePose>,
+    /// The shooter's cue and chalk (shop codes; empty: the classic ones).
+    pub cue_look: (String, String),
     /// Where the cue ball will touch the first ball: drawn as a see-through ball.
     pub ghost: Option<Vec3>,
     pub guides: Vec<Guide>,
