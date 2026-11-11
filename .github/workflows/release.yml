@@ -27,7 +27,7 @@ jobs:
           - { os: macos-latest, name: macos-arm64, exe: snook }
           - { os: ubuntu-22.04, name: linux-x64, exe: snook }
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - name: Install Linux dependencies
@@ -57,7 +57,7 @@ jobs:
     name: Server image
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: docker/login-action@v3
         with:
           registry: ghcr.io

@@ -447,7 +447,11 @@ async fn friends_blocks_and_reports() {
 
 #[tokio::test]
 async fn tournament_runs_to_a_champion() {
-    let url = start(Rules::default()).await;
+    // The two semi-finals are played one after the other: a long shot clock
+    // keeps the waiting one from playing time-out shots meanwhile (slow CI
+    // machines take more than 30 s for a game).
+    let rules = Rules { shot_clock: Duration::from_secs(600), ..Rules::default() };
+    let url = start(rules).await;
     let mut clients = Vec::new();
     for name in ["ana", "ben", "cid", "dan"] {
         clients.push((name, Client::register(&url, name).await.0));
