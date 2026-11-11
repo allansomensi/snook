@@ -1105,6 +1105,41 @@ mod tests {
         assert_eq!(g.current_player(), 1);
     }
 
+    /// Snookered: a kick off the cushions that then hits one's own ball is
+    /// legal (if a ball reaches a cushion or a pocket afterwards).
+    #[test]
+    fn kicks_off_the_cushions_are_legal() {
+        for rails in [1, 2] {
+            let mut g = after_break(3);
+            g.groups = [Some(Group::Solids), Some(Group::Stripes)];
+            let hw = g.table.spec.width / 2.0;
+            layout(
+                &mut g,
+                &[
+                    (0, DVec2::new(-0.9, -0.2)),
+                    (12, DVec2::new(-0.3, -0.2)), // the snooker
+                    (3, DVec2::new(0.3, -0.2)),
+                    (8, DVec2::new(-0.9, 0.35)),
+                ],
+            );
+            // Unfold the path across the cushions (the nose touches the
+            // ball ~27.5 mm from its centre).
+            let line = hw - 0.0275;
+            let target = match rails {
+                1 => DVec2::new(0.3, 2.0 * line + 0.2),
+                _ => DVec2::new(0.3, 4.0 * line - 0.2),
+            };
+            let d = target - g.ball(BallId::CUE).xy();
+            let speed = if rails == 1 { 2.5 } else { 4.5 };
+            let report =
+                g.play_shot(&Shot::new(crate::math::atan2(d.y, d.x), speed), None).unwrap();
+            assert_eq!(report.first_contact, Some(BallId(3)), "{rails}-rail kick");
+            assert_eq!(report.fouls, vec![], "{rails}-rail kick: {report:?}");
+            assert!(!report.continues, "nothing made: the turn passes, no ball in hand");
+            assert_eq!(g.ball_in_hand(), None);
+        }
+    }
+
     /// Hundreds of games of varied shots, checking the rules' invariants
     /// after every one of them.
     #[test]
