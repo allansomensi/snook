@@ -16,6 +16,9 @@
 ### Fixes
 - The bottom and right cushions were darker than the others: their faces
   were wound the other way, so the light hit them from behind.
+- The side pockets showed a black trapezoid between the jaws: the cloth
+  was cut away there, opening onto nothing. It now runs on to the hole and
+  rolls over its edge, as in the corner pockets.
 - Hover hints (tooltips, achievement cards, "Shoot!", the power hint) are
   drawn after everything else, so panels, buttons, chat and toasts drawn
   later no longer cover them ("Find an opponent…" used to hide under the

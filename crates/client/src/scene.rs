@@ -657,9 +657,8 @@ impl Scene {
             let r = pocket_radius_of(&table, id);
             let c2 = pocket_center_of(&table, id);
             let center = surface(c2, 0.0);
-            // Side pockets have no shelf to speak of: the cloth stops just past
-            // the cushion line and the mouth drops straight into the pocket
-            // (w = how far from the middle, across the table, the cloth goes).
+            // Side pockets: w = where the cushion line is, across the table
+            // (the leather lip must not reach in front of it, over the cloth).
             let edge = if id.is_side() { (table.spec.width / 2.0) as f32 + 0.008 } else { 0.0 };
             holes[k] = vec4(center.x, center.z, r, edge);
             let jaws: Vec<(DVec2, DVec2)> = table
