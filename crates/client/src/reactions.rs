@@ -55,7 +55,7 @@ pub fn draw_locked(code: &str, at: Vec2, size: f32) {
         &atlas(),
         at.x - size / 2.0,
         at.y - size / 2.0,
-        Color::new(0.08, 0.06, 0.05, 0.55 * a),
+        Color::new(0.55, 0.5, 0.45, 0.3 * a),
         DrawTextureParams {
             dest_size: Some(vec2(size, size)),
             source: Some(src),
