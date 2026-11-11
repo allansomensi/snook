@@ -247,9 +247,18 @@ impl Server {
 
     /// Unlocks every achievement `user` has earned and tells them.
     pub async fn check_achievements(&self, user: &User) {
+        self.check_achievements_after(user, false).await
+    }
+
+    /// Like [`Server::check_achievements`]; `rated_win` when the player just
+    /// won a rated game (what event achievements ask for).
+    pub async fn check_achievements_after(&self, user: &User, rated_win: bool) {
         let friends = self.store.friend_count(user.id).await.unwrap_or(0);
         let mut stats = user.stats(now());
         stats.friends = friends;
+        if rated_win {
+            stats.today = snook_proto::month_day(now());
+        }
         let earned: Vec<&str> = stats.earned().collect();
         match self.store.add_achievements(user.id, &earned, now()).await {
             Ok(new) => {
@@ -358,9 +367,11 @@ async fn run_effect(server: &Arc<Server>, effect: Effect) {
         Effect::RecordMatch { record, keys } => match server.store.record_match(&record).await {
             Ok(users) => {
                 server.invalidate_leaderboard();
-                for user in users.into_iter().flatten() {
+                for (seat, user) in users.into_iter().enumerate() {
+                    let Some(user) = user else { continue };
                     server.with(|l| l.refresh_user(user.clone()));
-                    server.check_achievements(&user).await;
+                    let rated_win = record.rated && record.winner == seat;
+                    server.check_achievements_after(&user, rated_win).await;
                 }
             }
             Err(e) => tracing::error!("could not record the match {keys:?}: {e}"),

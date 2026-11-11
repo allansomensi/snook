@@ -315,8 +315,7 @@ impl Materials {
             let params =
                 || MaterialParams { pipeline_params, uniforms: uniforms.clone(), textures: vec![] };
             // SNOOK_SAFE_GRAPHICS=1 forces the basic shader (for troubleshooting).
-            let first =
-                if std::env::var_os("SNOOK_SAFE_GRAPHICS").is_some() { simple } else { FRAGMENT };
+            let first = if crate::dev::flag("SNOOK_SAFE_GRAPHICS") { simple } else { FRAGMENT };
             match load_material(ShaderSource::Glsl { vertex, fragment: first }, params()) {
                 Ok(m) => m,
                 Err(e) => {

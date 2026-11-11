@@ -85,8 +85,7 @@ impl User {
             tournaments_played: self.tournaments_played,
             tournaments_won: self.tournaments_won,
             account_days: ((now - self.created_at).max(0) / 86_400) as u32,
-            today: snook_proto::month_day(now),
-            joined: self.created_at,
+            today: 0,
         }
     }
 }
@@ -427,7 +426,7 @@ pub fn apply_match_numbers(u: &mut User, m: &MatchRecord, seat: usize) {
     } else {
         u.casual_games += 1;
     }
-    if won {
+    if won && m.rated {
         u.eight_wins += m.eight_win as u32;
         u.runouts += m.runout as u32;
         u.shutouts += m.shutout as u32;

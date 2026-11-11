@@ -7,7 +7,8 @@
 //! So two equally rated players exchange about `K/2` points, a favourite who wins
 //! gains little, and an underdog who wins gains a lot. Like FIDE, the K-factor is
 //! larger for new players (their rating settles quickly) and smaller at the top
-//! (ratings become stable).
+//! (ratings become stable). The factors are deliberately small: a rating is
+//! earned over many games, not a lucky evening.
 
 use serde::{Deserialize, Serialize};
 
@@ -29,11 +30,11 @@ impl Default for EloConfig {
     fn default() -> Self {
         EloConfig {
             initial_rating: 1200,
-            provisional_games: 30,
-            k_provisional: 40.0,
-            k_standard: 20.0,
-            k_elite: 10.0,
-            elite_threshold: 2400,
+            provisional_games: 10,
+            k_provisional: 24.0,
+            k_standard: 14.0,
+            k_elite: 8.0,
+            elite_threshold: 1900,
             floor: 100,
         }
     }
@@ -115,8 +116,8 @@ mod tests {
     fn equal_players_exchange_half_k() {
         let c = EloConfig::default();
         let r = apply_result(&c, established(1500), established(1500));
-        assert_eq!(r.winner_delta, 10);
-        assert_eq!(r.loser_delta, -10);
+        assert_eq!(r.winner_delta, 7);
+        assert_eq!(r.loser_delta, -7);
     }
 
     #[test]
@@ -124,9 +125,9 @@ mod tests {
         let c = EloConfig::default();
         let fav = apply_result(&c, established(1800), established(1400));
         let upset = apply_result(&c, established(1400), established(1800));
-        assert_eq!(fav.winner_delta, 2);
-        assert_eq!(upset.winner_delta, 18);
-        assert_eq!(upset.loser_delta, -18);
+        assert_eq!(fav.winner_delta, 1);
+        assert_eq!(upset.winner_delta, 13);
+        assert_eq!(upset.loser_delta, -13);
     }
 
     #[test]
@@ -134,7 +135,7 @@ mod tests {
         let c = EloConfig::default();
         let newbie = Rating::new(&c);
         let r = apply_result(&c, newbie, established(1200));
-        assert_eq!(r.winner_delta, 20);
+        assert_eq!(r.winner_delta, 12);
         assert_eq!(r.winner.games, 1);
         let r = apply_result(&c, established(110), Rating { rating: 105, games: 50 });
         assert_eq!(r.loser.rating, 100);

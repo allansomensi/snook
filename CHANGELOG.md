@@ -16,9 +16,15 @@ First public version.
   place the caret, keys repeat when held.
 
 ### Online
-- Reactions during a match: 6 for everyone and 15 to unlock with
-  achievements and events (Halloween, the holidays, New Year, founders).
-  They pop up discreetly by the sender's card.
+- Reactions during a match: 4 for everyone; the other 16 come from hard
+  rated-game achievements (100 games, 50 wins, 10 in a row, rating 2100…)
+  and from winning a rated game during an event (Halloween, the holidays,
+  New Year). They pop up discreetly by the sender's card.
+- Progress is earned slowly: smaller rating changes (K 24 for the first 10
+  games, then 14, 8 from 1900), everyone starts as a Rookie, feats (8-ball
+  wins, runouts, shutouts) count only in rated games, and at most 3 rated
+  games a day against the same opponent. Games against the computer never
+  touch ratings, numbers, achievements or reactions.
 - The 8-ball pocket is called by clicking a pocket on the table (no panel),
   and the call is binding for the rest of the game.
 - With the chat folded, new messages show a pulsing dot and a short preview.
@@ -29,7 +35,8 @@ First public version.
   the server's result is authoritative).
 - Fixed: a game won on the 8-ball was shown to the loser as a resignation.
 - Accounts with a country flag; names coloured by rating tier; profiles with
-  numbers, achievements (38, four of them events) and match history; the world top 100.
+  numbers, achievements (37, three of them events), the reactions unlocked
+  and progress towards the next tier and match history; the world top 100.
 - Open tables (public or private with a password), invitations, tournaments
   (4, 8 or 16 players, public or private), friends, blocking and reporting.
 - The game's events appear in the match chat, quieter than what people write.

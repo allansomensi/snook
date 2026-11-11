@@ -66,7 +66,7 @@ impl Default for Hud {
             show_help: true,
             chat_input: String::new(),
             // Development aid: SNOOK_CHAT_CLOSED starts with the chat folded.
-            chat_open: std::env::var_os("SNOOK_CHAT_CLOSED").is_none(),
+            chat_open: !crate::dev::flag("SNOOK_CHAT_CLOSED"),
             chat_scroll: 0,
             confirm_leave: false,
             banner_key: None,
@@ -82,7 +82,7 @@ impl Default for Hud {
             zoom: 0.5,
             zoom_drag: false,
             // Development aid: SNOOK_OPEN_REACTIONS opens the picker.
-            reactions_open: std::env::var_os("SNOOK_OPEN_REACTIONS").is_some(),
+            reactions_open: crate::dev::flag("SNOOK_OPEN_REACTIONS"),
         }
     }
 }

@@ -55,6 +55,16 @@ What was reviewed in the game before the release, what changed and why.
   opponent's starts as soon as the server announces it; the opponent's cue
   glides instead of jumping 10 times a second.
 
+## Review before launch
+
+- Panels are almost opaque: the table behind no longer muddies the text.
+- Settings use the same segmented controls as the setup screens (the old
+  radio rows overlapped: "Off" ran into "2×").
+- An empty lounge offers "Open a table" right there.
+- The profile shows how far the next tier is and the reactions collected.
+- The menu's left side is darker, so the buttons read over the table.
+- Pocket castings are polished brass instead of flat cream plates.
+
 ## Text fields
 
 Every field has a caret: arrows, Home/End, Delete, Ctrl+arrows (by word),

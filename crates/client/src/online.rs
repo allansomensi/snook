@@ -359,7 +359,7 @@ impl Online {
                     self.send(ClientMsg::Friends);
                     self.send(ClientMsg::Leaderboard);
                     // Development aid: SNOOK_AUTOINVITE=<name> invites that player.
-                    if let Ok(to) = std::env::var("SNOOK_AUTOINVITE") {
+                    if let Some(to) = crate::dev::var("SNOOK_AUTOINVITE") {
                         self.send(ClientMsg::Invite { to, rated: true });
                     }
                 }
@@ -436,7 +436,7 @@ impl Online {
                 }
             }
             ServerMsg::Invited { from, rated } => {
-                if std::env::var_os("SNOOK_AUTOPLAY").is_some() && current.is_none() {
+                if crate::dev::flag("SNOOK_AUTOPLAY") && current.is_none() {
                     // Development aid: accept at once.
                     self.send(ClientMsg::AnswerInvite { from, accept: true });
                     return save;
@@ -510,11 +510,11 @@ impl Online {
                 self.outgoing = None;
                 self.incoming.clear();
                 // Development aid: SNOOK_AUTOCHAT="text" says it at the start of a match.
-                if let Ok(text) = std::env::var("SNOOK_AUTOCHAT") {
+                if let Some(text) = crate::dev::var("SNOOK_AUTOCHAT") {
                     self.send(ClientMsg::MatchChat { text });
                 }
                 // SNOOK_AUTOREACT="code" sends that reaction.
-                if let Ok(code) = std::env::var("SNOOK_AUTOREACT") {
+                if let Some(code) = crate::dev::var("SNOOK_AUTOREACT") {
                     self.send(ClientMsg::React { code });
                 }
                 let next = Match::online(
@@ -1101,6 +1101,10 @@ impl Online {
                 MUTED,
                 false,
             );
+            let b = Rect::new(list.x, list.y + 62.0, 200.0f32.min(list.w), 36.0);
+            if ui.primary_button(b, t("Open a table")) {
+                self.tab = Tab::Tables;
+            }
             return None;
         }
         let row_h = 46.0;
@@ -1360,8 +1364,7 @@ impl Online {
             return;
         }
         // Development aid (screenshots): open the first running tournament.
-        if self.selected_tournament.is_none() && std::env::var_os("SNOOK_OPEN_TOURNAMENT").is_some()
-        {
+        if self.selected_tournament.is_none() && crate::dev::flag("SNOOK_OPEN_TOURNAMENT") {
             self.selected_tournament =
                 self.tournaments.iter().find(|t| t.state == TournamentState::Running).map(|t| t.id);
         }

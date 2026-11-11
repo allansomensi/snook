@@ -242,7 +242,7 @@ impl Match {
         let mut controllers = [Controller::Remote; 2];
         // Development aid: SNOOK_AUTOPLAY=1 lets the computer play this seat
         // (two such games can play a whole online match by themselves).
-        controllers[seat] = if std::env::var_os("SNOOK_AUTOPLAY").is_some() {
+        controllers[seat] = if crate::dev::flag("SNOOK_AUTOPLAY") {
             Controller::Computer(Difficulty::Hard)
         } else {
             Controller::Human
@@ -801,7 +801,7 @@ impl Match {
         let report = match self.online.as_mut() {
             Some(o) => match o.pending_end.take() {
                 Some((end, report)) => {
-                    if std::env::var_os("SNOOK_NET_DEBUG").is_some() {
+                    if crate::dev::flag("SNOOK_NET_DEBUG") {
                         let mut local = self.game.clone();
                         local.finish_shot((*pending).clone());
                         let same = local == end;

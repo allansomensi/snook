@@ -209,20 +209,20 @@ fn portuguese(en: &str) -> Option<&'static str> {
         "On the 8-ball: {pocket} pocket" => "Na bola 8: caçapa {pocket}",
         "Show ping (online)" => "Mostrar ping (online)",
         "Reactions" => "Reações",
+        "{n} points to {tier}" => "Faltam {n} pontos para {tier}",
+        "Top tier" => "Nível máximo",
         "Reactions {n}/{total}" => "Reações {n}/{total}",
-        "Founder" => "Fundador",
-        "Create your account before April 2027." => "Crie sua conta antes de abril de 2027.",
         "Haunted table" => "Mesa assombrada",
-        "Play online during Halloween (Oct 24 – Nov 2)." => {
-            "Jogue online no Halloween (24/out – 2/nov)."
+        "Win a rated game during Halloween (Oct 24 – Nov 2)." => {
+            "Vença uma partida valendo rating no Halloween (24/out – 2/nov)."
         }
         "Winter league" => "Liga de fim de ano",
-        "Play online over the holidays (Dec 15 – Jan 6)." => {
-            "Jogue online nas festas de fim de ano (15/dez – 6/jan)."
+        "Win a rated game over the holidays (Dec 15 – Jan 6)." => {
+            "Vença uma partida valendo rating nas festas (15/dez – 6/jan)."
         }
         "Fireworks" => "Fogos de artifício",
-        "Play online at the turn of the year (Dec 31 – Jan 1)." => {
-            "Jogue online na virada do ano (31/dez – 1/jan)."
+        "Win a rated game at the turn of the year (Dec 31 – Jan 1)." => {
+            "Vença uma partida valendo rating na virada do ano (31/dez – 1/jan)."
         }
         "Shows where the object ball and the cue ball go (not online)." => {
             "Mostra para onde vão a bola da vez e a branca (fora do online)."
@@ -496,26 +496,28 @@ fn portuguese(en: &str) -> Option<&'static str> {
             "Quando o tempo acaba, o adversário ganha bola na mão."
         }
         "Whitewash" => "Atropelo",
-        "Win 10 games by sinking the 8-ball." => "Vença 10 partidas encaçapando a bola 8.",
+        "Win 10 rated games on the 8-ball." => "Vença 10 partidas valendo rating na bola 8.",
         "Win 10 rated games in a row." => "Vença 10 partidas valendo rating seguidas.",
         "Win 10 rated games." => "Vença 10 partidas valendo rating.",
-        "Win 10 shutouts." => "Vença 10 partidas sem o adversário encaçapar nenhuma bola.",
-        "Win 100 games by sinking the 8-ball." => "Vença 100 partidas encaçapando a bola 8.",
+        "Win 10 rated shutouts." => {
+            "Vença 10 partidas valendo rating sem o adversário encaçapar nenhuma bola."
+        }
+        "Win 100 rated games on the 8-ball." => "Vença 100 partidas valendo rating na bola 8.",
         "Win 100 rated games." => "Vença 100 partidas valendo rating.",
-        "Win 250 games by sinking the 8-ball." => "Vença 250 partidas encaçapando a bola 8.",
+        "Win 250 rated games on the 8-ball." => "Vença 250 partidas valendo rating na bola 8.",
         "Win 3 rated games in a row." => "Vença 3 partidas valendo rating seguidas.",
         "Win 5 rated games in a row." => "Vença 5 partidas valendo rating seguidas.",
         "Win 5 tournaments." => "Vença 5 torneios.",
-        "Win 50 games by sinking the 8-ball." => "Vença 50 partidas encaçapando a bola 8.",
+        "Win 50 rated games on the 8-ball." => "Vença 50 partidas valendo rating na bola 8.",
         "Win 50 rated games." => "Vença 50 partidas valendo rating.",
         "Win 500 rated games." => "Vença 500 partidas valendo rating.",
         "Win a rated game." => "Vença uma partida valendo rating.",
         "Win a tournament." => "Vença um torneio.",
-        "Win before your opponent sinks a ball of their group." => {
-            "Vença antes de o adversário encaçapar uma bola do grupo dele."
+        "Win a rated game before your opponent sinks a ball of their group." => {
+            "Vença valendo rating antes de o adversário encaçapar uma bola do grupo dele."
         }
-        "Win from the break without your opponent getting a shot." => {
-            "Vença desde a saída sem o adversário dar uma tacada."
+        "Win a rated game from the break without your opponent getting a shot." => {
+            "Vença valendo rating desde a saída sem o adversário dar uma tacada."
         }
         "Withdraw" => "Desistir do torneio",
         "World ranking" => "Ranking mundial",

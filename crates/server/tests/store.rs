@@ -59,7 +59,8 @@ async fn exercise(store: Store) {
     let casual = MatchRecord { rated: false, delta: [0, 0], winner: 1, ..m.clone() };
     let [ua, ub] = store.record_match(&casual).await.unwrap();
     assert_eq!(ua.unwrap().casual_games, 1);
-    assert_eq!(ub.unwrap().eight_wins, 1);
+    // Feats only count in rated games.
+    assert_eq!(ub.unwrap().eight_wins, 0);
 
     let history = store.history(b.id, 10).await.unwrap();
     assert_eq!(history.len(), 2);

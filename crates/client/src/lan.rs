@@ -118,7 +118,7 @@ impl LanScreen {
         } else {
             ui.button(host_r, t("You are hosting a game"), false);
         }
-        y += 54.0;
+        y += 62.0;
         if let Some(port) = hosting {
             let ip = local_ip().unwrap_or_else(|| "?".into());
             ui.text(

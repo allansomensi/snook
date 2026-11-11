@@ -10,7 +10,7 @@ pub struct Stats {
     pub games: u32,
     /// Rated wins.
     pub wins: u32,
-    /// Wins (rated or casual) by legally pocketing the 8-ball.
+    /// Rated wins by legally pocketing the 8-ball.
     pub eight_wins: u32,
     pub casual_games: u32,
     pub peak_rating: i32,
@@ -26,12 +26,10 @@ pub struct Stats {
     pub tournaments_won: u32,
     /// Days since the account was created.
     pub account_days: u32,
-    /// Today's date as month * 100 + day, UTC (0: unknown), for events.
+    /// The date of a rated win just recorded, as month * 100 + day, UTC
+    /// (0: none): event achievements need a rated win during the event.
     #[serde(default)]
     pub today: u16,
-    /// When the account was created (Unix seconds; 0: unknown).
-    #[serde(default)]
-    pub joined: i64,
 }
 
 /// Which number an achievement looks at.
@@ -52,14 +50,12 @@ pub enum Stat {
     /// 1 while today (month * 100 + day) is in this range, both ends
     /// included; a range that wraps (Dec–Jan) works.
     Season(u16, u16),
-    /// 1 if the account was created before this time (Unix seconds).
-    JoinedBefore(i64),
 }
 
 impl Stat {
     /// Event achievements are unlocked by being there, not by numbers.
     pub fn is_event(self) -> bool {
-        matches!(self, Stat::Season(..) | Stat::JoinedBefore(_))
+        matches!(self, Stat::Season(..))
     }
 }
 
@@ -83,7 +79,6 @@ impl Stats {
                 let inside = if from <= to { d >= from && d <= to } else { d >= from || d <= to };
                 (d != 0 && inside) as i64
             }
-            Stat::JoinedBefore(t) => (self.joined > 0 && self.joined < t) as i64,
         }
     }
 
@@ -127,10 +122,10 @@ pub const ACHIEVEMENTS: &[Achievement] = &[
     a("wins_50", "Shark", "Win 50 rated games.", Stat::Wins, 50, 1),
     a("wins_100", "Centurion", "Win 100 rated games.", Stat::Wins, 100, 2),
     a("wins_500", "Unstoppable", "Win 500 rated games.", Stat::Wins, 500, 3),
-    a("eight_10", "Eight is enough", "Win 10 games by sinking the 8-ball.", Stat::EightWins, 10, 0),
-    a("eight_50", "Black ball", "Win 50 games by sinking the 8-ball.", Stat::EightWins, 50, 1),
-    a("eight_100", "Closer", "Win 100 games by sinking the 8-ball.", Stat::EightWins, 100, 2),
-    a("eight_250", "Executioner", "Win 250 games by sinking the 8-ball.", Stat::EightWins, 250, 3),
+    a("eight_10", "Eight is enough", "Win 10 rated games on the 8-ball.", Stat::EightWins, 10, 0),
+    a("eight_50", "Black ball", "Win 50 rated games on the 8-ball.", Stat::EightWins, 50, 1),
+    a("eight_100", "Closer", "Win 100 rated games on the 8-ball.", Stat::EightWins, 100, 2),
+    a("eight_250", "Executioner", "Win 250 rated games on the 8-ball.", Stat::EightWins, 250, 3),
     a("rating_1300", "Skilled", "Reach a rating of 1300.", Stat::PeakRating, 1300, 0),
     a("rating_1500", "Expert", "Reach a rating of 1500.", Stat::PeakRating, 1500, 1),
     a("rating_1700", "Master", "Reach a rating of 1700.", Stat::PeakRating, 1700, 2),
@@ -142,7 +137,7 @@ pub const ACHIEVEMENTS: &[Achievement] = &[
     a(
         "runout_1",
         "Break and run",
-        "Win from the break without your opponent getting a shot.",
+        "Win a rated game from the break without your opponent getting a shot.",
         Stat::Runouts,
         1,
         1,
@@ -151,12 +146,12 @@ pub const ACHIEVEMENTS: &[Achievement] = &[
     a(
         "shutout_1",
         "Shutout",
-        "Win before your opponent sinks a ball of their group.",
+        "Win a rated game before your opponent sinks a ball of their group.",
         Stat::Shutouts,
         1,
         0,
     ),
-    a("shutout_10", "Whitewash", "Win 10 shutouts.", Stat::Shutouts, 10, 2),
+    a("shutout_10", "Whitewash", "Win 10 rated shutouts.", Stat::Shutouts, 10, 2),
     a("casual_25", "Just for fun", "Play 25 casual games.", Stat::CasualGames, 25, 0),
     a("friend_1", "Good company", "Make a friend.", Stat::Friends, 1, 0),
     a("friend_10", "Popular", "Have 10 friends.", Stat::Friends, 10, 1),
@@ -167,17 +162,9 @@ pub const ACHIEVEMENTS: &[Achievement] = &[
     a("veteran_365", "Old timer", "Have an account for a year.", Stat::AccountDays, 365, 2),
     // Events: being online at the right time. Each one unlocks a reaction.
     a(
-        "event_founder",
-        "Founder",
-        "Create your account before April 2027.",
-        Stat::JoinedBefore(1_806_537_600),
-        1,
-        1,
-    ),
-    a(
         "event_halloween",
         "Haunted table",
-        "Play online during Halloween (Oct 24 – Nov 2).",
+        "Win a rated game during Halloween (Oct 24 – Nov 2).",
         Stat::Season(1024, 1102),
         1,
         1,
@@ -185,7 +172,7 @@ pub const ACHIEVEMENTS: &[Achievement] = &[
     a(
         "event_winter",
         "Winter league",
-        "Play online over the holidays (Dec 15 – Jan 6).",
+        "Win a rated game over the holidays (Dec 15 – Jan 6).",
         Stat::Season(1215, 106),
         1,
         1,
@@ -193,7 +180,7 @@ pub const ACHIEVEMENTS: &[Achievement] = &[
     a(
         "event_new_year",
         "Fireworks",
-        "Play online at the turn of the year (Dec 31 – Jan 1).",
+        "Win a rated game at the turn of the year (Dec 31 – Jan 1).",
         Stat::Season(1231, 101),
         1,
         2,
@@ -243,8 +230,5 @@ mod tests {
         assert!(has(at(1220), "event_winter") && has(at(106), "event_winter"));
         assert!(!has(at(1214), "event_winter") && !has(at(107), "event_winter"));
         assert!(has(at(1231), "event_new_year") && !has(at(102), "event_new_year"));
-        let founder = Stats { joined: 1_790_000_000, ..Stats::default() };
-        assert!(has(founder, "event_founder"));
-        assert!(!has(Stats { joined: 1_810_000_000, ..Stats::default() }, "event_founder"));
     }
 }

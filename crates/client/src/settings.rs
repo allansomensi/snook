@@ -57,15 +57,15 @@ impl SettingsScreen {
             Tab::Graphics => {
                 ui.text(t("Graphics quality"), x, y, 16.0, GOLD, true);
                 y += 26.0;
-                let mut rx = x;
-                for q in Quality::ALL {
-                    if ui.radio(rx, y, t(q.name()), config.quality == q) && config.quality != q {
-                        config.quality = q;
-                        config.msaa = q.default_msaa();
-                    }
-                    rx += inner / 4.0;
+                let labels: Vec<&str> = Quality::ALL.iter().map(|q| t(q.name())).collect();
+                let sel = Quality::ALL.iter().position(|q| *q == config.quality).unwrap_or(0);
+                if let Some(i) = ui.segmented(Rect::new(x, y, inner, 32.0), &labels, sel)
+                    && Quality::ALL[i] != config.quality
+                {
+                    config.quality = Quality::ALL[i];
+                    config.msaa = config.quality.default_msaa();
                 }
-                y += 24.0;
+                y += 40.0;
                 let hint = match config.quality {
                     Quality::Low => "For old or very slow computers.",
                     Quality::Medium => "Balanced: smooth on most laptops.",
@@ -76,14 +76,14 @@ impl SettingsScreen {
                 y += 34.0;
                 ui.text(t("Anti-aliasing (smooth edges)"), x, y, 16.0, GOLD, true);
                 y += 26.0;
-                let mut rx = x;
-                for (n, label) in [(1, t("Off")), (2, "2×"), (4, "4×"), (8, "8×")] {
-                    if ui.radio(rx, y, label, config.msaa == n) {
-                        config.msaa = n;
-                    }
-                    rx += inner / 4.0;
+                let levels = [1, 2, 4, 8];
+                let sel = levels.iter().position(|n| *n == config.msaa).unwrap_or(0);
+                if let Some(i) =
+                    ui.segmented(Rect::new(x, y, inner, 32.0), &[t("Off"), "2×", "4×", "8×"], sel)
+                {
+                    config.msaa = levels[i];
                 }
-                y += 24.0;
+                y += 40.0;
                 if config.msaa != startup_msaa {
                     ui.text(t("Restart the game to apply this change."), x, y, 13.0, ALERT, false);
                 }
@@ -105,24 +105,24 @@ impl SettingsScreen {
                 ui.checkbox(x + inner / 2.0, y, t("Show ping (online)"), &mut config.show_ping);
             }
             Tab::Game => {
-                ui.text(t("Language"), x, y + 1.0, 15.0, CREAM, false);
-                let mut lx = x + 150.0;
-                for l in Lang::ALL {
-                    if ui.radio(lx, y, l.name(), config.language == l) {
-                        config.language = l;
-                    }
-                    lx += 130.0;
+                ui.text(t("Language"), x, y + 8.0, 15.0, CREAM, false);
+                let names: Vec<&str> = Lang::ALL.iter().map(|l| l.name()).collect();
+                let sel = Lang::ALL.iter().position(|l| *l == config.language).unwrap_or(0);
+                if let Some(i) =
+                    ui.segmented(Rect::new(x + 150.0, y, inner - 150.0, 30.0), &names, sel)
+                {
+                    config.language = Lang::ALL[i];
                 }
-                y += 36.0;
-                ui.text(t("Aiming guide"), x, y + 1.0, 15.0, CREAM, false);
-                let mut gx = x + 150.0;
-                for g in AimGuide::ALL {
-                    if ui.radio(gx, y, t(g.name()), config.guide == g) {
-                        config.guide = g;
-                    }
-                    gx += 110.0;
+                y += 40.0;
+                ui.text(t("Aiming guide"), x, y + 8.0, 15.0, CREAM, false);
+                let names: Vec<&str> = AimGuide::ALL.iter().map(|g| t(g.name())).collect();
+                let sel = AimGuide::ALL.iter().position(|g| *g == config.guide).unwrap_or(0);
+                if let Some(i) =
+                    ui.segmented(Rect::new(x + 150.0, y, inner - 150.0, 30.0), &names, sel)
+                {
+                    config.guide = AimGuide::ALL[i];
                 }
-                y += 36.0;
+                y += 40.0;
                 ui.text(t("Mouse aim sensitivity"), x, y, 15.0, CREAM, false);
                 ui.slider(
                     72,

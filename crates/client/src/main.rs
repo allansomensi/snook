@@ -11,6 +11,7 @@ mod camera;
 mod config;
 mod coords;
 mod countries;
+mod dev;
 mod flags;
 mod game;
 mod gfx;
@@ -294,7 +295,12 @@ async fn main() {
     let mut was_in_match = current.is_some();
     let mut hud_opacity = 1.0f32;
     let mut frame = 0u32;
+    // Development aid: SNOOK_PROFILE prints the CPU time of a frame (without
+    // waiting for the GPU) every 300 frames.
+    let profiling = crate::dev::flag("SNOOK_PROFILE");
+    let mut cpu = (0.0f64, 0.0f64, 0u32);
     loop {
+        let frame_start = std::time::Instant::now();
         let dt = get_frame_time().min(0.1);
         ui::update_scale(config.ui_size);
         ui.begin();
@@ -356,8 +362,7 @@ async fn main() {
         controls.sensitivity = config.aim_sensitivity;
         let mut cam = rig.update(dt, current.as_ref(), get_time() as f32);
         // Development aid: SNOOK_CAM="eye x,y,z,target x,y,z" fixes the camera.
-        if let Some(v) = std::env::var("SNOOK_CAM")
-            .ok()
+        if let Some(v) = crate::dev::var("SNOOK_CAM")
             .map(|v| v.split(',').filter_map(|x| x.trim().parse::<f32>().ok()).collect::<Vec<_>>())
             && v.len() == 6
         {
@@ -384,6 +389,10 @@ async fn main() {
                 let overlay = play::overlay(m, &scene, get_time() as f32);
                 scene.draw(&cam, m.balls(), dt, &overlay);
             }
+            // The lounge fills the window and hides the table: don't spend
+            // the GPU (and the battery) drawing it behind.
+            None if matches!(screen, Screen::LanLounge)
+                || (matches!(screen, Screen::Online) && online.signed_in()) => {}
             None => scene.draw(&cam, &menu_rack, dt, &Overlay::default()),
         }
 
@@ -708,7 +717,7 @@ async fn main() {
             println!("fps {}", get_fps());
         }
         // Development aid: SNOOK_SHOTS="300,900" also saves `<name>-300.png`… on the way.
-        if let (Some(path), Ok(list)) = (&options.screenshot, std::env::var("SNOOK_SHOTS"))
+        if let (Some(path), Some(list)) = (&options.screenshot, crate::dev::var("SNOOK_SHOTS"))
             && list.split(',').filter_map(|n| n.trim().parse::<u32>().ok()).any(|n| n == frame)
         {
             let mut image = get_screen_data();
@@ -727,6 +736,14 @@ async fn main() {
             }
             image.export_png(path);
             break;
+        }
+        if profiling {
+            let ms = frame_start.elapsed().as_secs_f64() * 1000.0;
+            cpu = (cpu.0 + ms, cpu.1.max(ms), cpu.2 + 1);
+            if cpu.2 == 300 {
+                eprintln!("cpu per frame: avg {:.2} ms, worst {:.2} ms", cpu.0 / 300.0, cpu.1);
+                cpu = (0.0, 0.0, 0);
+            }
         }
         next_frame().await;
         retired.clear();

@@ -121,7 +121,8 @@ impl Tier {
     pub fn min_rating(self) -> i32 {
         match self {
             Tier::Rookie => i32::MIN,
-            Tier::Amateur => 1100,
+            // Everyone starts at 1200, a Rookie: every tier is earned.
+            Tier::Amateur => 1250,
             Tier::Skilled => 1300,
             Tier::Expert => 1500,
             Tier::Master => 1700,
@@ -798,7 +799,8 @@ mod tests {
         assert!(valid_country(""));
         assert!(!valid_country("XX"));
         assert!(COUNTRIES.len() > 200);
-        assert_eq!(Tier::of(1200), Tier::Amateur);
+        assert_eq!(Tier::of(1200), Tier::Rookie);
+        assert_eq!(Tier::of(1250), Tier::Amateur);
         assert_eq!(Tier::of(900), Tier::Rookie);
         assert_eq!(Tier::of(2500), Tier::Legend);
         assert_eq!(Tier::of(1500), Tier::Expert);

@@ -191,6 +191,39 @@ impl ProfileScreen {
             ui.text_centered(label, c.x + c.w / 2.0, c.y + 34.0, size, MUTED, false);
         }
 
+        // Progress towards the next tier.
+        if !player.guest {
+            let next = snook_proto::Tier::ALL.into_iter().find(|t| t.min_rating() > player.rating);
+            let bx = r.x + 20.0;
+            let bw = (r.w * 0.36).min(320.0);
+            match next {
+                Some(next) => {
+                    let from = if tier == snook_proto::Tier::Rookie {
+                        snook_core::rating::EloConfig::default().initial_rating.min(player.rating)
+                    } else {
+                        tier.min_rating()
+                    };
+                    let span = (next.min_rating() - from).max(1) as f32;
+                    let k = ((player.rating - from) as f32 / span).clamp(0.0, 1.0);
+                    let label = tw(
+                        "{n} points to {tier}",
+                        &[("n", &(next.min_rating() - player.rating)), ("tier", &t(next.name()))],
+                    );
+                    ui.text(&label, bx, r.y + 156.0, 12.0, MUTED, false);
+                    let bar = Rect::new(bx, r.y + 175.0, bw, 6.0);
+                    rrect(bar, 3.0, Color::new(1.0, 1.0, 1.0, 0.08));
+                    if k > 0.0 {
+                        rrect(
+                            Rect::new(bar.x, bar.y, (bar.w * k).max(6.0), bar.h),
+                            3.0,
+                            tier_color(next),
+                        );
+                    }
+                }
+                None => ui.text(t("Top tier"), bx, r.y + 160.0, 13.0, tier_color(tier), true),
+            }
+        }
+
         draw_line(r.x + 20.0, r.y + 192.0, r.x + r.w - 20.0, r.y + 192.0, 1.0, BORDER);
         // Actions.
         let mut bx = r.x + r.w - 24.0;
@@ -262,7 +295,8 @@ impl ProfileScreen {
     }
 
     fn achievements(&self, ui: &mut Ui, p: &Profile, area: Rect) {
-        let got = p.achievements.len();
+        let got =
+            ACHIEVEMENTS.iter().filter(|a| p.achievements.iter().any(|(c, _)| c == a.code)).count();
         ui.text(
             &tw("Achievements {n}/{total}", &[("n", &got), ("total", &ACHIEVEMENTS.len())]),
             area.x,
@@ -271,8 +305,42 @@ impl ProfileScreen {
             GOLD,
             true,
         );
-        let cell = 46.0;
+        let cell = 40.0;
         let cols = ((area.w + 6.0) / (cell + 6.0)).floor().max(1.0) as usize;
+        let rows = ACHIEVEMENTS.len().div_ceil(cols);
+        // The reactions this player has unlocked, under the medals.
+        let ry = area.y + 28.0 + rows as f32 * (cell + 6.0) + 14.0;
+        if ry + 60.0 < area.y + area.h {
+            let codes: Vec<&str> = p.achievements.iter().map(|(c, _)| c.as_str()).collect();
+            let open = snook_proto::REACTIONS.iter().filter(|r| r.unlocked(&codes)).count();
+            ui.text(
+                &tw(
+                    "Reactions {n}/{total}",
+                    &[("n", &open), ("total", &snook_proto::REACTIONS.len())],
+                ),
+                area.x,
+                ry,
+                15.0,
+                GOLD,
+                true,
+            );
+            let size = 26.0;
+            let per_row = ((area.w + 4.0) / (size + 4.0)).floor().max(1.0) as usize;
+            for (k, r) in snook_proto::REACTIONS.iter().enumerate() {
+                let c = vec2(
+                    area.x + size / 2.0 + (k % per_row) as f32 * (size + 4.0),
+                    ry + 26.0 + size / 2.0 + (k / per_row) as f32 * (size + 4.0),
+                );
+                if c.y + size / 2.0 > area.y + area.h {
+                    break;
+                }
+                if r.unlocked(&codes) {
+                    crate::reactions::draw(r.code, c, size, 1.0);
+                } else {
+                    crate::reactions::draw_locked(r.code, c, size * 0.9);
+                }
+            }
+        }
         let mut tip = None;
         for (k, a) in ACHIEVEMENTS.iter().enumerate() {
             let (col, row) = (k % cols, k / cols);

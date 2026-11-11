@@ -8,7 +8,7 @@ use crate::paint::{draw_circle, draw_circle_lines, draw_line, draw_rectangle, dr
 pub const GOLD: Color = Color::new(0.91, 0.75, 0.38, 1.0);
 pub const CREAM: Color = Color::new(0.94, 0.89, 0.80, 1.0);
 pub const MUTED: Color = Color::new(0.70, 0.64, 0.56, 1.0);
-pub const PANEL: Color = Color::new(0.09, 0.055, 0.035, 0.88);
+pub const PANEL: Color = Color::new(0.09, 0.055, 0.035, 0.96);
 pub const BORDER: Color = Color::new(0.45, 0.31, 0.16, 1.0);
 pub const ALERT: Color = Color::new(1.0, 0.56, 0.44, 1.0);
 pub const GREEN: Color = Color::new(0.12, 0.45, 0.25, 1.0);

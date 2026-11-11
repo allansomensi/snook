@@ -62,6 +62,10 @@ shooter                     server                         opponent
   (both players; not in tournaments) or `leave_match`.
 - Reconnecting within the grace period resumes the match with a fresh
   `match_started`.
+- Ratings: Elo with K 24 for the first 10 rated games, 14 after, 8 from
+  1900 (`crates/core/src/rating.rs`). Two accounts get at most 3 rated games
+  a day against each other; later ones are casual. Feats (8-ball wins,
+  runouts, shutouts) count in rated games only.
 - `react { code }` sends a reaction to the table (`reaction { seat, code }`
   to both players). Codes and what unlocks each are in
   `crates/proto/src/reactions.rs`; the server drops locked ones and allows a

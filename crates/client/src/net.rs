@@ -260,7 +260,7 @@ mod tests {
             c.send(ClientMsg::Guest { name: name.into() });
             wait_for(c, "auth", |m| matches!(m, ServerMsg::AuthOk { .. }));
         }
-        let mut worst = Duration::ZERO;
+        let mut times = Vec::new();
         for k in 0..20 {
             // Chat is rate-limited: stay under it.
             std::thread::sleep(Duration::from_millis(1100));
@@ -272,9 +272,14 @@ mod tests {
                 "chat",
                 |m| matches!(m, ServerMsg::Chat { line } if line.text == text),
             );
-            worst = worst.max(got - sent);
+            times.push(got - sent);
         }
-        println!("worst chat latency through the server: {worst:?}");
-        assert!(worst < Duration::from_millis(50), "chat took {worst:?}");
+        times.sort();
+        let (median, worst) = (times[times.len() / 2], times[times.len() - 1]);
+        println!("chat latency through the server: median {median:?}, worst {worst:?}");
+        // The bug this guards against cost 1–2 s per message; shared CI
+        // machines have the odd slow moment, so only the median is tight.
+        assert!(median < Duration::from_millis(40), "median {median:?}");
+        assert!(worst < Duration::from_millis(500), "worst {worst:?}");
     }
 }

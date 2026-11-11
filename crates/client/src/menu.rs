@@ -35,7 +35,7 @@ fn shade_texture() -> Texture2D {
     let mut rgba = Vec::with_capacity(W as usize * 4);
     for x in 0..W {
         let k = x as f32 / (W - 1) as f32;
-        let a = 0.6 * (1.0 - k * k * (3.0 - 2.0 * k));
+        let a = 0.82 * (1.0 - k * k * (3.0 - 2.0 * k));
         rgba.extend_from_slice(&[0, 0, 0, (a * 255.0) as u8]);
     }
     let tex = Texture2D::from_rgba8(W, 1, &rgba);
@@ -56,7 +56,7 @@ impl Menu {
             0.0,
             0.0,
             WHITE,
-            DrawTextureParams { dest_size: Some(vec2(sw * 0.6, sh)), ..Default::default() },
+            DrawTextureParams { dest_size: Some(vec2(sw * 0.7, sh)), ..Default::default() },
         );
 
         let left = (sw * 0.06).clamp(24.0, 90.0);
@@ -87,9 +87,9 @@ impl Menu {
             ui.block(r);
             let primary = k == 0;
             let bg = if primary {
-                Color::new(0.10 + 0.06 * a, 0.36 + 0.1 * a, 0.20 + 0.06 * a, 0.95)
+                Color::new(0.10 + 0.06 * a, 0.36 + 0.1 * a, 0.20 + 0.06 * a, 0.98)
             } else {
-                Color::new(0.10 + 0.12 * a, 0.065 + 0.08 * a, 0.04 + 0.04 * a, 0.9)
+                Color::new(0.10 + 0.12 * a, 0.065 + 0.08 * a, 0.04 + 0.04 * a, 0.97)
             };
             rrect(
                 Rect::new(shifted.x, shifted.y + 3.0, shifted.w, shifted.h),

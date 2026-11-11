@@ -208,7 +208,8 @@ impl PgStore {
         for (seat, slot) in out.iter_mut().enumerate() {
             let won = seat == m.winner;
             let (rated, delta) = (m.rated, m.delta[seat]);
-            let bonus = |flag: bool| (won && flag) as i32;
+            // Feats only count in rated games (casual ones are easy to arrange).
+            let bonus = |flag: bool| (rated && won && flag) as i32;
             let row = query(&format!(
                 "UPDATE users SET
                     rating = rating + $2,

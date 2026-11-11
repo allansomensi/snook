@@ -52,7 +52,7 @@ impl Default for Rules {
         Rules {
             shot_clock: Duration::from_secs(30),
             reconnect_grace: Duration::from_secs(60),
-            max_daily_rated_pair: 5,
+            max_daily_rated_pair: 3,
             chat_history: 60,
             motd: "Welcome to Snook! Be kind, play fair.".into(),
             lan: false,

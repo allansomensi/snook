@@ -19,21 +19,21 @@ pub const REACTIONS: &[Reaction] = &[
     r("thumbs_up", "1f44d", None),
     r("clap", "1f44f", None),
     r("wow", "1f62e", None),
-    r("phew", "1f605", None),
-    r("thinking", "1f914", None),
     r("handshake", "1f91d", None),
-    r("laugh", "1f602", Some("games_10")),
-    r("cool", "1f60e", Some("wins_10")),
-    r("heart", "2764", Some("friend_1")),
-    r("ice", "1f976", Some("shutout_1")),
-    r("eight", "1f3b1", Some("eight_10")),
-    r("fire", "1f525", Some("streak_5")),
-    r("target", "1f3af", Some("runout_1")),
-    r("shark", "1f988", Some("wins_50")),
-    r("muscle", "1f4aa", Some("wins_100")),
-    r("trophy", "1f3c6", Some("tournament_win")),
-    r("crown", "1f451", Some("rating_1900")),
-    r("star", "2b50", Some("event_founder")),
+    // Everything else takes real play: rated games only.
+    r("thinking", "1f914", Some("games_100")),
+    r("phew", "1f605", Some("wins_50")),
+    r("heart", "2764", Some("friend_10")),
+    r("cool", "1f60e", Some("wins_100")),
+    r("laugh", "1f602", Some("games_500")),
+    r("ice", "1f976", Some("shutout_10")),
+    r("eight", "1f3b1", Some("eight_100")),
+    r("fire", "1f525", Some("streak_10")),
+    r("target", "1f3af", Some("runout_10")),
+    r("shark", "1f988", Some("wins_500")),
+    r("muscle", "1f4aa", Some("games_1000")),
+    r("trophy", "1f3c6", Some("tournament_win_5")),
+    r("crown", "1f451", Some("rating_2100")),
     r("pumpkin", "1f383", Some("event_halloween")),
     r("tree", "1f384", Some("event_winter")),
     r("fireworks", "1f386", Some("event_new_year")),
@@ -69,6 +69,8 @@ mod tests {
         let none: [&str; 0] = [];
         assert!(reaction("thumbs_up").unwrap().unlocked(&none));
         assert!(!reaction("crown").unwrap().unlocked(&none));
-        assert!(reaction("crown").unwrap().unlocked(&["rating_1900"]));
+        assert!(reaction("crown").unwrap().unlocked(&["rating_2100"]));
+        // Few are free.
+        assert!(REACTIONS.iter().filter(|r| r.unlock.is_none()).count() <= 4);
     }
 }

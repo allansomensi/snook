@@ -17,6 +17,9 @@ const CUSHION_TOP: f32 = 0.043;
 const CUSHION_DEPTH: f32 = 0.05;
 /// Height of the wooden rail top above the cloth.
 const RAIL_TOP: f32 = 0.046;
+/// Colour of the brass pocket castings (and the jaws cut through the rail).
+const CAST_COLOR: Color = Color::new(0.47, 0.35, 0.17, 1.0);
+
 /// Thickness of the metal pocket castings on the rail.
 const CAST_H: f32 = 0.006;
 const LAMP_Y: f32 = TABLE_HEIGHT + 0.95;
@@ -340,7 +343,8 @@ impl Scene {
         let inner = rounded_loop(l / 2.0 + bi, w / 2.0 + bi, 0.0);
         let mut body = MeshBuilder::default();
         let mut cast = MeshBuilder::default();
-        let cast_color = rgb(205, 194, 166);
+        // Polished antique brass, like the lamp (cream plates read as paper).
+        let cast_color = CAST_COLOR;
         let n = outer.len();
         // Arc length along the loop (for wood grain that follows the rail).
         let mut along = vec![0.0f32; n + 1];
@@ -445,7 +449,7 @@ impl Scene {
             }
         }
         add(body, &rail_wood, Surface::WOOD.cut(2.0));
-        add(cast, &white, Surface::lit(0.9, 60.0, 0.1, 0.45).cut(2.0));
+        add(cast, &white, Surface::lit(1.6, 90.0, 0.12, 0.7).cut(2.0));
 
         // Legs.
         let mut legs = MeshBuilder::default();
@@ -956,7 +960,7 @@ fn jaw_wall(
     let felt = rgb(170, 180, 170);
     // Where the jaw cuts through the rail, the facing is the pocket casting
     // (only the rubber part is covered in cloth).
-    let cast = rgb(150, 142, 122);
+    let cast = CAST_COLOR;
     for w in ds.windows(2) {
         let (d0, d1) = (w[0], w[1]);
         let p0 = a + dir * (d0 / rate);
