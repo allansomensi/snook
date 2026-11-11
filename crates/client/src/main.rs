@@ -698,6 +698,16 @@ async fn main() {
         if options.show_fps && frame.is_multiple_of(120) {
             println!("fps {}", get_fps());
         }
+        // Development aid: SNOOK_SHOTS="300,900" also saves `<name>-300.png`… on the way.
+        if let (Some(path), Ok(list)) = (&options.screenshot, std::env::var("SNOOK_SHOTS"))
+            && list.split(',').filter_map(|n| n.trim().parse::<u32>().ok()).any(|n| n == frame)
+        {
+            let mut image = get_screen_data();
+            for px in image.bytes.as_chunks_mut::<4>().0 {
+                px[3] = 255;
+            }
+            image.export_png(&path.replace(".png", &format!("-{frame}.png")));
+        }
         if let Some(path) = &options.screenshot
             && frame == options.frames
         {

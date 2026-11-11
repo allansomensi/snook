@@ -203,6 +203,7 @@ pub fn shot_error(e: ShotError) -> String {
 
 fn portuguese(en: &str) -> Option<&'static str> {
     Some(match en {
+        "Win %" => "% vit.",
         "Reset the camera: top view, no zoom (C)" => "Voltar a câmera: visão de cima, sem zoom (C)",
         "Drag the table to turn it · Wheel · C" => "Arraste a mesa para girar · Roda · C",
         "Drag the cue · click a ball or a spot" => "Arraste o taco · clique numa bola ou ponto",
@@ -591,7 +592,7 @@ fn portuguese(en: &str) -> Option<&'static str> {
         "Camera pulls back to watch each shot" => "Câmera se afasta para mostrar cada tacada",
         "Camera" => "Câmera",
         "Cancel" => "Cancelar",
-        "Casual game: ratings unchanged" => "Partida casual: o rating não muda",
+        "Casual game: ratings unchanged" => "Partida amistosa: o rating não muda",
         "Center" => "Centro",
         "Chat" => "Chat",
         "Click a ball or a spot" => "Clique numa bola ou num ponto",
@@ -633,7 +634,9 @@ fn portuguese(en: &str) -> Option<&'static str> {
             "Novo aqui? Escolha um nome e uma senha e clique em Criar conta."
         }
         "Next game starts in a moment…" => "A próxima partida começa em instantes…",
-        "No rated games yet. Be the first!" => "Nenhuma partida ranqueada ainda. Seja o primeiro!",
+        "No rated games yet. Be the first!" => {
+            "Nenhuma partida valendo rating ainda. Seja o primeiro!"
+        }
         "Nobody else is here right now." => "Ninguém mais por aqui agora.",
         "Off" => "Desligado",
         "On the 8-ball: call a pocket" => "Na bola 8: cante a caçapa",
@@ -654,7 +657,7 @@ fn portuguese(en: &str) -> Option<&'static str> {
         "Players online" => "Jogadores online",
         "Quick aim" => "Mira rápida",
         "Quit" => "Sair",
-        "Rated games (affect your rating)" => "Partidas ranqueadas (valem rating)",
+        "Rated games (affect your rating)" => "Partidas valendo rating",
         "Reconnected." => "Reconectado.",
         "Rematch" => "Revanche",
         "Resign this game" => "Desistir desta partida",
@@ -755,7 +758,7 @@ fn portuguese(en: &str) -> Option<&'static str> {
         "That invitation is no longer valid." => "Esse convite não é mais válido.",
         "That player is no longer available." => "Esse jogador não está mais disponível.",
         "You've played many rated games against each other today: this one is casual." => {
-            "Vocês já jogaram muitas partidas ranqueadas hoje: esta será casual."
+            "Vocês já jogaram muitas partidas valendo rating hoje: esta será amistosa."
         }
         "Resign first to leave a game in progress." => {
             "Desista primeiro para sair de uma partida em andamento."
@@ -799,13 +802,13 @@ fn portuguese(en: &str) -> Option<&'static str> {
         "Server: {s}" => "Servidor: {s}",
         "The {ball} was spotted." => "A {ball} voltou para a mesa.",
         "Waiting for {to} ({kind})…" => "Aguardando {to} ({kind})…",
-        "rated" => "ranqueada",
-        "casual" => "casual",
+        "rated" => "valendo rating",
+        "casual" => "amistosa",
         "Waiting for {name}…" => "Aguardando {name}…",
         "{by} declined your invitation." => "{by} recusou seu convite.",
         "{from} invites you to {kind}" => "{from} convida você para {kind}",
-        "a rated game" => "uma partida ranqueada",
-        "a casual game" => "uma partida casual",
+        "a rated game" => "uma partida valendo rating",
+        "a casual game" => "uma partida amistosa",
         "{name} calls the 8-ball in the {pocket} pocket." => {
             "{name} canta a bola 8 na caçapa {pocket}."
         }

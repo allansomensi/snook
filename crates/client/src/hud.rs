@@ -93,19 +93,38 @@ const CHAT_FIELD: u64 = 40;
 fn ball_icon(ui: &Ui, id: BallId, x: f32, y: f32, size: f32) {
     let c = ball_color(id);
     let color = Color::from_rgba(c[0], c[1], c[2], 255);
+    let ivory = Color::from_rgba(246, 242, 228, 255);
     let r = size / 2.0;
     let (cx, cy) = (x + r, y + r);
     if id.0 > 8 {
-        draw_circle(cx, cy, r, Color::from_rgba(246, 242, 228, 255));
-        draw_rectangle(x + 1.0, cy - size * 0.22, size - 2.0, size * 0.44, color);
+        // Stripe: ivory ball with a coloured band, clipped to the circle.
+        draw_circle(cx, cy, r, ivory);
+        // The band is the part of the disc with |y| < band: a convex shape
+        // (two arcs joined by straight edges), filled as a fan.
+        let band = size * 0.27;
+        let a = (band / r).clamp(0.0, 1.0).asin();
+        let mut pts: Vec<Vec2> = Vec::with_capacity(20);
+        for k in 0..=8 {
+            let t = -a + 2.0 * a * k as f32 / 8.0;
+            pts.push(vec2(cx + r * t.cos(), cy + r * t.sin()));
+        }
+        for k in 0..=8 {
+            let t = std::f32::consts::PI - a + 2.0 * a * k as f32 / 8.0;
+            pts.push(vec2(cx + r * t.cos(), cy + r * t.sin()));
+        }
+        let center = vec2(cx, cy);
+        for i in 0..pts.len() {
+            draw_triangle(center, pts[i], pts[(i + 1) % pts.len()], color);
+        }
     } else {
         draw_circle(cx, cy, r, color);
     }
-    draw_circle(cx, cy, r * 0.66, Color::from_rgba(246, 242, 228, 255));
-    draw_circle_lines(cx, cy, r, 1.0, Color::new(0.0, 0.0, 0.0, 0.6));
+    draw_circle(cx, cy, r * 0.62, ivory);
+    draw_circle_lines(cx, cy, r, 1.2, Color::new(0.0, 0.0, 0.0, 0.7));
     let label = id.0.to_string();
-    let fs = if id.0 >= 10 { size * 0.5 } else { size * 0.6 };
-    ui.text_centered(&label, cx, cy - fs * 0.52, fs, BLACK, true);
+    let fs = if id.0 >= 10 { size * 0.44 } else { size * 0.56 };
+    let w = ui.text_size(&label, fs, true).x;
+    ui.text(&label, cx - w / 2.0, cy - fs * 0.55, fs, BLACK, true);
 }
 
 fn player_card(ui: &mut Ui, m: &Match, seat: usize, x: f32, y: f32, w: f32) {
@@ -173,10 +192,10 @@ fn player_card(ui: &mut Ui, m: &Match, seat: usize, x: f32, y: f32, w: f32) {
             if remaining.is_empty() {
                 ui.text(t("On the 8-ball"), x + 10.0, ry + 1.0, 13.0, GOLD, false);
                 let tw_ = ui.text_size(t("On the 8-ball"), 13.0, false).x;
-                ball_icon(ui, BallId::EIGHT, x + 16.0 + tw_, ry - 2.0, 19.0);
+                ball_icon(ui, BallId::EIGHT, x + 16.0 + tw_, ry - 2.0, 20.0);
             } else {
                 for (k, id) in remaining.into_iter().enumerate() {
-                    ball_icon(ui, id, x + 10.0 + k as f32 * 21.0, ry - 2.0, 19.0);
+                    ball_icon(ui, id, x + 10.0 + k as f32 * 22.0, ry - 2.0, 20.0);
                 }
             }
         }

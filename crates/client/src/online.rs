@@ -488,6 +488,10 @@ impl Online {
             } => {
                 self.outgoing = None;
                 self.incoming.clear();
+                // Development aid: SNOOK_AUTOCHAT="text" says it at the start of a match.
+                if let Ok(text) = std::env::var("SNOOK_AUTOCHAT") {
+                    self.send(ClientMsg::MatchChat { text });
+                }
                 let next = Match::online(
                     match_id,
                     seat,
@@ -1311,6 +1315,12 @@ impl Online {
             }
             return;
         }
+        // Development aid (screenshots): open the first running tournament.
+        if self.selected_tournament.is_none() && std::env::var_os("SNOOK_OPEN_TOURNAMENT").is_some()
+        {
+            self.selected_tournament =
+                self.tournaments.iter().find(|t| t.state == TournamentState::Running).map(|t| t.id);
+        }
         if let Some(id) = self.selected_tournament {
             match self.tournaments.iter().find(|t| t.id == id).cloned() {
                 Some(tour) => return self.draw_tournament(ui, area, &tour),
@@ -1678,7 +1688,10 @@ fn draw_bracket(ui: &mut Ui, area: Rect, tour: &TournamentInfo, me: &str) {
             tw("Round {n}", &[("n", &(r + 1))])
         };
         ui.text(&title, x + 4.0, area.y, 12.0, MUTED, true);
-        let slot_h = (area.h - 20.0) / round.len().max(1) as f32;
+        // Compact: no more than ~2.4 cards' height per first-round match.
+        let first = tour.rounds[0].len().max(1) as f32;
+        let height = (area.h - 20.0).min(first * card_h * 2.4);
+        let slot_h = height / round.len().max(1) as f32;
         for (i, m) in round.iter().enumerate() {
             let cy = area.y + 20.0 + slot_h * (i as f32 + 0.5);
             let card = Rect::new(x + 4.0, cy - card_h / 2.0, col_w - 14.0, card_h);

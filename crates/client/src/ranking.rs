@@ -61,8 +61,8 @@ impl Ranking {
             (r.x + 70.0, t("Player")),
             (r.x + r.w - 300.0, t("Rating")),
             (r.x + r.w - 210.0, t("Tier")),
-            (r.x + r.w - 110.0, t("Games")),
-            (r.x + r.w - 54.0, t("Won")),
+            (r.x + r.w - 130.0, t("Games")),
+            (r.x + r.w - 58.0, t("Win %")),
         ];
         let head_y = r.y + 76.0;
         for (x, label) in cols {
@@ -133,9 +133,9 @@ impl Ranking {
             );
             ui.text(&e.rating.to_string(), r.x + r.w - 300.0, ty, 15.0, CREAM, true);
             ui.text(t(tier.name()), r.x + r.w - 210.0, ty + 1.0, 13.0, tier_color(tier), false);
-            ui.text(&e.games.to_string(), r.x + r.w - 110.0, ty + 1.0, 13.0, MUTED, false);
+            ui.text(&e.games.to_string(), r.x + r.w - 130.0, ty + 1.0, 13.0, MUTED, false);
             let pct = (e.wins * 100).checked_div(e.games).unwrap_or(0);
-            ui.text(&format!("{pct}%"), r.x + r.w - 54.0, ty + 1.0, 13.0, MUTED, false);
+            ui.text(&format!("{pct}%"), r.x + r.w - 58.0, ty + 1.0, 13.0, MUTED, false);
             if hover && ui.clicked(row) {
                 action = RankingAction::Profile(e.username.clone());
             }
