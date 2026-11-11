@@ -209,6 +209,17 @@ fn portuguese(en: &str) -> Option<&'static str> {
         "On the 8-ball: {pocket} pocket" => "Na bola 8: caçapa {pocket}",
         "Show ping (online)" => "Mostrar ping (online)",
         "Reactions" => "Reações",
+        "Play now" => "Jogar agora",
+        "Find an opponent of your level automatically" => {
+            "Encontra automaticamente um adversário do seu nível"
+        }
+        "Looking for an opponent… {t}" => "Procurando adversário… {t}",
+        "any rating" => "qualquer rating",
+        "rating ±{n} · {mode}" => "rating ±{n} · {mode}",
+        "Potting success" => "Aproveitamento",
+        "Balls made" => "Bolas encaçapadas",
+        "Best run" => "Maior sequência",
+        "Fouls" => "Faltas",
         "seen just now" => "visto agora há pouco",
         "seen {n} min ago" => "visto há {n} min",
         "seen {n} h ago" => "visto há {n} h",

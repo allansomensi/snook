@@ -96,7 +96,62 @@ pub struct Notice {
     pub ttl: f32,
 }
 
+/// One player's numbers for the current game (the end-of-game panel).
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
+pub struct ShotStats {
+    pub shots: u32,
+    /// Shots that legally made at least one ball.
+    pub potting_shots: u32,
+    /// Object balls legally made.
+    pub balls: u32,
+    pub fouls: u32,
+    /// Most balls made in one visit to the table.
+    pub best_run: u32,
+    run: u32,
+    /// Shots taken with the cue ball in hand.
+    pub in_hand: u32,
+}
+
+impl ShotStats {
+    /// Updates the numbers with a shot by this player.
+    pub fn add(&mut self, report: &ShotReport, in_hand: bool) {
+        self.shots += 1;
+        self.in_hand += in_hand as u32;
+        if report.is_foul() {
+            self.fouls += 1;
+        }
+        let made = if report.is_foul() {
+            0
+        } else {
+            report.pocketed.iter().filter(|(b, _)| b.is_object()).count() as u32
+        };
+        if made > 0 {
+            self.potting_shots += 1;
+            self.balls += made;
+            self.run += made;
+            self.best_run = self.best_run.max(self.run);
+        }
+        if !report.continues {
+            self.run = 0;
+        }
+    }
+
+    /// Potting success, 0..=100.
+    pub fn pot_rate(&self) -> u32 {
+        (self.potting_shots * 100).checked_div(self.shots).unwrap_or(0)
+    }
+
+    /// Share of shots with ball in hand, 0..=100.
+    pub fn in_hand_rate(&self) -> u32 {
+        (self.in_hand * 100).checked_div(self.shots).unwrap_or(0)
+    }
+}
+
 pub struct Match {
+    /// Each player's numbers this game.
+    pub stats: [ShotStats; 2],
+    /// The shot being shown was taken with the cue ball in hand.
+    shot_in_hand: bool,
     pub game: EightBallGame,
     pub names: [String; 2],
     pub controllers: [Controller; 2],
@@ -219,6 +274,8 @@ impl Match {
             notices: Vec::new(),
             log: Vec::new(),
             last_report: None,
+            stats: [ShotStats::default(); 2],
+            shot_in_hand: false,
             guide: settings.guide,
             games_played: 0,
             wins: [0, 0],
@@ -270,6 +327,8 @@ impl Match {
             notices: Vec::new(),
             log: Vec::new(),
             last_report: None,
+            stats: [ShotStats::default(); 2],
+            shot_in_hand: false,
             // No full guide against people.
             guide: guide.online(),
             games_played: 0,
@@ -365,6 +424,7 @@ impl Match {
         self.seed = self.seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
         let breaker = (self.games_played % 2) as usize;
         self.game = EightBallGame::new(self.seed, breaker);
+        self.stats = [ShotStats::default(); 2];
         self.last_report = None;
         self.last_shot = None;
         self.replay = None;
@@ -542,6 +602,7 @@ impl Match {
     }
 
     fn start_animation(&mut self, pending: PendingShot, shot: Shot) {
+        self.shot_in_hand = self.game.ball_in_hand().is_some();
         self.last_shot =
             Some(ReplayShot { start: self.game.clone(), shot, called: pending.called_pocket });
         self.replay = None;
@@ -561,6 +622,8 @@ impl Match {
     }
 
     fn report_shot(&mut self, report: &ShotReport) {
+        self.stats[report.shooter % 2].add(report, self.shot_in_hand);
+        self.shot_in_hand = false;
         let shooter = self.names[report.shooter].clone();
         for foul in &report.fouls {
             self.notify(
@@ -1308,6 +1371,32 @@ impl FeedLine {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn match_stats_count_runs_fouls_and_ball_in_hand() {
+        use snook_core::{Foul, PocketId};
+        let report = |made: &[u8], foul: bool, continues: bool| ShotReport {
+            shooter: 0,
+            was_break: false,
+            first_contact: Some(BallId(1)),
+            pocketed: made.iter().map(|n| (BallId(*n), PocketId::FootLeft)).collect(),
+            fouls: if foul { vec![Foul::NoContact] } else { vec![] },
+            spotted: vec![],
+            group_assigned: None,
+            continues,
+            game_over: None,
+        };
+        let mut s = ShotStats::default();
+        s.add(&report(&[1, 2], false, true), false);
+        s.add(&report(&[3], false, true), false);
+        s.add(&report(&[], false, false), false);
+        s.add(&report(&[4], false, true), true);
+        s.add(&report(&[5], true, false), false);
+        assert_eq!((s.shots, s.potting_shots, s.balls, s.fouls), (5, 3, 4, 1));
+        assert_eq!(s.best_run, 3);
+        assert_eq!(s.pot_rate(), 60);
+        assert_eq!(s.in_hand_rate(), 20);
+    }
 
     fn players() -> [PlayerInfo; 2] {
         let p = |n: &str| PlayerInfo {

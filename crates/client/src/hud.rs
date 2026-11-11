@@ -463,8 +463,9 @@ impl Hud {
             let o = m.online.as_ref().expect("online");
             let me = o.seat;
             let won = over.winner == me && !o.spectator;
-            let r = Rect::new(sw / 2.0 - 220.0, sh / 2.0 - 110.0, 440.0, 220.0);
+            let r = Rect::new(sw / 2.0 - 220.0, sh / 2.0 - 110.0 - STATS_H / 2.0, 440.0, 220.0);
             ui.panel(r);
+            draw_match_stats(ui, m, Rect::new(r.x, r.y + r.h + 8.0, r.w, STATS_H - 8.0));
             crate::ui::rrect_lines(r, 8.0, 2.0, if won { GOLD } else { BORDER });
             let title = if won {
                 t("You win!").to_string()
@@ -565,8 +566,9 @@ impl Hud {
             }
         } else if let (Phase::GameOver, Some(over)) = (&m.phase, m.game.game_over()) {
             let all_computers = m.controllers.iter().all(|c| matches!(c, Controller::Computer(_)));
-            let r = Rect::new(sw / 2.0 - 210.0, sh / 2.0 - 95.0, 420.0, 190.0);
+            let r = Rect::new(sw / 2.0 - 210.0, sh / 2.0 - 95.0 - STATS_H / 2.0, 420.0, 190.0);
             ui.panel(r);
+            draw_match_stats(ui, m, Rect::new(r.x, r.y + r.h + 8.0, r.w, STATS_H - 8.0));
             ui.text_centered(
                 &tw("{name} wins!", &[("name", &m.names[over.winner])]),
                 sw / 2.0,
@@ -1009,6 +1011,46 @@ impl Hud {
 }
 
 const PREVIEW_TIME: f32 = 5.0;
+/// Height of the numbers panel under the game-over panel (and the gap).
+const STATS_H: f32 = 150.0;
+
+/// The game in numbers, per player: potting success, balls made, best run,
+/// fouls and how often they had the cue ball in hand.
+fn draw_match_stats(ui: &mut Ui, m: &Match, r: Rect) {
+    ui.panel(r);
+    let s = &m.stats;
+    let rows = [
+        (t("Potting success"), format!("{}%", s[0].pot_rate()), format!("{}%", s[1].pot_rate())),
+        (t("Balls made"), s[0].balls.to_string(), s[1].balls.to_string()),
+        (t("Best run"), s[0].best_run.to_string(), s[1].best_run.to_string()),
+        (t("Fouls"), s[0].fouls.to_string(), s[1].fouls.to_string()),
+        (
+            t("Ball in hand"),
+            format!("{}%", s[0].in_hand_rate()),
+            format!("{}%", s[1].in_hand_rate()),
+        ),
+    ];
+    let label_x = r.x + 16.0;
+    let col = [r.x + r.w * 0.62, r.x + r.w * 0.86];
+    for (k, name) in m.names.iter().enumerate() {
+        let (name, size) = ui.fitted(name, 13.0, r.w * 0.22, true);
+        ui.text_centered(&name, col[k], r.y + 10.0, size, GOLD, true);
+    }
+    for (i, (label, a, b)) in rows.iter().enumerate() {
+        let y = r.y + 32.0 + i as f32 * 21.0;
+        if i % 2 == 0 {
+            crate::ui::rrect(
+                Rect::new(r.x + 8.0, y - 3.0, r.w - 16.0, 20.0),
+                4.0,
+                Color::new(1.0, 1.0, 1.0, 0.035),
+            );
+        }
+        let (label, size) = ui.fitted(label, 13.0, r.w * 0.45, false);
+        ui.text(&label, label_x, y, size, MUTED, false);
+        ui.text_centered(a, col[0], y, 13.0, CREAM, true);
+        ui.text_centered(b, col[1], y, 13.0, CREAM, true);
+    }
+}
 const REACTION_TIME: f32 = 2.8;
 
 /// Reactions float down from the sender's card and fade (drawn even while

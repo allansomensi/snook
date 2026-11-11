@@ -175,8 +175,25 @@ pub struct Lounge {
     chat: VecDeque<ChatLine>,
     /// Player -> who is watching their games (lower-case names).
     watchers: HashMap<String, HashSet<String>>,
+    /// "Play now": who is waiting for an opponent.
+    queue: Vec<Queued>,
+    /// Pairs the queue matched recently (not matched again right away).
+    recent_pairs: VecDeque<(String, String, Instant)>,
     effects: Option<UnboundedSender<Effect>>,
     next_guest_id: i64,
+}
+
+struct Queued {
+    key: String,
+    rated: bool,
+    since: Instant,
+    last_status: Instant,
+}
+
+/// How far apart two ratings may be after waiting `secs`: close at first,
+/// wider every second, anyone after two minutes.
+pub fn queue_range(secs: f32) -> u32 {
+    if secs >= 120.0 { u32::MAX } else { (50.0 + secs * 6.0).min(800.0) as u32 }
 }
 
 pub fn key(name: &str) -> String {
@@ -414,6 +431,7 @@ impl Lounge {
         self.close_table_of(&k);
         self.drop_invites_of(&k);
         self.stop_watching(&k);
+        self.queue.retain(|q| q.key != k);
         let session = self.sessions.remove(&k).expect("checked");
         if let Some(id) = session.room
             && let Some(room) = self.rooms.get_mut(&id)
@@ -584,6 +602,8 @@ impl Lounge {
             ClientMsg::MatchChat { text } => self.match_chat(&k, &text),
             ClientMsg::React { code } => self.react(&k, &code),
             ClientMsg::StopSpectating => self.stop_watching(&k),
+            ClientMsg::QueueJoin { rated } => self.queue_join(&k, rated),
+            ClientMsg::QueueLeave => self.queue_leave(&k, true),
             ClientMsg::Invite { to, rated } => self.invite(&k, &key(&to), rated),
             ClientMsg::CancelInvite { to } => {
                 let to = key(&to);
@@ -760,6 +780,117 @@ impl Lounge {
             if !blocked {
                 self.send(&p, msg.clone());
             }
+        }
+    }
+
+    fn queue_join(&mut self, k: &str, rated: bool) {
+        let Some(s) = self.sessions.get(k) else { return };
+        if s.room.is_some() {
+            return self.error(k, "Finish your game first.");
+        }
+        if self.in_tournament(k).is_some() {
+            return self.error(k, "Players in a tournament can't start other games.");
+        }
+        let rated = rated && !s.guest && !self.rules.lan;
+        self.queue.retain(|q| q.key != k);
+        self.close_table_of(k);
+        self.stop_watching(k);
+        let now = Instant::now();
+        self.queue.push(Queued { key: k.to_string(), rated, since: now, last_status: now });
+        self.send(
+            k,
+            ServerMsg::Queue { searching: true, rated, waited_secs: 0, range: queue_range(0.0) },
+        );
+        self.match_queue();
+    }
+
+    /// Takes `k` out of the queue (`tell`: they asked, so confirm it).
+    fn queue_leave(&mut self, k: &str, tell: bool) {
+        let before = self.queue.len();
+        self.queue.retain(|q| q.key != k);
+        if tell || self.queue.len() != before {
+            self.send(
+                k,
+                ServerMsg::Queue { searching: false, rated: false, waited_secs: 0, range: 0 },
+            );
+        }
+    }
+
+    /// Pairs whoever can be paired: the closest ratings first, within what
+    /// both have waited for.
+    fn match_queue(&mut self) {
+        let now = Instant::now();
+        self.recent_pairs.retain(|(_, _, t)| now.duration_since(*t) < Duration::from_secs(120));
+        // Drop whoever can no longer play (left, started a game elsewhere).
+        let gone: Vec<String> = self
+            .queue
+            .iter()
+            .filter(|q| self.sessions.get(&q.key).is_none_or(|s| s.room.is_some()))
+            .map(|q| q.key.clone())
+            .collect();
+        for k in gone {
+            self.queue_leave(&k, false);
+        }
+        loop {
+            let mut best: Option<(usize, usize, i32)> = None;
+            for i in 0..self.queue.len() {
+                for j in (i + 1)..self.queue.len() {
+                    let (a, b) = (&self.queue[i], &self.queue[j]);
+                    if a.rated != b.rated
+                        || self.blocks(&a.key, &b.key)
+                        || self.blocks(&b.key, &a.key)
+                    {
+                        continue;
+                    }
+                    let waited = |q: &Queued| now.duration_since(q.since).as_secs_f32();
+                    // Not the same opponent twice in a row, unless nobody else comes.
+                    let recent = self.recent_pairs.iter().any(|(x, y, _)| {
+                        (x == &a.key && y == &b.key) || (x == &b.key && y == &a.key)
+                    });
+                    if recent && waited(a).min(waited(b)) < 45.0 {
+                        continue;
+                    }
+                    let ra = self.sessions[&a.key].user.rating;
+                    let rb = self.sessions[&b.key].user.rating;
+                    let gap = (ra - rb).unsigned_abs();
+                    let allowed = queue_range(waited(a)).min(queue_range(waited(b)));
+                    if gap <= allowed && best.is_none_or(|(_, _, g)| (gap as i32) < g) {
+                        best = Some((i, j, gap as i32));
+                    }
+                }
+            }
+            let Some((i, j, _)) = best else { break };
+            let b = self.queue.remove(j);
+            let a = self.queue.remove(i);
+            self.recent_pairs.push_back((a.key.clone(), b.key.clone(), now));
+            for k in [&a.key, &b.key] {
+                self.send(
+                    k,
+                    ServerMsg::Queue { searching: false, rated: a.rated, waited_secs: 0, range: 0 },
+                );
+            }
+            self.start_room([a.key, b.key], a.rated, None);
+        }
+        // Keep the waiting players informed (every few seconds).
+        let updates: Vec<(String, bool, u32)> = self
+            .queue
+            .iter_mut()
+            .filter(|q| now.duration_since(q.last_status) >= Duration::from_secs(3))
+            .map(|q| {
+                q.last_status = now;
+                (q.key.clone(), q.rated, now.duration_since(q.since).as_secs() as u32)
+            })
+            .collect();
+        for (k, rated, secs) in updates {
+            self.send(
+                k.as_str(),
+                ServerMsg::Queue {
+                    searching: true,
+                    rated,
+                    waited_secs: secs,
+                    range: queue_range(secs as f32),
+                },
+            );
         }
     }
 
@@ -1039,6 +1170,7 @@ impl Lounge {
         for k in &keys {
             self.drop_invites_of(k);
             self.close_table_of(k);
+            self.queue_leave(k, false);
         }
         let users = [self.sessions[&keys[0]].user.clone(), self.sessions[&keys[1]].user.clone()];
         let guests = [self.sessions[&keys[0]].guest, self.sessions[&keys[1]].guest];
@@ -1772,6 +1904,9 @@ impl Lounge {
 
     /// Called periodically: shot clocks, abandoned games, tournaments.
     pub fn tick(&mut self) {
+        if !self.queue.is_empty() {
+            self.match_queue();
+        }
         let nowi = Instant::now();
         let grace = self.rules.reconnect_grace;
         let mut finished = Vec::new();

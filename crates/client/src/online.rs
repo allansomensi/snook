@@ -118,6 +118,9 @@ pub struct Online {
     friend_input: String,
     pub profile: Option<Profile>,
     unread_friend_requests: bool,
+    /// Searching in "Play now": rated, seconds waited and the rating range
+    /// when the server last said so, and when that was.
+    queue: Option<(bool, u32, u32, std::time::Instant)>,
     /// Round trip to the server, measured with a ping every few seconds.
     pub rtt: Option<std::time::Duration>,
     ping_sent: Option<std::time::Instant>,
@@ -189,6 +192,7 @@ impl Online {
             friend_input: String::new(),
             profile: None,
             unread_friend_requests: false,
+            queue: None,
             achievements: Vec::new(),
             rtt: None,
             ping_sent: None,
@@ -304,6 +308,7 @@ impl Online {
                 }
                 NetEvent::Closed(reason) => {
                     self.conn = None;
+                    self.queue = None;
                     let was_in = self.signed_in();
                     let attempt = match self.stage {
                         Stage::Reconnecting { attempt, .. } => attempt,
@@ -362,6 +367,10 @@ impl Online {
                     if let Some(to) = crate::dev::var("SNOOK_AUTOINVITE") {
                         self.send(ClientMsg::Invite { to, rated: true });
                     }
+                    // SNOOK_AUTOQUEUE=1 joins "Play now".
+                    if crate::dev::flag("SNOOK_AUTOQUEUE") {
+                        self.send(ClientMsg::QueueJoin { rated: true });
+                    }
                     // SNOOK_AUTOWATCH=<name> watches that friend's game.
                     if let Some(username) = crate::dev::var("SNOOK_AUTOWATCH") {
                         self.send(ClientMsg::Spectate { username });
@@ -392,6 +401,7 @@ impl Online {
                     drop(m);
                 }
                 self.conn = None;
+                self.queue = None;
                 self.stage = if self.lan { Stage::Idle } else { Stage::SignIn };
                 self.error = Some(crate::i18n::server_text(&reason));
             }
@@ -513,6 +523,7 @@ impl Online {
                 spectating,
             } => {
                 self.outgoing = None;
+                self.queue = None;
                 if !spectating {
                     self.incoming.clear();
                 }
@@ -556,6 +567,10 @@ impl Online {
                 Some(m) if m.is_online() => m.handle_server(ServerMsg::Error { message }),
                 _ => self.toast(crate::i18n::server_text(&message), false),
             },
+            ServerMsg::Queue { searching, rated, waited_secs, range } => {
+                self.queue =
+                    searching.then(|| (rated, waited_secs, range, std::time::Instant::now()));
+            }
             ServerMsg::SpectateEnded { reason } => {
                 if current.as_ref().is_some_and(|m| m.is_spectating()) {
                     *current = None;
@@ -602,6 +617,7 @@ impl Online {
     pub fn logout(&mut self, config: &mut Config) {
         self.send(ClientMsg::Logout);
         self.conn = None;
+        self.queue = None;
         self.me = None;
         self.token.clear();
         self.auto_resume = false;
@@ -732,6 +748,7 @@ impl Online {
         if ui.button(Rect::new(sw / 2.0 - 70.0, r.y + r.h - 40.0, 140.0, 30.0), t("Back"), true) {
             if !self.signed_in() {
                 self.conn = None;
+                self.queue = None;
                 self.stage = Stage::Idle;
             }
             return OnlineAction::Leave;
@@ -1103,7 +1120,60 @@ impl Online {
         draw_circle(x, y, 4.5, color);
     }
 
+    /// "Play now": one click to be paired with someone of a similar rating.
+    fn draw_play_now(&mut self, ui: &mut Ui, r: Rect) {
+        match self.queue {
+            None => {
+                if ui.primary_button(r, t("Play now")) {
+                    self.send(ClientMsg::QueueJoin { rated: self.rated_games && !self.lan });
+                }
+                if ui.hovering(r) {
+                    ui.tooltip(t("Find an opponent of your level automatically"), r);
+                }
+            }
+            Some((rated, waited, range, at)) => {
+                rrect(r, 8.0, Color::new(0.10, 0.30, 0.18, 0.55));
+                rrect_lines(r, 8.0, 1.5, Color::new(0.35, 0.8, 0.5, 0.8));
+                // A small spinner.
+                let c = vec2(r.x + 22.0, r.y + r.h / 2.0);
+                let a = get_time() as f32 * 5.0;
+                for k in 0..8 {
+                    let ang = a + k as f32 * std::f32::consts::TAU / 8.0;
+                    let p = c + Vec2::from_angle(ang) * 8.0;
+                    draw_circle(p.x, p.y, 1.8, Color::new(0.6, 1.0, 0.7, (k as f32 + 1.0) / 8.0));
+                }
+                let secs = waited + at.elapsed().as_secs() as u32;
+                let title = tw(
+                    "Looking for an opponent… {t}",
+                    &[("t", &format!("{}:{:02}", secs / 60, secs % 60))],
+                );
+                let sub = if range == u32::MAX {
+                    t("any rating").to_string()
+                } else {
+                    tw(
+                        "rating ±{n} · {mode}",
+                        &[("n", &range), ("mode", &if rated { t("rated") } else { t("casual") })],
+                    )
+                };
+                let cw = 100.0f32.min(r.w * 0.3);
+                let (title, size) = ui.fitted(&title, 14.0, r.w - cw - 56.0, true);
+                ui.text(&title, r.x + 40.0, r.y + 7.0, size, CREAM, true);
+                ui.text(&sub, r.x + 40.0, r.y + r.h - 19.0, 12.0, MUTED, false);
+                if ui.button(
+                    Rect::new(r.x + r.w - cw - 8.0, r.y + 7.0, cw, r.h - 14.0),
+                    t("Cancel"),
+                    true,
+                ) {
+                    self.send(ClientMsg::QueueLeave);
+                    self.queue = None;
+                }
+            }
+        }
+    }
+
     fn draw_players(&mut self, ui: &mut Ui, area: Rect) -> Option<OnlineAction> {
+        self.draw_play_now(ui, Rect::new(area.x, area.y, area.w, 44.0));
+        let area = Rect::new(area.x, area.y + 54.0, area.w, area.h - 54.0);
         self.rated_toggle(ui, Rect::new(area.x, area.y, area.w.min(260.0), 30.0));
         let me = self.me.as_ref().map(|m| m.username.clone()).unwrap_or_default();
         let mut players: Vec<PlayerInfo> =

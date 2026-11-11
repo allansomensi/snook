@@ -376,6 +376,34 @@ async fn friends_can_watch_and_react() {
 }
 
 #[tokio::test]
+async fn play_now_pairs_players_of_the_same_mode() {
+    let url = start(Rules::default()).await;
+    let (mut alice, _) = Client::register(&url, "alice").await;
+    let (mut bob, _) = Client::register(&url, "bob").await;
+    let (mut carol, _) = Client::register(&url, "carol").await;
+    // Carol wants a casual game: she isn't paired with the rated queue.
+    carol.send(ClientMsg::QueueJoin { rated: false }).await;
+    carol.expect("searching", |m| matches!(m, ServerMsg::Queue { searching: true, .. })).await;
+    alice.send(ClientMsg::QueueJoin { rated: true }).await;
+    alice.expect("searching", |m| matches!(m, ServerMsg::Queue { searching: true, .. })).await;
+    bob.send(ClientMsg::QueueJoin { rated: true }).await;
+    for c in [&mut alice, &mut bob] {
+        let ServerMsg::MatchStarted { rated, players, .. } =
+            c.expect("paired", |m| matches!(m, ServerMsg::MatchStarted { .. })).await
+        else {
+            unreachable!()
+        };
+        assert!(rated);
+        let mut names: Vec<_> = players.iter().map(|p| p.username.clone()).collect();
+        names.sort();
+        assert_eq!(names, ["alice", "bob"]);
+    }
+    // Carol leaves the queue.
+    carol.send(ClientMsg::QueueLeave).await;
+    carol.expect("left", |m| matches!(m, ServerMsg::Queue { searching: false, .. })).await;
+}
+
+#[tokio::test]
 async fn login_errors_and_validation() {
     let url = start(Rules::default()).await;
     let (_alice, token) = Client::register(&url, "Alice").await;

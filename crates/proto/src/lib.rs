@@ -444,6 +444,11 @@ pub enum ClientMsg {
     React {
         code: String,
     },
+    /// "Play now": wait for an opponent of a similar rating.
+    QueueJoin {
+        rated: bool,
+    },
+    QueueLeave,
     /// Watch the games of this friend (follows them from game to game).
     Spectate {
         username: String,
@@ -690,6 +695,15 @@ pub enum ServerMsg {
     Reaction {
         seat: usize,
         code: String,
+    },
+    /// The player's place in the "Play now" queue (sent when it changes and
+    /// every few seconds while searching). `range` is how far from their
+    /// rating an opponent may be by now.
+    Queue {
+        searching: bool,
+        rated: bool,
+        waited_secs: u32,
+        range: u32,
     },
     /// How many people are watching this match.
     Spectators {
