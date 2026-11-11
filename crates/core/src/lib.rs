@@ -7,6 +7,7 @@
 //! client and the game server run exactly the same simulation.
 
 pub mod ball;
+pub mod math;
 pub mod physics;
 pub mod table;
 

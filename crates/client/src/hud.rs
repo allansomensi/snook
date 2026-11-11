@@ -253,7 +253,9 @@ fn status_line(m: &Match) -> Option<String> {
             let target = match m.game.group_of(m.game.current_player()) {
                 Some(Group::Solids) => t("solids"),
                 Some(Group::Stripes) => t("stripes"),
-                None => t("any ball"),
+                // Official rule: the break never decides the groups; the
+                // first ball made after it does.
+                None => t("open table: the next ball you make sets your group"),
             };
             Some(tw("{name} to shoot ({target})", &[("name", name), ("target", &target)]))
         }

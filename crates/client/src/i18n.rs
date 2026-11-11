@@ -739,7 +739,9 @@ fn portuguese(en: &str) -> Option<&'static str> {
         "Your name" => "Seu nome",
         "Your opponent went back to the lounge." => "Seu adversário voltou ao salão.",
         "Your turn" => "Sua vez",
-        "any ball" => "qualquer bola",
+        "open table: the next ball you make sets your group" => {
+            "mesa aberta: a próxima bola que você encaçapar define seu grupo"
+        }
         "draw" => "puxada",
         "follow" => "seguida",
         "stun" => "seca",
@@ -895,7 +897,9 @@ fn portuguese(en: &str) -> Option<&'static str> {
         "The cue ball left the table" => "A branca saiu da mesa",
         "The cue ball didn't hit any ball" => "A branca não tocou em nenhuma bola",
         "Wrong ball hit first ({ball})" => "Tocou primeiro na bola errada ({ball})",
-        "No ball reached a cushion after contact" => "Nenhuma bola tocou uma tabela após o contato",
+        "No ball reached a cushion after contact" => {
+            "A branca tocou a bola, mas nenhuma bola chegou à tabela depois"
+        }
         "The {ball} left the table" => "A {ball} saiu da mesa",
         "Illegal break" => "Saída irregular",
         "pocketed the 8-ball" => "encaçapou a bola 8",

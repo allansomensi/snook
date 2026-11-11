@@ -8,6 +8,9 @@ license.workspace = true
 
 [dependencies]
 glam.workspace = true
+# Pure-Rust math (musl's libm): the same bits on every OS, so the server and
+# every player simulate a shot identically.
+libm = "0.2"
 serde.workspace = true
 
 [dev-dependencies]

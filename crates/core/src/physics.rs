@@ -169,6 +169,9 @@ const SLIP_EPS: f64 = 1e-4;
 const LINEAR_EPS: f64 = 5e-4;
 const SPIN_EPS: f64 = 0.05;
 const AIRBORNE_EPS: f64 = 1e-7;
+/// Most sub-steps a time step is split into (a ball at the maximum speed
+/// needs 3).
+const MAX_SUBSTEPS: usize = 16;
 /// Bounces slower than this are absorbed by the slate.
 const LANDING_SPEED: f64 = 0.15;
 
@@ -262,9 +265,26 @@ impl Simulation {
         self.stop_all();
     }
 
-    /// One fixed time step.
+    /// One fixed time step. Fast balls are moved in sub-steps, so none goes
+    /// further than an eighth of its radius between two collision checks: a
+    /// thin cut at full power still registers the contact.
     pub fn step(&mut self) {
         let dt = self.params.time_step;
+        let fastest = self
+            .balls
+            .iter()
+            .filter(|b| b.is_moving())
+            .map(|b| b.velocity.length())
+            .fold(0.0, f64::max);
+        let max_travel = self.radius() / 8.0;
+        let n = ((fastest * dt / max_travel).ceil() as usize).clamp(1, MAX_SUBSTEPS);
+        let sub = dt / n as f64;
+        for _ in 0..n {
+            self.substep(sub);
+        }
+    }
+
+    fn substep(&mut self, dt: f64) {
         self.time += dt;
         for i in 0..self.balls.len() {
             if self.balls[i].is_moving() {
@@ -279,7 +299,7 @@ impl Simulation {
         }
         // A few passes make clustered collisions (the break) resolve cleanly.
         for _ in 0..3 {
-            if !self.resolve_ball_collisions() {
+            if !self.resolve_ball_collisions(dt) {
                 break;
             }
         }
@@ -340,7 +360,13 @@ impl Simulation {
         b.position += b.velocity * dt;
         let rot = b.angular_velocity * dt;
         if rot.length_squared() > 0.0 {
-            b.orientation = (DQuat::from_scaled_axis(rot) * b.orientation).normalize();
+            // Portable `DQuat::from_scaled_axis` (same bits on every OS).
+            let angle = rot.length();
+            let axis = rot / angle;
+            let half = angle / 2.0;
+            let (sh, ch) = (crate::math::sin(half), crate::math::cos(half));
+            let q = DQuat::from_xyzw(axis.x * sh, axis.y * sh, axis.z * sh, ch);
+            b.orientation = (q * b.orientation).normalize();
         }
     }
 
@@ -383,8 +409,9 @@ impl Simulation {
         self.events.push(Event::Slate { time, ball: id, speed: impact });
     }
 
-    /// Returns true if any collision was resolved.
-    fn resolve_ball_collisions(&mut self) -> bool {
+    /// Returns true if any collision was resolved. `dt` is the sub-step just
+    /// integrated (for contacts that happened during it).
+    fn resolve_ball_collisions(&mut self, dt: f64) -> bool {
         let r = self.radius();
         let m = self.table.spec.ball_mass;
         let inertia = self.inertia();
@@ -404,11 +431,28 @@ impl Simulation {
                 if !bi.is_moving() && !bj.is_moving() {
                     continue;
                 }
-                let delta = bj.position - bi.position;
-                let dist_sq = delta.length_squared();
-                if dist_sq >= min_dist * min_dist || dist_sq == 0.0 {
+                let mut delta = bj.position - bi.position;
+                let mut dist_sq = delta.length_squared();
+                // Apart now, but they may have touched during the last
+                // sub-step (a thin cut): find when, go back to that moment,
+                // collide, and finish the sub-step with the new velocities.
+                let mut rewind = 0.0;
+                if dist_sq >= min_dist * min_dist {
+                    match touch_time(delta, bj.velocity - bi.velocity, min_dist, dt) {
+                        Some(back) => {
+                            rewind = back;
+                            self.balls[i].position -= bi.velocity * back;
+                            self.balls[j].position -= bj.velocity * back;
+                            delta = self.balls[j].position - self.balls[i].position;
+                            dist_sq = delta.length_squared();
+                        }
+                        None => continue,
+                    }
+                }
+                if dist_sq == 0.0 {
                     continue;
                 }
+                let (bi, bj) = (self.balls[i], self.balls[j]);
                 let dist = dist_sq.sqrt();
                 let n = delta / dist;
                 let ri = n * r;
@@ -419,7 +463,7 @@ impl Simulation {
                 let vn = rel.dot(n);
 
                 // Push the balls apart so they never remain interpenetrated.
-                let overlap = min_dist - dist;
+                let overlap = (min_dist - dist).max(0.0);
                 let mut correction = n * (overlap / 2.0 + 1e-9);
                 if bi.motion != Motion::Airborne && bj.motion != Motion::Airborne {
                     correction.z = 0.0;
@@ -428,6 +472,9 @@ impl Simulation {
                 self.balls[j].position += correction;
 
                 if vn <= 0.0 {
+                    // Not approaching after all: put them back where they were.
+                    self.balls[i].position += bi.velocity * rewind;
+                    self.balls[j].position += bj.velocity * rewind;
                     continue;
                 }
                 any = true;
@@ -458,6 +505,8 @@ impl Simulation {
                     if b.position.z <= r + AIRBORNE_EPS && b.velocity.z < 0.0 {
                         b.velocity.z = 0.0;
                     }
+                    // The rest of the sub-step, after the contact.
+                    b.position += b.velocity * rewind;
                 }
                 self.events.push(Event::BallBall {
                     time: self.time,
@@ -609,6 +658,29 @@ impl Simulation {
     }
 }
 
+/// Two balls `delta` apart now (`rel` = their relative velocity) were within
+/// `min_dist` at some point of the last `dt` seconds: how long ago they
+/// first touched.
+fn touch_time(delta: DVec3, rel: DVec3, min_dist: f64, dt: f64) -> Option<f64> {
+    let a = rel.length_squared();
+    if a <= 0.0 {
+        return None;
+    }
+    // Where they were `dt` ago, and |d0 + rel·t| = min_dist for t in [0, dt].
+    let d0 = delta - rel * dt;
+    let b = 2.0 * d0.dot(rel);
+    let c = d0.length_squared() - min_dist * min_dist;
+    if c <= 0.0 {
+        return None; // Already touching then: handled as an overlap.
+    }
+    let disc = b * b - 4.0 * a * c;
+    if disc < 0.0 {
+        return None;
+    }
+    let t = (-b - disc.sqrt()) / (2.0 * a);
+    (0.0..=dt).contains(&t).then_some(dt - t)
+}
+
 /// Horizontal velocity of the point of the ball touching the cloth.
 fn contact_slip(v: DVec2, w: DVec3, r: f64) -> DVec2 {
     DVec2::new(v.x - r * w.y, v.y + r * w.x)
@@ -630,10 +702,10 @@ pub fn cue_impulse(params: &PhysicsParams, table: &Table, shot: &Shot) -> (DVec3
     let m = table.spec.ball_mass;
     let inertia = 0.4 * m * r * r;
     let yaw = shot.yaw + params.squirt * shot.tip.x;
-    let forward = DVec3::new(yaw.cos(), yaw.sin(), 0.0);
+    let forward = DVec3::new(crate::math::cos(yaw), crate::math::sin(yaw), 0.0);
     let up = DVec3::Z;
     let right = forward.cross(up);
-    let (sin_e, cos_e) = shot.elevation.sin_cos();
+    let (sin_e, cos_e) = (crate::math::sin(shot.elevation), crate::math::cos(shot.elevation));
     let axis = forward * cos_e - up * sin_e;
     let cue_up = up * cos_e + forward * sin_e;
     let a = shot.tip.x * params.max_tip_offset * r;
@@ -776,6 +848,23 @@ mod tests {
         let blocker = sim.ball(BallId(5)).unwrap();
         assert!(cue.position.x > -0.36 + r, "cue ball should land beyond the blocker");
         assert!(blocker.status == BallStatus::InPlay);
+    }
+
+    /// The thinnest cuts at full power must count as contact (they used to
+    /// slip between two collision checks).
+    #[test]
+    fn thin_cuts_at_full_power_register() {
+        let r = TableSpec::BAR_BOX_7FT.ball_radius;
+        for k in 0..40 {
+            // Overlap of 0.02 mm, at 40 different phases along the path.
+            let offset = 2.0 * r - 0.00002;
+            let start = -0.5 - k as f64 * 0.00017;
+            let mut sim = sim_with(&[(0, DVec2::new(start, 0.0)), (5, DVec2::new(0.0, offset))]);
+            sim.strike(BallId::CUE, &Shot::new(0.0, 7.0)).unwrap();
+            sim.run_to_rest();
+            let hit = sim.events().iter().any(|e| matches!(e, Event::BallBall { .. }));
+            assert!(hit, "graze missed at phase {k}");
+        }
     }
 
     #[test]

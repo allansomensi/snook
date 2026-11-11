@@ -24,7 +24,7 @@ use snook_core::{EightBallGame, GameOverReason, PocketId, Shot, ShotReport};
 pub const SPECTATOR_SEAT: usize = 2;
 
 /// Bumped whenever messages change incompatibly.
-pub const PROTOCOL_VERSION: u32 = 8;
+pub const PROTOCOL_VERSION: u32 = 9;
 
 /// Username rules: 3–16 characters, letters, digits and underscores.
 pub fn valid_username(name: &str) -> bool {

@@ -212,7 +212,7 @@ impl Table {
             for start in [on_long, on_short] {
                 let side = (start - mouth_center).dot(outward.perp()).signum();
                 let turn = -side * spec.corner_facing_turn;
-                let dir = DVec2::from_angle(turn).rotate(outward);
+                let dir = crate::math::from_angle(turn).rotate(outward);
                 cushions.push(CushionSegment { a: start, b: start + dir * jaw });
             }
             let hole_radius = spec.corner_hole_radius;
@@ -232,7 +232,7 @@ impl Table {
             let left = DVec2::new(-half_side, sy * hw);
             let right = DVec2::new(half_side, sy * hw);
             let outward = DVec2::new(0.0, sy);
-            let open = spec.side_facing_open.tan();
+            let open = crate::math::tan(spec.side_facing_open);
             cushions.push(CushionSegment {
                 a: left,
                 b: left + DVec2::new(-open, sy).normalize() * jaw,
