@@ -397,7 +397,7 @@ impl Hud {
             };
             ui.text_centered(&title, sw / 2.0, r.y + 16.0, 28.0, GOLD, true);
             ui.text_centered(
-                crate::i18n::reason(over.reason),
+                &crate::i18n::result_line(over.reason, &m.names[over.winner], &m.names[1 - over.winner]),
                 sw / 2.0,
                 r.y + 56.0,
                 15.0,
@@ -474,7 +474,7 @@ impl Hud {
                 true,
             );
             ui.text_centered(
-                crate::i18n::reason(over.reason),
+                &crate::i18n::result_line(over.reason, &m.names[over.winner], &m.names[1 - over.winner]),
                 sw / 2.0,
                 r.y + 60.0,
                 15.0,

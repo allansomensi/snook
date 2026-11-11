@@ -59,5 +59,8 @@ without consequence, take over accounts, or take the server down cheaply.
 - **One instance.** The lounge is in memory: a restart ends games in progress
   (accounts and results are safe). Fine for this size; scaling out would need
   a shared message bus.
+- **macroquad soundness advisory (RUSTSEC-2025-0035).** The game's engine
+  has known unsound internal APIs; they affect memory safety in edge cases of
+  its own code, not network input. The server doesn't use it. Track upstream.
 - **Unsigned Windows executable.** SmartScreen warns on first run until the
   game is code-signed or distributed through the Microsoft Store.

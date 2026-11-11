@@ -149,8 +149,19 @@ pub fn ball(id: BallId) -> String {
     if id == BallId::CUE { t("cue ball").to_string() } else { tw("{n}-ball", &[("n", &id.0)]) }
 }
 
-pub fn reason(r: GameOverReason) -> &'static str {
-    t(r.description())
+/// How a game ended, naming who did it ("Ana sank the 8 too early").
+pub fn result_line(r: GameOverReason, winner: &str, loser: &str) -> String {
+    use GameOverReason::*;
+    let (key, name) = match r {
+        PocketedEight => ("{name} sank the 8-ball", winner),
+        EightPocketedEarly => ("{name} sank the 8 too early", loser),
+        EightInWrongPocket => ("{name} sank the 8 in the wrong pocket", loser),
+        EightPocketedOnFoul => ("{name} fouled on the 8", loser),
+        EightOffTable => ("{name} knocked the 8 off the table", loser),
+        Resignation => ("{name} resigned", loser),
+        Abandoned => ("{name} left the game", loser),
+    };
+    tw(key, &[("name", &name)])
 }
 
 /// How a game in the history ended, from the player's side.
@@ -192,6 +203,14 @@ pub fn shot_error(e: ShotError) -> String {
 
 fn portuguese(en: &str) -> Option<&'static str> {
     Some(match en {
+        "{name} sank the 8-ball" => "{name} encaçapou a bola 8",
+        "{name} sank the 8 too early" => "{name} encaçapou a 8 antes da hora",
+        "{name} sank the 8 in the wrong pocket" => "{name} encaçapou a 8 na caçapa errada",
+        "{name} fouled on the 8" => "{name} cometeu falta na 8",
+        "{name} knocked the 8 off the table" => "{name} jogou a 8 para fora da mesa",
+        "{name} resigned" => "{name} desistiu",
+        "{name} left the game" => "{name} saiu da partida",
+        "{winner} wins! ({how})" => "{winner} vence! ({how})",
         "#{n} in the world" => "#{n} no mundo",
         "3–16 letters, digits or underscores." => "3 a 16 letras, números ou sublinhados.",
         "A short line, as in rated online games." => {

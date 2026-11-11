@@ -337,6 +337,10 @@ impl Online {
                     save = true;
                     self.send(ClientMsg::Friends);
                     self.send(ClientMsg::Leaderboard);
+                    // Development aid: SNOOK_AUTOINVITE=<name> invites that player.
+                    if let Ok(to) = std::env::var("SNOOK_AUTOINVITE") {
+                        self.send(ClientMsg::Invite { to, rated: true });
+                    }
                 }
             }
             ServerMsg::AuthError { reason } => {
@@ -411,6 +415,11 @@ impl Online {
                 }
             }
             ServerMsg::Invited { from, rated } => {
+                if std::env::var_os("SNOOK_AUTOPLAY").is_some() && current.is_none() {
+                    // Development aid: accept at once.
+                    self.send(ClientMsg::AnswerInvite { from, accept: true });
+                    return save;
+                }
                 self.incoming.retain(|(f, _)| *f != from);
                 self.incoming.push((from, rated));
             }

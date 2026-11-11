@@ -1,0 +1,9 @@
+# cargo audit reads Cargo.lock, which lists optional dependencies of every
+# crate whether or not they are built. These two come from sqlx's MySQL and
+# SQLite drivers, which Snook does not enable (`cargo tree -i rsa` and
+# `cargo tree -i libsqlite3-sys` print nothing): they are never compiled.
+[advisories]
+ignore = [
+    "RUSTSEC-2023-0071", # rsa (sqlx-mysql, not built)
+    "RUSTSEC-2026-0459", # libsqlite3-sys (sqlx-sqlite, not built)
+]

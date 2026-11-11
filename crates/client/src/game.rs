@@ -233,7 +233,13 @@ impl Match {
         guide: AimGuide,
     ) -> Self {
         let mut controllers = [Controller::Remote; 2];
-        controllers[seat] = Controller::Human;
+        // Development aid: SNOOK_AUTOPLAY=1 lets the computer play this seat
+        // (two such games can play a whole online match by themselves).
+        controllers[seat] = if std::env::var_os("SNOOK_AUTOPLAY").is_some() {
+            Controller::Computer(Difficulty::Hard)
+        } else {
+            Controller::Human
+        };
         let mut m = Match {
             game,
             names: [players[0].username.clone(), players[1].username.clone()],
@@ -570,13 +576,8 @@ impl Match {
         }
         if let Some(over) = report.game_over {
             let winner = self.names[over.winner].clone();
-            self.notify(
-                tw(
-                    "{winner} wins: {reason}!",
-                    &[("winner", &winner), ("reason", &crate::i18n::reason(over.reason))],
-                ),
-                true,
-            );
+            let how = crate::i18n::result_line(over.reason, &winner, &self.names[1 - over.winner]);
+            self.notify(tw("{winner} wins! ({how})", &[("winner", &winner), ("how", &how)]), true);
         } else if !report.continues {
             let next = self.names[self.game.current_player()].clone();
             if let Some(bih) = self.game.ball_in_hand() {
@@ -789,6 +790,12 @@ impl Match {
         let report = match self.online.as_mut() {
             Some(o) => match o.pending_end.take() {
                 Some((end, report)) => {
+                    if std::env::var_os("SNOOK_NET_DEBUG").is_some() {
+                        let mut local = self.game.clone();
+                        local.finish_shot((*pending).clone());
+                        let same = local == end;
+                        eprintln!("shot {}: prediction {}", end.shots_taken(), if same { "matched the server" } else { "DIFFERED from the server" });
+                    }
                     // The server's result is authoritative.
                     self.game = end;
                     report
@@ -1002,10 +1009,11 @@ impl Match {
         let text = match result.reason {
             GameOverReason::Abandoned => tw("{name} left the game.", &[("name", &name)]),
             GameOverReason::Resignation => tw("{name} resigned.", &[("name", &name)]),
-            reason => tw(
-                "{winner} wins: {reason}!",
-                &[("winner", &self.names[result.winner]), ("reason", &crate::i18n::reason(reason))],
-            ),
+            reason => {
+                let winner = &self.names[result.winner];
+                let how = crate::i18n::result_line(reason, winner, &name);
+                tw("{winner} wins! ({how})", &[("winner", winner), ("how", &how)])
+            }
         };
         self.game.conclude(result.winner, result.reason);
         self.notify(text, true);
