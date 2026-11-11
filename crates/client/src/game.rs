@@ -794,7 +794,11 @@ impl Match {
                         let mut local = self.game.clone();
                         local.finish_shot((*pending).clone());
                         let same = local == end;
-                        eprintln!("shot {}: prediction {}", end.shots_taken(), if same { "matched the server" } else { "DIFFERED from the server" });
+                        eprintln!(
+                            "shot {}: prediction {}",
+                            end.shots_taken(),
+                            if same { "matched the server" } else { "DIFFERED from the server" }
+                        );
                     }
                     // The server's result is authoritative.
                     self.game = end;
