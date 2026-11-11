@@ -70,7 +70,9 @@ impl Default for Hud {
             show_help: false,
             chat_input: String::new(),
             // Development aid: SNOOK_CHAT_CLOSED starts with the chat folded.
-            chat_open: !crate::dev::flag("SNOOK_CHAT_CLOSED"),
+            // Folded at the start (a dot and a preview announce new messages).
+            // Development aid: SNOOK_CHAT_OPEN opens it.
+            chat_open: crate::dev::flag("SNOOK_CHAT_OPEN"),
             chat_scroll: 0,
             confirm_leave: false,
             banner_key: None,
