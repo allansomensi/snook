@@ -248,7 +248,14 @@ async fn user_of(server: &Server, obj: &Value) -> Option<User> {
     // Our own reference first, then the customer.
     let id = str_of(obj, "client_reference_id")
         .or_else(|| obj.get("metadata").and_then(|m| str_of(m, "user_id")))
+        // Invoices: where the subscription's metadata is, in older and newer
+        // API versions (`subscription_details`, then `parent.…`), or on the
+        // subscription line itself.
         .or_else(|| obj.pointer("/subscription_details/metadata/user_id").and_then(Value::as_str))
+        .or_else(|| {
+            obj.pointer("/parent/subscription_details/metadata/user_id").and_then(Value::as_str)
+        })
+        .or_else(|| obj.pointer("/lines/data/0/metadata/user_id").and_then(Value::as_str))
         .and_then(|s| s.parse::<i64>().ok());
     let id = match id {
         Some(id) => Some(id),
@@ -323,8 +330,9 @@ pub async fn apply_event(server: &Server, event: &Value) -> Result<(), String> {
         }
         "invoice.paid" => {
             let Some(user) = user_of(server, obj).await else {
-                tracing::warn!("invoice.paid for an unknown player");
-                return Ok(());
+                // Maybe it came before the checkout that links the customer:
+                // fail, so Stripe delivers it again a little later.
+                return Err("invoice.paid for a player not known yet".into());
             };
             let invoice = str_of(obj, "id").unwrap_or("");
             let end = obj
