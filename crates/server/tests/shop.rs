@@ -89,3 +89,83 @@ async fn unknown_players_and_events_are_ignored() {
     apply_event(&server, &json!({ "type": "ping", "data": { "object": {} } })).await.unwrap();
     assert!(apply_event(&server, &json!({ "type": "x" })).await.is_err(), "no object");
 }
+
+/// A refunded VIP month is found by its invoice (the charge names the
+/// payment too, which is not how VIP months are recorded).
+#[tokio::test]
+async fn refunded_vip_months_end_vip_and_take_the_coins_back() {
+    let (server, id) = setup().await;
+    server.store.set_stripe_customer(id, "cus_9").await.unwrap();
+    let invoice = json!({
+        "type": "invoice.paid",
+        "data": { "object": {
+            "id": "in_5", "customer": "cus_9", "amount_paid": 1490, "currency": "brl",
+            "lines": { "data": [ { "period": { "end": now() + 30 * 86_400 } } ] }
+        }}
+    });
+    apply_event(&server, &invoice).await.unwrap();
+    // Part of the money back: the month stands.
+    let partial = json!({
+        "type": "charge.refunded",
+        "data": { "object": { "payment_intent": "pi_55", "invoice": "in_5", "refunded": false } }
+    });
+    apply_event(&server, &partial).await.unwrap();
+    assert!(server.store.wallet(id).await.unwrap().vip_until > now());
+    let refund = json!({
+        "type": "charge.refunded",
+        "data": { "object": { "payment_intent": "pi_55", "invoice": "in_5", "refunded": true } }
+    });
+    apply_event(&server, &refund).await.unwrap();
+    apply_event(&server, &refund).await.unwrap();
+    let w = server.store.wallet(id).await.unwrap();
+    assert!(w.vip_until <= now(), "VIP ends with the refund");
+    assert_eq!(w.coins, 0, "the month's coins go back, once");
+    // The same invoice delivered again later changes nothing.
+    apply_event(&server, &invoice).await.unwrap();
+    let w = server.store.wallet(id).await.unwrap();
+    assert!(w.vip_until <= now());
+    assert_eq!(w.coins, 0);
+}
+
+/// The first invoice of a subscription can arrive before the checkout that
+/// links the customer to the player: the month must not be lost, nor paid twice.
+#[tokio::test]
+async fn a_new_subscription_is_granted_whatever_the_order_of_events() {
+    let (server, id) = setup().await;
+    let invoice = json!({
+        "type": "invoice.paid",
+        "data": { "object": {
+            "id": "in_8", "customer": "cus_new", "amount_paid": 1490, "currency": "brl",
+            "lines": { "data": [ { "period": { "end": now() + 30 * 86_400 } } ] }
+        }}
+    });
+    apply_event(&server, &invoice).await.unwrap();
+    assert_eq!(server.store.wallet(id).await.unwrap().vip_until, 0, "nobody to give it to yet");
+    let session = json!({
+        "type": "checkout.session.completed",
+        "data": { "object": {
+            "id": "cs_8", "mode": "subscription", "payment_status": "paid",
+            "client_reference_id": id.to_string(), "customer": "cus_new",
+            "invoice": "in_8", "amount_total": 1490, "currency": "brl"
+        }}
+    });
+    apply_event(&server, &session).await.unwrap();
+    apply_event(&server, &invoice).await.unwrap();
+    apply_event(&server, &session).await.unwrap();
+    let w = server.store.wallet(id).await.unwrap();
+    assert!(w.vip_until > now() + 29 * 86_400);
+    assert_eq!(w.coins, VIP_MONTHLY_COINS as i64, "one month of coins");
+    // The subscription's own metadata on the invoice is enough, too.
+    let renewal = json!({
+        "type": "invoice.paid",
+        "data": { "object": {
+            "id": "in_9", "customer": "cus_other", "amount_paid": 1490, "currency": "brl",
+            "parent": { "subscription_details": { "metadata": { "user_id": id.to_string() } } },
+            "lines": { "data": [ { "period": { "end": now() + 60 * 86_400 } } ] }
+        }}
+    });
+    apply_event(&server, &renewal).await.unwrap();
+    let w = server.store.wallet(id).await.unwrap();
+    assert!(w.vip_until > now() + 59 * 86_400);
+    assert_eq!(w.coins, 2 * VIP_MONTHLY_COINS as i64);
+}

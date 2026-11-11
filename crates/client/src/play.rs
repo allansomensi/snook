@@ -333,6 +333,8 @@ impl Controls {
             if is_key_pressed(KeyCode::Escape) {
                 m.aim.charging = false;
                 m.aim.power = 0.0;
+                // This Esc cancelled the stroke: it doesn't open the menu too.
+                m.escape_used = true;
             } else if is_key_down(KeyCode::Space) {
                 m.aim.power = (m.aim.power + CHARGE_RATE * dt as f32).min(1.0);
             } else if is_key_released(KeyCode::Space) {

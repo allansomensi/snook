@@ -278,10 +278,11 @@ impl Hud {
         let sh = crate::ui::vh();
         let mut action = HudAction::None;
 
+        let escape_used = std::mem::take(&mut m.escape_used);
         if !ui.wants_keyboard {
             if is_key_pressed(KeyCode::Escape) && self.reactions_open {
                 self.reactions_open = false;
-            } else if is_key_pressed(KeyCode::Escape) && !m.aim.charging {
+            } else if is_key_pressed(KeyCode::Escape) && !m.aim.charging && !escape_used {
                 self.paused = !self.paused;
                 self.confirm_leave = false;
             }

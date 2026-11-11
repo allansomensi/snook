@@ -175,6 +175,8 @@ pub struct Match {
     pub clock: Option<(f32, f32)>,
     pub last_shot: Option<ReplayShot>,
     pub replay: Option<Replay>,
+    /// Esc was already used this frame (to cancel a stroke being charged).
+    pub escape_used: bool,
     seed: u64,
     events_seen: usize,
     demo_timer: f32,
@@ -287,6 +289,7 @@ impl Match {
             clock: settings.shot_clock.map(|s| (s as f32, s as f32)),
             last_shot: None,
             replay: None,
+            escape_used: false,
             seed,
             events_seen: 0,
             demo_timer: 0.0,
@@ -377,6 +380,7 @@ impl Match {
             clock: None,
             last_shot: None,
             replay: None,
+            escape_used: false,
             seed: match_id,
             events_seen: 0,
             demo_timer: 0.0,
@@ -1236,7 +1240,11 @@ impl Match {
                 }
             }
             ServerMsg::ShotRejected { turn, reason, game } => {
-                if o.predicted.is_some_and(|(t, _)| t == turn) {
+                // Our own predicted shot, or one being shown for the opponent
+                // (the server could not play it): back to the table as it was.
+                if o.predicted.is_some_and(|(t, _)| t == turn)
+                    || (in_progress && o.sim_turn == Some(turn))
+                {
                     o.predicted = None;
                     o.sim_turn = None;
                     o.turn_start = None;
@@ -1244,6 +1252,7 @@ impl Match {
                     self.game = game;
                     self.phase = Phase::Turn { placing_cue_ball: false, computer: None };
                     self.replay = None;
+                    self.last_shot = None;
                 } else if matches!(self.phase, Phase::Turn { .. }) {
                     self.game = game;
                 }
@@ -1521,6 +1530,30 @@ mod tests {
         m.handle_server(ServerMsg::ShotRejected {
             turn: 0,
             reason: "It's not your turn.".into(),
+            game: before.clone(),
+        });
+        assert!(matches!(m.phase, Phase::Turn { .. }));
+        assert_eq!(m.game, before);
+    }
+
+    /// The server could not play the opponent's shot: the animation stops
+    /// and the table goes back, instead of waiting for a result for ever.
+    #[test]
+    fn an_opponents_refused_shot_rolls_back_too() {
+        let mut m = online_match(1);
+        let before = m.game.clone();
+        m.handle_server(ServerMsg::ShotTaken {
+            seat: 0,
+            turn: 0,
+            shot: Shot::new(0.0, 6.0),
+            called_pocket: None,
+            cue_ball: None,
+            timeout: false,
+        });
+        assert!(matches!(m.phase, Phase::Simulating(_)));
+        m.handle_server(ServerMsg::ShotRejected {
+            turn: 0,
+            reason: "The server could not play that shot.".into(),
             game: before.clone(),
         });
         assert!(matches!(m.phase, Phase::Turn { .. }));

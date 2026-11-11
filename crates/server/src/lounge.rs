@@ -85,6 +85,14 @@ const SHOT_MARGIN: Duration = Duration::from_millis(1500);
 /// Aim and cue-ball updates are relayed at most this often.
 const AIM_RELAY: Duration = Duration::from_millis(33);
 const MATCH_CHAT_KEEP: usize = 40;
+/// Opening and closing tables, tournaments and the queue are announced to
+/// the whole lounge: a dozen at once, then one a second (a person clicking
+/// never gets near it; a script can't flood everyone through it).
+const ACTION_BURST: f64 = 12.0;
+const ACTION_RATE: f64 = 1.0;
+/// A tournament still taking names is dropped when its host has been gone
+/// this long (it would hold one of the few tournament slots forever).
+const HOSTLESS_TOURNAMENT: Duration = Duration::from_secs(300);
 
 pub struct Session {
     pub conn_id: u64,
@@ -101,6 +109,8 @@ pub struct Session {
     last_chat: String,
     repeats: u32,
     invite_bucket: Bucket,
+    /// Lounge actions everyone hears about (tables, tournaments, the queue).
+    action_bucket: Bucket,
     last_aim: Option<Instant>,
     /// Achievement codes (they unlock reactions).
     achievements: Vec<String>,
@@ -373,6 +383,16 @@ impl Lounge {
         blocked: HashSet<i64>,
     ) {
         let k = key(&user.username);
+        if self.sessions.contains_key(&k) {
+            // Signed in again from somewhere else: whatever the old connection
+            // had going in the lounge (an open table, a place in the queue,
+            // invitations, a game being watched) ends with it. A match in
+            // progress carries over below.
+            self.close_table_of(&k);
+            self.drop_invites_of(&k);
+            self.stop_watching(&k);
+            self.queue.retain(|q| q.key != k);
+        }
         if let Some(old) = self.sessions.remove(&k) {
             let _ = old
                 .tx
@@ -408,6 +428,7 @@ impl Lounge {
                 last_chat: String::new(),
                 repeats: 0,
                 invite_bucket: Bucket::new(6.0, 0.2),
+                action_bucket: Bucket::new(ACTION_BURST, ACTION_RATE),
                 last_aim: None,
                 achievements: Vec::new(),
                 reaction_bucket: Bucket::new(3.0, 0.5),
@@ -620,6 +641,22 @@ impl Lounge {
     /// Handles a message from a signed-in player.
     pub fn handle(&mut self, username: &str, msg: ClientMsg) {
         let k = key(username);
+        let announced = matches!(
+            msg,
+            ClientMsg::OpenTable { .. }
+                | ClientMsg::CloseTable
+                | ClientMsg::JoinTable { .. }
+                | ClientMsg::QueueJoin { .. }
+                | ClientMsg::QueueLeave
+                | ClientMsg::Tournaments
+                | ClientMsg::CreateTournament { .. }
+                | ClientMsg::JoinTournament { .. }
+                | ClientMsg::LeaveTournament { .. }
+                | ClientMsg::StartTournament { .. }
+        );
+        if announced && !self.sessions.get_mut(&k).is_some_and(|s| s.action_bucket.take()) {
+            return self.error(&k, "Slow down a little.");
+        }
         match msg {
             ClientMsg::Chat { text } => self.chat(&k, &text),
             ClientMsg::MatchChat { text } => self.match_chat(&k, &text),
@@ -1759,6 +1796,9 @@ impl Lounge {
 
     fn leave_tournament(&mut self, k: &str, id: u64) {
         let Some(t) = self.tournaments.get_mut(&id) else { return };
+        if !t.players.iter().any(|p| p == k) {
+            return;
+        }
         match t.state {
             TournamentState::Registering => {
                 if t.host == k {
@@ -2002,12 +2042,27 @@ impl Lounge {
         for id in running {
             self.tournament_progress(id);
         }
-        let expired: Vec<u64> = self
-            .tournaments
-            .values()
-            .filter(|t| t.finished_at.is_some_and(|f| f.elapsed() > Duration::from_secs(600)))
-            .map(|t| t.id)
-            .collect();
+        // Tournaments still taking names whose host went away and stayed away.
+        let mut expired: Vec<u64> = Vec::new();
+        for t in self.tournaments.values_mut() {
+            if t.state != TournamentState::Registering {
+                continue;
+            }
+            if self.sessions.contains_key(&t.host) {
+                t.missing_since.remove(&t.host);
+            } else {
+                let since = *t.missing_since.entry(t.host.clone()).or_insert(nowi);
+                if nowi.duration_since(since) > HOSTLESS_TOURNAMENT {
+                    expired.push(t.id);
+                }
+            }
+        }
+        expired.extend(
+            self.tournaments
+                .values()
+                .filter(|t| t.finished_at.is_some_and(|f| f.elapsed() > Duration::from_secs(600)))
+                .map(|t| t.id),
+        );
         for id in expired {
             self.tournaments.remove(&id);
             self.broadcast(&ServerMsg::TournamentRemoved { id });

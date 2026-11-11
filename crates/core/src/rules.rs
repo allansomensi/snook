@@ -559,7 +559,11 @@ impl EightBallGame {
             if !fouls.is_empty() {
                 self.ball_in_hand =
                     Some(if was_break { BallInHand::Kitchen } else { BallInHand::Anywhere });
-                if !self.ball(BallId::CUE).in_play() {
+                // A scratch, or a break foul that left the cue ball beyond the
+                // head string: it goes back to the kitchen, so the incoming
+                // player can always shoot from where it lies.
+                let cue = self.ball(BallId::CUE);
+                if !cue.in_play() || !self.can_place_cue_ball(cue.xy()) {
                     self.respot_cue_ball();
                 }
             }
@@ -777,6 +781,23 @@ mod tests {
         assert!(report.fouls.contains(&Foul::IllegalBreak));
         assert_eq!(g.current_player(), 1);
         assert_eq!(g.ball_in_hand(), Some(BallInHand::Kitchen));
+    }
+
+    /// A break foul without a scratch used to leave the cue ball beyond the
+    /// head string with ball in hand "in the kitchen": no shot was allowed
+    /// until the player moved it.
+    #[test]
+    fn a_break_foul_always_leaves_a_playable_cue_ball() {
+        for seed in 0..20 {
+            let mut g = EightBallGame::new(seed, 0);
+            // Soft enough to be illegal, hard enough to cross the head string.
+            let report = g.play_shot(&Shot::new(0.0, 1.2), None).unwrap();
+            assert!(report.fouls.contains(&Foul::IllegalBreak), "seed {seed}");
+            assert_eq!(g.ball_in_hand(), Some(BallInHand::Kitchen));
+            let cue = g.ball(BallId::CUE).xy();
+            assert!(g.can_place_cue_ball(cue), "seed {seed}: cue ball left at {cue:?}");
+            assert!(g.prepare_shot(&Shot::new(0.0, 2.0), None).is_ok());
+        }
     }
 
     #[test]

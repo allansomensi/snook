@@ -702,6 +702,9 @@ async fn handle_socket(server: Arc<Server>, socket: WebSocket, ip: IpAddr) {
     let mut flood = Bucket::new(120.0, 40.0);
     // Shop actions (some open payment pages at the provider).
     let mut shop_bucket = Bucket::new(6.0, 0.1);
+    // Requests that read or write the database (profiles, friends, blocks,
+    // reports…): plenty for a person, far too few to wear the database down.
+    let mut query_bucket = Bucket::new(30.0, 2.0);
     loop {
         let next = tokio::select! {
             m = tokio::time::timeout(IDLE_TIMEOUT, stream.next()) => m,
@@ -711,16 +714,17 @@ async fn handle_socket(server: Arc<Server>, socket: WebSocket, ip: IpAddr) {
             Ok(Some(Ok(m))) => m,
             _ => break,
         };
-        let text = match next {
-            Message::Text(t) => t,
-            Message::Close(_) => break,
-            _ => continue,
-        };
+        // Every frame counts, whatever its kind (pings and binary frames too).
         if !flood.take() {
             tracing::warn!("{ip_text}: message flood, closing");
             send(ServerMsg::Kicked { reason: "Too many messages.".into() });
             break;
         }
+        let text = match next {
+            Message::Text(t) => t,
+            Message::Close(_) => break,
+            _ => continue,
+        };
         let Ok(msg) = parse_client(text.as_str()) else {
             send(ServerMsg::Error { message: "Malformed message.".into() });
             continue;
@@ -737,6 +741,10 @@ async fn handle_socket(server: Arc<Server>, socket: WebSocket, ip: IpAddr) {
                 }
                 _ => break,
             }
+            continue;
+        }
+        if is_query_msg(&msg) && !query_bucket.take() {
+            send(ServerMsg::Error { message: "Slow down a little.".into() });
             continue;
         }
         let Some((me, guest)) = user.clone() else {
@@ -942,6 +950,23 @@ async fn handle_socket(server: Arc<Server>, socket: WebSocket, ip: IpAddr) {
     }
     drop(tx);
     let _ = tokio::time::timeout(Duration::from_secs(2), writer).await;
+}
+
+/// Messages answered from the database.
+fn is_query_msg(msg: &ClientMsg) -> bool {
+    matches!(
+        msg,
+        ClientMsg::Profile { .. }
+            | ClientMsg::Spectate { .. }
+            | ClientMsg::SetCountry { .. }
+            | ClientMsg::Friends
+            | ClientMsg::FriendRequest { .. }
+            | ClientMsg::FriendAnswer { .. }
+            | ClientMsg::FriendRemove { .. }
+            | ClientMsg::Block { .. }
+            | ClientMsg::Unblock { .. }
+            | ClientMsg::Report { .. }
+    )
 }
 
 fn is_account_msg(msg: &ClientMsg) -> bool {

@@ -56,7 +56,17 @@ First public version.
 - The game's events appear in the match chat, quieter than what people write.
 - The game signs in in the background; the menu shows who is signed in.
 
+- After a foul on the break the cue ball always goes back behind the head
+  string (it used to stay where it stopped, and no shot was allowed until
+  the player moved it).
+- Esc while charging a shot only cancels the shot (it used to open the menu
+  as well).
+
 ### Server
+- Before launch: limits on lounge actions and database requests, no ghost
+  tables or queue places after signing in elsewhere, tournaments abandoned
+  by their host are removed, VIP refunds and first payments handled in any
+  order of events. See `docs/SECURITY.md` (14–20).
 - PostgreSQL storage (Neon-ready) with migrations; in memory for LAN and tests.
 - Hardened: hashed and renewed sessions, sign-in and sign-up throttling,
   flood and connection limits, bounded queues, simulation off the main lock,

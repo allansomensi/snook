@@ -27,6 +27,13 @@ without consequence, take over accounts, or take the server down cheaply.
 | 11 | The settings file (with the session token) was world-readable and written in place. | Low | Written to a temporary file and renamed; `0600` on Unix. |
 | 12 | Minimum password length 6. | Low | 8–72 characters, not only digits, not one repeated character. |
 | 13 | The client trusted the address of the proxy as the player's address. | Medium (on hosts behind a proxy) | `SNOOK_CLIENT_IP_HEADER` with a list of headers; the staff panel warns when every player shares one address. |
+| 14 | Lounge actions that are announced to everyone (opening and closing tables, tournaments, the queue) had no limit of their own: one connection could make the server send thousands of messages a second to the whole lounge. | Medium | Their own limit per player (12 at once, then one a second); leaving a tournament one is not in says nothing to anyone. |
+| 15 | Requests answered from the database (profiles, friends, blocks, reports, watching) were limited only by the general message limit, also before signing in. | Medium | Their own limit per connection (30 at once, then two a second). |
+| 16 | Only text frames counted towards the flood limit (pings and binary frames were free). | Low | Every frame counts. |
+| 17 | Signing in from a second place left the first connection's open table and place in the queue behind: a "ghost" table anyone could join, or a game starting for a player who never asked. | Low | The old connection's table, queue place, invitations and spectating end with it (a match in progress still carries over). |
+| 18 | A tournament whose host left before it started stayed open for ever, holding one of the 20 tournament slots. | Low | Removed five minutes after the host goes away. |
+| 19 | A refunded VIP month was looked up by the payment id only (VIP months are recorded by invoice): VIP and its coins stayed after the refund. A refund interrupted half-way could leave the coins behind. | Medium | Found by payment or invoice; the coins are taken back exactly once, keyed by the payment; partial refunds leave the purchase alone. |
+| 20 | The first invoice of a subscription can arrive before the checkout that links the customer to the player: the paid month was dropped. | Medium | The checkout grants the first month as well (once per invoice), and the invoice finds the player through the subscription's metadata. |
 
 ## Built in from the start
 

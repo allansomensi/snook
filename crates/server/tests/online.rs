@@ -776,3 +776,74 @@ async fn admin_panel_requires_staff() {
     };
     assert!(reason.contains("banned"), "{reason}");
 }
+
+/// Signing in again from another place ends what the old connection had
+/// going in the lounge: its open table must not stay behind as a ghost.
+#[tokio::test]
+async fn a_replaced_session_leaves_no_table_or_queue_behind() {
+    let url = start(Rules::default()).await;
+    let (mut alice, token) = Client::register(&url, "alice").await;
+    let (mut bob, _) = Client::register(&url, "bob").await;
+    alice.send(ClientMsg::OpenTable { rated: false, password: None }).await;
+    let ServerMsg::TableOpened { table } =
+        bob.expect("table", |m| matches!(m, ServerMsg::TableOpened { .. })).await
+    else {
+        unreachable!()
+    };
+    // Alice opens the game on another computer.
+    let mut alice2 = Client::connect(&url).await;
+    alice2.send(ClientMsg::Resume { token }).await;
+    alice2.expect("auth", |m| matches!(m, ServerMsg::AuthOk { .. })).await;
+    bob.expect("closed", |m| matches!(m, ServerMsg::TableClosed { id } if *id == table.id)).await;
+    let ServerMsg::Tables { tables } =
+        alice2.expect("tables", |m| matches!(m, ServerMsg::Tables { .. })).await
+    else {
+        unreachable!()
+    };
+    assert!(tables.is_empty(), "the old table is gone");
+    bob.send(ClientMsg::JoinTable { id: table.id, password: None }).await;
+    bob.expect("error", |m| matches!(m, ServerMsg::Error { .. })).await;
+}
+
+/// Lounge actions that everyone hears about can't be used to flood the lounge.
+#[tokio::test]
+async fn lounge_actions_are_rate_limited() {
+    let url = start(Rules::default()).await;
+    let (mut alice, _) = Client::register(&url, "alice").await;
+    let (mut bob, _) = Client::register(&url, "bob").await;
+    for _ in 0..40 {
+        alice.send(ClientMsg::OpenTable { rated: false, password: None }).await;
+    }
+    alice.expect("limit", |m| matches!(m, ServerMsg::Error { .. })).await;
+    alice.send(ClientMsg::Chat { text: "done".into() }).await;
+    let mut opened = 0;
+    while let ServerMsg::TableOpened { .. } = bob
+        .expect("tables", |m| matches!(m, ServerMsg::TableOpened { .. } | ServerMsg::Chat { .. }))
+        .await
+    {
+        opened += 1;
+    }
+    assert!((1..=14).contains(&opened), "{opened} tables announced");
+    // Leaving a tournament one never joined says nothing to anyone.
+    bob.send(ClientMsg::CreateTournament {
+        name: "Friday".into(),
+        size: 4,
+        rated: false,
+        password: None,
+    })
+    .await;
+    let ServerMsg::TournamentUpdated { tournament } =
+        bob.expect("tournament", |m| matches!(m, ServerMsg::TournamentUpdated { .. })).await
+    else {
+        unreachable!()
+    };
+    let (mut carol, _) = Client::register(&url, "carol").await;
+    carol.send(ClientMsg::LeaveTournament { id: tournament.id }).await;
+    carol.send(ClientMsg::Chat { text: "hello".into() }).await;
+    let next = bob
+        .expect("next", |m| {
+            matches!(m, ServerMsg::TournamentUpdated { .. } | ServerMsg::Chat { .. })
+        })
+        .await;
+    assert!(matches!(next, ServerMsg::Chat { .. }), "{next:?}");
+}
