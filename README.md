@@ -1,3 +1,5 @@
+<p align="center"><img src="crates/client/assets/icon/snook-256.png" width="128" alt="Snook"></p>
+
 # Snook
 
 A lightweight 3D eight-ball pool game for the desktop, written in Rust.
@@ -14,6 +16,30 @@ world ranking that keeps everyone coming back.
 | Lounge | Profile |
 |---|---|
 | ![Lounge](docs/screenshots/lounge.png) | ![Profile](docs/screenshots/profile.png) |
+
+## Download
+
+Get the latest version from the
+[Releases page](https://github.com/allansomensi/snook/releases/latest):
+
+- **Windows**: `snook-x86_64-pc-windows-msvc.msi` installs the game with a
+  Start menu (and optional desktop) shortcut; the `.zip` is a portable copy.
+- **macOS** (Apple Silicon or Intel) and **Linux** (x64 or ARM64): the
+  `.tar.xz` for your computer, or install from a terminal:
+
+  ```bash
+  curl --proto '=https' --tlsv1.2 -LsSf https://github.com/allansomensi/snook/releases/latest/download/snook-installer.sh | sh
+  ```
+
+- **Windows from PowerShell**:
+
+  ```powershell
+  powershell -ExecutionPolicy Bypass -c "irm https://github.com/allansomensi/snook/releases/latest/download/snook-installer.ps1 | iex"
+  ```
+
+On Linux the game needs the usual desktop libraries (ALSA, X11, OpenGL),
+which every desktop installation has. How releases are made is described in
+[docs/RELEASING.md](docs/RELEASING.md).
 
 ## Features
 
@@ -184,12 +210,15 @@ crates/
             achievements, wallets and Stripe payments, the staff panel
             (Axum; PostgreSQL, or in memory for LAN games and tests)
   client/   snook: the desktop client built on macroquad (3D scene with a
-            custom lighting shader, input, HUD, sound, online and LAN screens)
+            custom lighting shader, input, HUD, sound, online and LAN screens);
+            assets/icon/ holds the emblem's files (made by src/icon.rs) and
+            wix/ the Windows installer
 vendor/
   miniquad/ miniquad with two platform fixes (see vendor/README.md)
 tools/      gen_countries.py, gen_reactions.py: regenerate the country list,
             the flag atlas and the reaction atlas
 Dockerfile, render.yaml: the server image and the Render blueprint
+dist-workspace.toml: packaging and releases with dist (docs/RELEASING.md)
 ```
 
 Online games are **authoritative**: the client only sends the stroke (aim, power,
@@ -205,8 +234,9 @@ client.
 4. ~~Rated games and the global leaderboard~~
 5. ~~Friends, private tables, tournaments, achievements, profiles, LAN, staff panel~~
 6. ~~Spectating friends, Play now, reactions, the shop and VIP~~
-7. Signed installers and store releases (Microsoft Store, Steam, itch.io)
-8. Replays of whole matches
+7. ~~Installers and packages for every platform (MSI, shell, PowerShell; dist)~~
+8. Signed installers and store releases (Microsoft Store, Steam, itch.io)
+9. Replays of whole matches
 
 ## License
 

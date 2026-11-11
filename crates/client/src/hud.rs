@@ -1338,11 +1338,13 @@ impl Hud {
         let hot = matches!(drag, crate::ui::Drag::Held(_) | crate::ui::Drag::Hover);
         draw_power_track(ui, track, m.aim.power, hot, true);
         if hot && !matches!(drag, crate::ui::Drag::Held(_)) {
-            let hint = t("Drag to set the power");
-            let w = ui.text_size(hint, 13.0, false).x + 20.0;
-            let r = Rect::new(track.x + (track.w - w) / 2.0, track.y - 40.0, w, 24.0);
-            crate::ui::rrect(r, 12.0, Color::new(0.0, 0.0, 0.0, 0.8));
-            ui.text(hint, r.x + 10.0, r.y + 5.0, 13.0, CREAM, false);
+            ui.overlay(move |ui| {
+                let hint = t("Drag to set the power");
+                let w = ui.text_size(hint, 13.0, false).x + 20.0;
+                let r = Rect::new(track.x + (track.w - w) / 2.0, track.y - 40.0, w, 24.0);
+                crate::ui::rrect(r, 12.0, Color::new(0.0, 0.0, 0.0, 0.85));
+                ui.text(hint, r.x + 10.0, r.y + 5.0, 13.0, CREAM, false);
+            });
         }
     }
 
@@ -1617,16 +1619,18 @@ fn shoot_button(ui: &mut Ui, r: Rect, enabled: bool) -> bool {
     );
     let clicked = enabled && hover && is_mouse_button_released(MouseButton::Left);
     if hover {
-        let label = t("Shoot!");
-        let w = ui.text_size(label, 13.0, true).x + 20.0;
-        let tr = Rect::new(
-            (r.x + r.w / 2.0 - w / 2.0).min(crate::ui::vw() - w - 6.0),
-            r.y - 32.0,
-            w,
-            24.0,
-        );
-        crate::ui::rrect(tr, 12.0, Color::new(0.0, 0.0, 0.0, 0.8));
-        ui.text(label, tr.x + 10.0, tr.y + 5.0, 13.0, CREAM, true);
+        ui.overlay(move |ui| {
+            let label = t("Shoot!");
+            let w = ui.text_size(label, 13.0, true).x + 20.0;
+            let tr = Rect::new(
+                (r.x + r.w / 2.0 - w / 2.0).min(crate::ui::vw() - w - 6.0),
+                r.y - 32.0,
+                w,
+                24.0,
+            );
+            crate::ui::rrect(tr, 12.0, Color::new(0.0, 0.0, 0.0, 0.85));
+            ui.text(label, tr.x + 10.0, tr.y + 5.0, 13.0, CREAM, true);
+        });
     }
     clicked
 }

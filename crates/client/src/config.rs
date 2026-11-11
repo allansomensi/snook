@@ -77,10 +77,11 @@ impl AimGuide {
 }
 
 /// The default game server; change it in Settings or with `SNOOK_SERVER`
-/// when building.
+/// when building (an empty `SNOOK_SERVER`, as CI passes when the variable
+/// isn't set, keeps the public server).
 pub const DEFAULT_SERVER: &str = match option_env!("SNOOK_SERVER") {
-    Some(s) => s,
-    None => "wss://snook-server.onrender.com/ws",
+    Some(s) if !s.is_empty() => s,
+    _ => "wss://snook-server.onrender.com/ws",
 };
 
 /// What earlier builds saved as the default; read as "the default" so they

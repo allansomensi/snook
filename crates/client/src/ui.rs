@@ -107,6 +107,12 @@ pub fn begin_ui_camera() {
     set_camera(&cam);
 }
 
+/// Something drawn on top of the interface at the end of the frame.
+struct Overlay {
+    tooltip: bool,
+    draw: Box<dyn FnOnce(&Ui)>,
+}
+
 pub struct Ui {
     regular: Font,
     bold: Font,
@@ -136,6 +142,10 @@ pub struct Ui {
     repeat: Option<(KeyCode, f64)>,
     /// The field `cursor` belongs to (focus can also be set from outside).
     cursor_owner: Option<u64>,
+    /// Hover hints asked for this frame, with the opacity at the time. They
+    /// are drawn by [`Ui::draw_overlays`] after everything else, so panels,
+    /// chat and toasts drawn later in the frame never cover them.
+    overlays: std::cell::RefCell<Vec<(Overlay, f32)>>,
 }
 
 impl Ui {
@@ -163,11 +173,13 @@ impl Ui {
             all_selected: false,
             repeat: None,
             cursor_owner: None,
+            overlays: std::cell::RefCell::new(Vec::new()),
         }
     }
 
     /// Call once at the start of each frame.
     pub fn begin(&mut self) {
+        self.overlays.get_mut().clear();
         self.mouse = Vec2::from(mouse_position()) / ui_scale();
         self.pressed = is_mouse_button_pressed(MouseButton::Left);
         self.released = is_mouse_button_released(MouseButton::Left);
@@ -850,15 +862,51 @@ impl Ui {
         enabled && hover && self.released
     }
 
-    /// A small dark label under (or above, near the bottom) `anchor`.
+    /// A small dark label under (or above, near the bottom) `anchor`. It is
+    /// drawn at the end of the frame, on top of the whole interface; only the
+    /// last one asked for in a frame is shown.
     pub fn tooltip(&self, text: &str, anchor: Rect) {
-        let w = self.text_size(text, 13.0, true).x + 18.0;
-        let below = anchor.y + anchor.h + 30.0 < vh();
-        let y = if below { anchor.y + anchor.h + 6.0 } else { anchor.y - 30.0 };
-        let x = (anchor.x + anchor.w / 2.0 - w / 2.0).clamp(4.0, vw() - w - 4.0);
-        let r = Rect::new(x, y, w, 24.0);
-        rrect(r, 12.0, Color::new(0.0, 0.0, 0.0, 0.85));
-        self.text(text, r.x + 9.0, r.y + 5.0, 13.0, CREAM, true);
+        let text = text.to_string();
+        let mut list = self.overlays.borrow_mut();
+        list.retain(|(o, _)| !o.tooltip);
+        list.push((
+            Overlay {
+                tooltip: true,
+                draw: Box::new(move |ui: &Ui| {
+                    let w = ui.text_size(&text, 13.0, true).x + 18.0;
+                    let below = anchor.y + anchor.h + 30.0 < vh();
+                    let y =
+                        if below { anchor.y + anchor.h + 6.0 } else { (anchor.y - 30.0).max(2.0) };
+                    let x =
+                        (anchor.x + anchor.w / 2.0 - w / 2.0).clamp(4.0, (vw() - w - 4.0).max(4.0));
+                    let r = Rect::new(x, y, w, 24.0);
+                    rrect(r, 12.0, Color::new(0.0, 0.0, 0.0, 0.9));
+                    rrect_lines(r, 12.0, 1.0, Color::new(BORDER.r, BORDER.g, BORDER.b, 0.7));
+                    ui.text(&text, r.x + 9.0, r.y + 5.0, 13.0, CREAM, true);
+                }),
+            },
+            crate::paint::opacity(),
+        ));
+    }
+
+    /// Draws `f` at the end of the frame, over the whole interface (hover
+    /// cards and hints that must never end up under a panel).
+    pub fn overlay(&self, f: impl FnOnce(&Ui) + 'static) {
+        self.overlays
+            .borrow_mut()
+            .push((Overlay { tooltip: false, draw: Box::new(f) }, crate::paint::opacity()));
+    }
+
+    /// Draws this frame's hover hints over everything drawn so far. Call
+    /// once, after the rest of the interface (in interface units).
+    pub fn draw_overlays(&self) {
+        let list = std::mem::take(&mut *self.overlays.borrow_mut());
+        let before = crate::paint::opacity();
+        for (o, alpha) in list {
+            crate::paint::set_opacity(alpha);
+            (o.draw)(self);
+        }
+        crate::paint::set_opacity(before);
     }
 
     /// A flag (if any) and a player name in their tier colour. Returns the width used.

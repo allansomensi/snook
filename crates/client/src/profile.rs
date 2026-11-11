@@ -384,28 +384,33 @@ impl ProfileScreen {
             }
         }
         if let Some((a, at, c)) = tip {
+            let level = a.level;
             let title = t(a.title);
             let desc = t(a.description);
             let when = at
                 .map(|at| tw("Unlocked {date}", &[("date", &date(at))]))
                 .unwrap_or_else(|| t("Locked").to_string());
-            let w = ui
-                .text_size(title, 14.0, true)
-                .x
-                .max(ui.text_size(desc, 13.0, false).x)
-                .max(ui.text_size(&when, 12.0, false).x)
-                + 24.0;
-            let tr = Rect::new(
-                (c.x + c.w / 2.0 - w / 2.0).clamp(4.0, crate::ui::vw() - w - 4.0),
-                c.y + c.h + 6.0,
-                w,
-                64.0,
-            );
-            rrect(tr, 8.0, Color::new(0.0, 0.0, 0.0, 0.9));
-            rrect_lines(tr, 8.0, 1.0, medal_color(a.level));
-            ui.text(title, tr.x + 12.0, tr.y + 8.0, 14.0, medal_color(a.level), true);
-            ui.text(desc, tr.x + 12.0, tr.y + 28.0, 13.0, CREAM, false);
-            ui.text(&when, tr.x + 12.0, tr.y + 46.0, 12.0, MUTED, false);
+            // On top of the whole screen: the history next to it must not cover it.
+            ui.overlay(move |ui| {
+                let w = ui
+                    .text_size(title, 14.0, true)
+                    .x
+                    .max(ui.text_size(desc, 13.0, false).x)
+                    .max(ui.text_size(&when, 12.0, false).x)
+                    + 24.0;
+                let below = c.y + c.h + 70.0 < crate::ui::vh();
+                let tr = Rect::new(
+                    (c.x + c.w / 2.0 - w / 2.0).clamp(4.0, (crate::ui::vw() - w - 4.0).max(4.0)),
+                    if below { c.y + c.h + 6.0 } else { c.y - 70.0 },
+                    w,
+                    64.0,
+                );
+                rrect(tr, 8.0, Color::new(0.0, 0.0, 0.0, 0.92));
+                rrect_lines(tr, 8.0, 1.0, medal_color(level));
+                ui.text(title, tr.x + 12.0, tr.y + 8.0, 14.0, medal_color(level), true);
+                ui.text(desc, tr.x + 12.0, tr.y + 28.0, 13.0, CREAM, false);
+                ui.text(&when, tr.x + 12.0, tr.y + 46.0, 12.0, MUTED, false);
+            });
         }
     }
 

@@ -1,0 +1,145 @@
+<?xml version='1.0' encoding='windows-1252'?>
+<!--
+  The Windows installer (.msi) of Snook, built by dist with cargo-wix
+  (WiX Toolset 3). Based on cargo-wix's template, Copyright (C) 2017
+  Christopher R. Field, Apache License 2.0.
+
+  Edited by hand (dist-workspace.toml has allow-dirty = ["msi"], so
+  `dist generate` leaves it alone):
+  - the game installs in Program Files\Snook, with a Start menu shortcut and
+    an optional desktop shortcut, and no PATH entry (it isn't a command);
+  - the emblem is the icon of the shortcuts and of "Installed apps";
+  - the dialogs carry the emblem (assets\icon\wix-*.bmp, made by the
+    `export_icons` test in src\icon.rs).
+
+  Variables set by cargo-wix: Version, CargoTargetBinDir (the folder with
+  snook.exe), CargoProfile, TargetTriple...
+-->
+
+<?if $(sys.BUILDARCH) = x64 or $(sys.BUILDARCH) = arm64 ?>
+    <?define PlatformProgramFilesFolder = "ProgramFiles64Folder" ?>
+<?else ?>
+    <?define PlatformProgramFilesFolder = "ProgramFilesFolder" ?>
+<?endif ?>
+
+<?define Assets = "$(sys.SOURCEFILEDIR)..\assets\icon" ?>
+
+<Wix xmlns='http://schemas.microsoft.com/wix/2006/wi'>
+
+    <Product
+        Id='*'
+        Name='Snook'
+        UpgradeCode='38A3FD0E-86A2-4518-A4AF-067047C4D793'
+        Manufacturer='Allan Somensi'
+        Language='1033'
+        Codepage='1252'
+        Version='$(var.Version)'>
+
+        <Package Id='*'
+            Keywords='Installer'
+            Description='Snook: 3D eight-ball pool'
+            Manufacturer='Allan Somensi'
+            InstallerVersion='450'
+            Languages='1033'
+            Compressed='yes'
+            InstallScope='perMachine'
+            SummaryCodepage='1252'
+            />
+
+        <MajorUpgrade
+            Schedule='afterInstallInitialize'
+            DowngradeErrorMessage='A newer version of [ProductName] is already installed. Setup will now exit.'/>
+
+        <Media Id='1' Cabinet='media1.cab' EmbedCab='yes' DiskPrompt='CD-ROM #1'/>
+        <Property Id='DiskPrompt' Value='Snook Installation'/>
+
+        <Icon Id='SnookIcon' SourceFile='$(var.Assets)\snook.ico'/>
+        <Property Id='ARPPRODUCTICON' Value='SnookIcon'/>
+        <Property Id='ARPHELPLINK' Value='https://github.com/allansomensi/snook'/>
+        <Property Id='ARPURLINFOABOUT' Value='https://github.com/allansomensi/snook'/>
+
+        <Directory Id='TARGETDIR' Name='SourceDir'>
+            <Directory Id='$(var.PlatformProgramFilesFolder)' Name='PFiles'>
+                <Directory Id='APPLICATIONFOLDER' Name='Snook'>
+                    <!-- The shortcuts belong to components in Program Files
+                         (keyed by the game and by a per-machine registry
+                         value), which suits a per-machine install. -->
+                    <Component Id='binary0' Guid='*'>
+                        <File
+                            Id='exe0'
+                            Name='snook.exe'
+                            DiskId='1'
+                            Source='$(var.CargoTargetBinDir)\snook.exe'
+                            KeyPath='yes'>
+                            <Shortcut
+                                Id='StartMenuShortcut'
+                                Directory='ProgramMenuFolder'
+                                Name='Snook'
+                                Description='3D eight-ball pool'
+                                WorkingDirectory='APPLICATIONFOLDER'
+                                Icon='SnookIcon'
+                                Advertise='no'/>
+                        </File>
+                    </Component>
+                    <Component Id='DesktopShortcut' Guid='17B40C4E-3C66-4817-9191-4025070C845E'>
+                        <RegistryValue
+                            Root='HKLM'
+                            Key='Software\Snook'
+                            Name='DesktopShortcut'
+                            Type='integer'
+                            Value='1'
+                            KeyPath='yes'/>
+                        <Shortcut
+                            Id='DesktopShortcut'
+                            Directory='DesktopFolder'
+                            Name='Snook'
+                            Description='3D eight-ball pool'
+                            Target='[#exe0]'
+                            WorkingDirectory='APPLICATIONFOLDER'
+                            Icon='SnookIcon'/>
+                    </Component>
+                </Directory>
+            </Directory>
+            <Directory Id='ProgramMenuFolder'/>
+            <Directory Id='DesktopFolder' Name='Desktop'/>
+        </Directory>
+
+        <Feature
+            Id='Binaries'
+            Title='Snook'
+            Description='The game, with a shortcut in the Start menu.'
+            Level='1'
+            ConfigurableDirectory='APPLICATIONFOLDER'
+            AllowAdvertise='no'
+            Display='expand'
+            Absent='disallow'>
+
+            <ComponentRef Id='binary0'/>
+
+            <Feature
+                Id='Desktop'
+                Title='Desktop shortcut'
+                Description='A shortcut to Snook on the desktop.'
+                Level='1'
+                AllowAdvertise='no'
+                Absent='allow'>
+                <ComponentRef Id='DesktopShortcut'/>
+            </Feature>
+        </Feature>
+
+        <SetProperty Id='ARPINSTALLLOCATION' Value='[APPLICATIONFOLDER]' After='CostFinalize'/>
+
+        <UI>
+            <UIRef Id='WixUI_FeatureTree'/>
+            <!-- No license page: straight from the welcome to the choices. -->
+            <Publish Dialog='WelcomeDlg' Control='Next' Event='NewDialog' Value='CustomizeDlg' Order='99'>1</Publish>
+            <Publish Dialog='CustomizeDlg' Control='Back' Event='NewDialog' Value='WelcomeDlg' Order='99'>1</Publish>
+        </UI>
+
+        <!-- The emblem on the installer's pages (493x58 banner, 493x312 welcome). -->
+        <WixVariable Id='WixUIBannerBmp' Value='$(var.Assets)\wix-banner.bmp'/>
+        <WixVariable Id='WixUIDialogBmp' Value='$(var.Assets)\wix-dialog.bmp'/>
+
+    </Product>
+
+</Wix>

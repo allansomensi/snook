@@ -1,0 +1,29 @@
+[workspace]
+members = ["cargo:."]
+
+# Config for 'dist' (https://axodotdev.github.io/cargo-dist): it builds the
+# game for every platform below, packs it (.zip / .tar.xz), makes the
+# installers and publishes them on GitHub Releases when a tag like `v0.2.0`
+# is pushed. After changing anything here, run `dist generate`.
+[dist]
+# The preferred dist version to use in CI (Cargo.toml SemVer syntax)
+cargo-dist-version = "0.33.1"
+# CI backends to support
+ci = "github"
+# The installers to generate for each app: a Windows installer (.msi) and
+# one-line installers for the terminal (macOS/Linux shell, Windows PowerShell)
+installers = ["shell", "powershell", "msi"]
+# Target platforms to build apps for (Rust target-triple syntax)
+targets = ["aarch64-apple-darwin", "aarch64-unknown-linux-gnu", "x86_64-apple-darwin", "x86_64-unknown-linux-gnu", "x86_64-pc-windows-msvc"]
+# Where the shell and PowerShell installers put the game (the .msi installs
+# it under Program Files with Start menu and desktop shortcuts)
+install-path = ["$XDG_BIN_HOME/", "$XDG_DATA_HOME/../bin", "~/.local/bin"]
+# Where to host releases
+hosting = "github"
+# Whether to install an updater program
+install-updater = false
+# Linux libraries and the release's game server, before each build
+github-build-setup = "../build-setup.yml"
+# wix/main.wxs is edited by hand (icon, shortcuts, no PATH entry, branded
+# dialogs): don't let `dist generate` overwrite it
+allow-dirty = ["msi"]

@@ -973,10 +973,11 @@ impl Online {
         ) {
             action = OnlineAction::Leave;
         }
-        ui.text("SNOOK", header.x + 56.0, header.y + 12.0, 24.0, GOLD, true);
+        crate::icon::draw(header.x + 52.0, header.y + 8.0, 36.0);
+        ui.text("SNOOK", header.x + 96.0, header.y + 12.0, 24.0, GOLD, true);
         let title_w = ui.text_size("SNOOK", 24.0, true).x;
         let title = if self.lan { t("LAN game") } else { t("lounge") };
-        ui.text(title, header.x + 66.0 + title_w, header.y + 19.0, 15.0, MUTED, false);
+        ui.text(title, header.x + 106.0 + title_w, header.y + 19.0, 15.0, MUTED, false);
         let online_text = match self.rtt.filter(|_| config.show_ping) {
             Some(rtt) => tw(
                 "{n} online · ping {ms} ms",

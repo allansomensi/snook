@@ -212,14 +212,18 @@ async fn main() {
     let mut ui = Ui::new();
     // Show something while the textures are generated.
     clear_background(Color::new(0.05, 0.035, 0.025, 1.0));
-    ui.text_centered(
-        "Snook",
-        screen_width() / 2.0,
-        screen_height() / 2.0 - 20.0,
-        32.0,
-        ui::GOLD,
-        true,
-    );
+    {
+        let size = (screen_height() * 0.22).clamp(96.0, 220.0);
+        icon::draw((screen_width() - size) / 2.0, screen_height() / 2.0 - size * 0.75, size);
+        ui.text_centered(
+            "SNOOK",
+            screen_width() / 2.0,
+            screen_height() / 2.0 + size * 0.35,
+            32.0,
+            ui::GOLD,
+            true,
+        );
+    }
     next_frame().await;
 
     let mut config = Config::load();
@@ -756,6 +760,9 @@ async fn main() {
         if let Some(l) = &lan {
             l.net.draw_toasts(&ui, toast_bottom);
         }
+
+        // Hover hints go on top of everything (panels, chat, toasts).
+        ui.draw_overlays();
 
         let in_match = current.is_some();
         if in_match != was_in_match {

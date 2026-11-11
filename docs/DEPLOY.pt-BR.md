@@ -139,9 +139,13 @@ salão, chat, mesas, torneios e partidas como no online.
    git push origin v0.1.0
    ```
 
-3. O workflow **Release** compila o jogo para Windows, macOS e Linux com o
-   servidor embutido e anexa os arquivos à página de Releases, e publica a
-   imagem do servidor em `ghcr.io/<você>/snook-server`.
+3. O workflow **Release** (gerado pelo [dist](https://axodotdev.github.io/cargo-dist))
+   compila o jogo para Windows, macOS (Intel e Apple Silicon) e Linux (x64 e
+   ARM64) com o servidor embutido e publica na página de Releases o
+   instalador `.msi`, os pacotes `.zip`/`.tar.xz` e os instaladores de uma
+   linha (shell e PowerShell). O workflow **Server image** publica a imagem
+   do servidor em `ghcr.io/<você>/snook-server`. Detalhes em
+   [RELEASING.md](RELEASING.md).
 
 ## 7. (Opcional) Manter o servidor acordado
 

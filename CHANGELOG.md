@@ -1,5 +1,26 @@
 # Changelog
 
+## Unreleased
+
+### Distribution
+- Releases are built and published by dist: a Windows installer (`.msi`,
+  with Start menu and desktop shortcuts and an uninstaller), portable
+  `.zip`/`.tar.xz` packages for Windows, macOS (Apple Silicon and Intel) and
+  Linux (x64 and ARM64), and one-line installers for the terminal (shell and
+  PowerShell). The server image has its own workflow.
+- A logo: a pool table seen from above with an "S" ball. It is the window
+  icon, the executable's icon (with version details on Windows), the
+  installer's icon and pictures, and it appears on the menu, in the lounge
+  and while the game loads.
+
+### Fixes
+- Hover hints (tooltips, achievement cards, "Shoot!", the power hint) are
+  drawn after everything else, so panels, buttons, chat and toasts drawn
+  later no longer cover them ("Find an opponent…" used to hide under the
+  rated/casual switch, achievement cards under the match history).
+- A release built with an empty `SNOOK_SERVER` (the CI variable not set) no
+  longer ships without a game server: it keeps the public one.
+
 ## 0.1.0
 
 First public version.
