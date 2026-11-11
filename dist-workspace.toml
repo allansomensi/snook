@@ -27,3 +27,7 @@ github-build-setup = "../build-setup.yml"
 # wix/main.wxs is edited by hand (icon, shortcuts, no PATH entry, branded
 # dialogs): don't let `dist generate` overwrite it
 allow-dirty = ["msi"]
+
+# GitHub's macos-14 runners are gone: build the Apple Silicon version on macos-15.
+[dist.github-custom-runners]
+aarch64-apple-darwin = "macos-15"

@@ -61,9 +61,6 @@
         <Directory Id='TARGETDIR' Name='SourceDir'>
             <Directory Id='$(var.PlatformProgramFilesFolder)' Name='PFiles'>
                 <Directory Id='APPLICATIONFOLDER' Name='Snook'>
-                    <!-- The shortcuts belong to components in Program Files
-                         (keyed by the game and by a per-machine registry
-                         value), which suits a per-machine install. -->
                     <Component Id='binary0' Guid='*'>
                         <File
                             Id='exe0'
@@ -71,36 +68,48 @@
                             DiskId='1'
                             Source='$(var.CargoTargetBinDir)\snook.exe'
                             KeyPath='yes'/>
-                        <Shortcut
-                            Id='StartMenuShortcut'
-                            Directory='ProgramMenuFolder'
-                            Name='Snook'
-                            Description='3D eight-ball pool'
-                            Target='[#exe0]'
-                            WorkingDirectory='APPLICATIONFOLDER'
-                            Icon='SnookIcon'/>
-                    </Component>
-                    <Component Id='DesktopShortcut' Guid='17B40C4E-3C66-4817-9191-4025070C845E'>
-                        <RegistryValue
-                            Root='HKLM'
-                            Key='Software\Snook'
-                            Name='DesktopShortcut'
-                            Type='integer'
-                            Value='1'
-                            KeyPath='yes'/>
-                        <Shortcut
-                            Id='DesktopShortcut'
-                            Directory='DesktopFolder'
-                            Name='Snook'
-                            Description='3D eight-ball pool'
-                            Target='[#exe0]'
-                            WorkingDirectory='APPLICATIONFOLDER'
-                            Icon='SnookIcon'/>
                     </Component>
                 </Directory>
             </Directory>
-            <Directory Id='ProgramMenuFolder'/>
-            <Directory Id='DesktopFolder' Name='Desktop'/>
+            <!-- Each shortcut is a component of its own in the folder it goes
+                 to, keyed by a value under HKCU (what the installer's
+                 validation, ICE38/ICE43, asks of shortcuts in those folders). -->
+            <Directory Id='ProgramMenuFolder'>
+                <Component Id='StartMenuShortcut' Guid='67F2BA8F-B4E2-426A-940B-1EDA367ED15C'>
+                    <Shortcut
+                        Id='StartMenuShortcut'
+                        Name='Snook'
+                        Description='3D eight-ball pool'
+                        Target='[#exe0]'
+                        WorkingDirectory='APPLICATIONFOLDER'
+                        Icon='SnookIcon'/>
+                    <RegistryValue
+                        Root='HKCU'
+                        Key='Software\Snook\Installer'
+                        Name='StartMenuShortcut'
+                        Type='integer'
+                        Value='1'
+                        KeyPath='yes'/>
+                </Component>
+            </Directory>
+            <Directory Id='DesktopFolder' Name='Desktop'>
+                <Component Id='DesktopShortcut' Guid='7C1D16AB-8E35-49A9-AB71-4A2B2AB8EC2D'>
+                    <Shortcut
+                        Id='DesktopShortcut'
+                        Name='Snook'
+                        Description='3D eight-ball pool'
+                        Target='[#exe0]'
+                        WorkingDirectory='APPLICATIONFOLDER'
+                        Icon='SnookIcon'/>
+                    <RegistryValue
+                        Root='HKCU'
+                        Key='Software\Snook\Installer'
+                        Name='DesktopShortcut'
+                        Type='integer'
+                        Value='1'
+                        KeyPath='yes'/>
+                </Component>
+            </Directory>
         </Directory>
 
         <Feature
@@ -114,6 +123,7 @@
             Absent='disallow'>
 
             <ComponentRef Id='binary0'/>
+            <ComponentRef Id='StartMenuShortcut'/>
 
             <Feature
                 Id='Desktop'

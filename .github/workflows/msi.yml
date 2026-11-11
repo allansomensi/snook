@@ -1,0 +1,46 @@
+# Builds the Windows installer whenever it (or what goes into it) changes, so
+# a mistake shows up here, with WiX's full output, instead of in a release.
+# The .msi is kept as an artifact of the run for trying it out.
+name: Windows installer
+
+on:
+  push:
+    paths:
+      - "crates/client/wix/**"
+      - "crates/client/assets/icon/**"
+      - "crates/client/build.rs"
+      - "dist-workspace.toml"
+      - ".github/workflows/msi.yml"
+  pull_request:
+    paths:
+      - "crates/client/wix/**"
+      - "crates/client/assets/icon/**"
+      - "crates/client/build.rs"
+      - "dist-workspace.toml"
+      - ".github/workflows/msi.yml"
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  msi:
+    name: Build the .msi
+    # The runner dist uses for Windows releases (it has WiX Toolset 3).
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@v2
+        with:
+          # The cargo-wix that dist 0.33 builds installers with.
+          tool: cargo-wix@0.3.9
+      - name: Build the game
+        run: cargo build --release --locked -p snook
+      - name: Build the installer (with WiX's output)
+        run: cargo wix --package snook --no-build --nocapture --target-bin-dir target/release --output target/wix/snook-x86_64-pc-windows-msvc.msi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: snook-msi
+          path: target/wix/*.msi
