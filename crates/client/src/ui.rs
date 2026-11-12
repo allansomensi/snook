@@ -739,6 +739,12 @@ impl Ui {
 
     /// A tab header; returns true when clicked.
     pub fn tab(&mut self, r: Rect, label: &str, selected: bool) -> bool {
+        self.tab_with_count(r, label, "", selected)
+    }
+
+    /// A tab with a small count at its right end (e.g. "3/14"); the label
+    /// keeps clear of it, shrinking if it must.
+    pub fn tab_with_count(&mut self, r: Rect, label: &str, count: &str, selected: bool) -> bool {
         self.block(r);
         let hover = r.contains(self.mouse);
         let bg = if selected {
@@ -752,10 +758,21 @@ impl Ui {
         if selected {
             draw_rectangle(r.x + 8.0, r.y + r.h - 3.0, r.w - 16.0, 3.0, GOLD);
         }
-        let (label, size) = self.fitted(label, 15.0, r.w - 10.0, true);
+        // Room for the count on the right; the label is centred when that
+        // clears it, else moved left (and shrunk only if it must).
+        let reserve = if count.is_empty() {
+            0.0
+        } else {
+            let cw = self.text_size(count, 11.0, false).x;
+            self.text(count, r.x + r.w - cw - 10.0, r.y + (r.h - 11.0) / 2.0, 11.0, MUTED, false);
+            cw + 14.0
+        };
+        let (label, size) = self.fitted(label, 15.0, r.w - 16.0 - reserve, true);
+        let width = self.text_size(&label, size, true).x;
+        let centre = (r.x + r.w / 2.0).min(r.x + r.w - reserve - 6.0 - width / 2.0);
         self.text_centered(
             &label,
-            r.x + r.w / 2.0,
+            centre,
             r.y + (r.h - size) / 2.0,
             size,
             if selected { GOLD } else { CREAM },

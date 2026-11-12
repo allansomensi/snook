@@ -83,7 +83,8 @@ pub fn lang() -> Lang {
 type Table = HashMap<&'static str, &'static str>;
 
 /// Reads a translation file: `English<TAB>translation` per line, `#` for
-/// comments, `\n` and `\t` for a new line and a tab.
+/// comments, `\n` and `\t` for a new line and a tab. A comment has no tab,
+/// so texts may start with `#` ("#{n} in the world").
 fn parse_table(text: &'static str) -> Table {
     fn unescape(s: &'static str) -> &'static str {
         if !s.contains('\\') {
@@ -107,7 +108,7 @@ fn parse_table(text: &'static str) -> Table {
         Box::leak(out.into_boxed_str())
     }
     text.lines()
-        .filter(|l| !l.trim().is_empty() && !l.starts_with('#'))
+        .filter(|l| !l.trim().is_empty() && !(l.starts_with('#') && !l.contains('\t')))
         .filter_map(|l| l.split_once('\t'))
         .map(|(en, tr)| (unescape(en), unescape(tr)))
         .collect()
@@ -269,6 +270,8 @@ mod tests {
         assert_eq!(t("Play"), "Jogar");
         assert_eq!(t("not in the table"), "not in the table");
         assert_eq!(tw("{name} wins!", &[("name", &"Ana")]), "Ana vence!");
+        // A text that starts with `#` is not a comment.
+        assert_eq!(tw("#{n} in the world", &[("n", &3)]), "#3 no mundo");
         assert_eq!(ball(BallId(8)), "bola 8");
         assert_eq!(
             server_text("Can't shoot: the game is over."),

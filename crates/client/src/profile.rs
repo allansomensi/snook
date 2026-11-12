@@ -506,7 +506,7 @@ impl ProfileScreen {
                 r.x + 40.0,
                 r.y + 4.0,
                 14.0,
-                r.w - 150.0,
+                r.w - 170.0,
             );
             let how = crate::i18n::history_reason(h.reason, h.won);
             let sub = if h.tournament {
@@ -514,7 +514,7 @@ impl ProfileScreen {
             } else {
                 how.to_string()
             };
-            let sub = ui.ellipsize(&sub, r.w - 150.0, 12.0);
+            let sub = ui.ellipsize(&sub, r.w - 170.0, 12.0);
             ui.text(&sub, r.x + 40.0, r.y + 22.0, 12.0, MUTED, false);
             let delta = if h.rated {
                 format!("{}{}", if h.delta >= 0 { "+" } else { "" }, h.delta)
@@ -530,16 +530,17 @@ impl ProfileScreen {
             };
             let dw = ui.text_size(&delta, 15.0, true).x;
             ui.text(&delta, r.x + r.w - dw - 10.0, r.y + 4.0, 15.0, dc, true);
-            // Watch it again (own games that kept their strokes).
+            let d = date(h.at);
+            let ddw = ui.text_size(&d, 11.0, false).x;
+            ui.text(&d, r.x + r.w - ddw - 10.0, r.y + 23.0, 11.0, MUTED, false);
+            // Watch it again (own games that kept their strokes), left of
+            // both the rating change and the date.
             if p.relation == Relation::Me && h.replay && h.match_id > 0 {
-                let br = Rect::new(r.x + r.w - dw - 46.0, r.y + 6.0, 26.0, 26.0);
+                let br = Rect::new(r.x + r.w - dw.max(ddw) - 46.0, r.y + 6.0, 26.0, 26.0);
                 if ui.icon_button(br, Icon::Replay, t("Watch again"), true) {
                     online.send(ClientMsg::Replay { match_id: h.match_id });
                 }
             }
-            let d = date(h.at);
-            let ddw = ui.text_size(&d, 11.0, false).x;
-            ui.text(&d, r.x + r.w - ddw - 10.0, r.y + 23.0, 11.0, MUTED, false);
         }
     }
 

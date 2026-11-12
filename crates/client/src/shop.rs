@@ -376,14 +376,10 @@ impl ShopScreen {
                 .count();
             let total = ITEMS.iter().filter(|i| i.category == c).count();
             let tr = Rect::new(side.x, y, side.w, 34.0);
-            if ui.tab(tr, category_name(c), self.tab == tab) {
+            let count = if signed_in { format!("{owned}/{total}") } else { String::new() };
+            if ui.tab_with_count(tr, category_name(c), &count, self.tab == tab) {
                 self.tab = tab;
                 self.first = 0;
-            }
-            if signed_in {
-                let count = format!("{owned}/{total}");
-                let cw = ui.text_size(&count, 11.0, false).x;
-                ui.text(&count, tr.x + tr.w - cw - 10.0, tr.y + 11.0, 11.0, MUTED, false);
             }
             y += 38.0;
         }
@@ -884,13 +880,11 @@ impl ShopScreen {
         ];
         for p in &perks {
             crate::icons::draw(Icon::Star, vec2(area.x + 10.0, y + 9.0), 12.0, GOLD);
-            for (i, line) in ui.wrap(p, area.w - 40.0, 15.0).iter().enumerate() {
+            let lines = ui.wrap(p, area.w - 40.0, 15.0);
+            for (i, line) in lines.iter().enumerate() {
                 ui.text(line, area.x + 26.0, y + i as f32 * 19.0, 15.0, CREAM, false);
-                if i > 0 {
-                    y += 19.0;
-                }
             }
-            y += 24.0;
+            y += lines.len().saturating_sub(1) as f32 * 19.0 + 24.0;
         }
         y += 6.0;
         let b = Rect::new(area.x, y, 280.0f32.min(area.w), 42.0);

@@ -283,9 +283,23 @@ async fn exercise(store: Store) {
     assert!(store.user_by_id(b.id).await.unwrap().unwrap().is_banned(t));
     // Only a ban still running hides a player from the ranking (this one
     // ended long ago).
-    assert!(store.leaderboard(10).await.unwrap().iter().any(|e| e.username == "bob"));
+    assert!(
+        store
+            .leaderboard(10, snook_server::now())
+            .await
+            .unwrap()
+            .iter()
+            .any(|e| e.username == "bob")
+    );
     store.set_ban(a.id, Some(i64::MAX), Some("cheating")).await.unwrap();
-    assert!(!store.leaderboard(10).await.unwrap().iter().any(|e| e.username == "Alice"));
+    assert!(
+        !store
+            .leaderboard(10, snook_server::now())
+            .await
+            .unwrap()
+            .iter()
+            .any(|e| e.username == "Alice")
+    );
     assert_eq!(store.rank_of(b.id).await.unwrap(), Some(1));
     store.set_ban(a.id, None, None).await.unwrap();
     assert_eq!(store.rank_of(b.id).await.unwrap(), Some(2));
