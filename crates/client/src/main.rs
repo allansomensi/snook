@@ -530,6 +530,20 @@ async fn main() {
             }
         }
 
+        // Development aid: with SNOOKERED_SCENE_ONLY, --screenshot saves the 3D
+        // scene without the interface (pictures for the store pages).
+        if crate::dev::flag("SNOOKERED_SCENE_ONLY")
+            && let Some(path) = &options.screenshot
+            && frame + 1 == options.frames
+        {
+            let mut image = get_screen_data();
+            for px in image.bytes.as_chunks_mut::<4>().0 {
+                px[3] = 255;
+            }
+            image.export_png(path);
+            break;
+        }
+
         // From here on: the 2D interface, in interface units.
         ui::begin_ui_camera();
         if !win_effects.is_empty() {
