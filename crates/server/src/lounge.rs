@@ -171,6 +171,9 @@ struct Tournament {
     profiles: HashMap<String, (User, bool)>,
     bracket: Option<Bracket>,
     missing_since: HashMap<String, Instant>,
+    /// Players who withdrew while the tournament was running (they lose
+    /// their next match, if it isn't being played yet, as a walkover).
+    withdrawn: HashSet<String>,
     finished_at: Option<Instant>,
 }
 
@@ -1080,6 +1083,7 @@ impl Lounge {
                 TournamentState::Registering => t.players.iter().any(|p| p == k),
                 TournamentState::Running => {
                     t.players.iter().any(|p| p == k)
+                        && !t.withdrawn.contains(k)
                         && t.bracket.as_ref().is_some_and(|b| b.alive(k))
                 }
                 TournamentState::Finished => false,
@@ -1092,6 +1096,7 @@ impl Lounge {
         self.tournaments.values().any(|t| {
             t.state == TournamentState::Running
                 && t.players.iter().any(|p| p == k)
+                && !t.withdrawn.contains(k)
                 && t.bracket.as_ref().is_some_and(|b| b.alive(k))
         })
     }
@@ -1752,6 +1757,7 @@ impl Lounge {
             profiles,
             bracket: None,
             missing_since: HashMap::new(),
+            withdrawn: HashSet::new(),
             finished_at: None,
         };
         self.tournaments.insert(id, t);
@@ -1810,7 +1816,12 @@ impl Lounge {
                 self.broadcast_tournament(id);
             }
             TournamentState::Running => {
-                // Withdrawing: lose the current match.
+                // Withdrawing: lose the current match (or the next one, when
+                // the opponent isn't known yet).
+                if !t.bracket.as_ref().is_some_and(|b| b.alive(k)) {
+                    return;
+                }
+                t.withdrawn.insert(k.to_string());
                 let Some(b) = t.bracket.as_mut() else { return };
                 let mut room = None;
                 for (r, round) in b.rounds.clone().iter().enumerate() {
@@ -1903,6 +1914,18 @@ impl Lounge {
                 slot.players[0].clone().expect("playable"),
                 slot.players[1].clone().expect("playable"),
             ];
+            // A player who withdrew loses at once.
+            match [t.withdrawn.contains(&players[0]), t.withdrawn.contains(&players[1])] {
+                [true, false] => {
+                    walkovers.push((r, i, 1));
+                    continue;
+                }
+                [false, true] | [true, true] => {
+                    walkovers.push((r, i, 0));
+                    continue;
+                }
+                [false, false] => {}
+            }
             let online =
                 [self.sessions.contains_key(&players[0]), self.sessions.contains_key(&players[1])];
             if online[0] && online[1] {

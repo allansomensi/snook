@@ -333,10 +333,11 @@ impl PgStore {
     pub async fn leaderboard(&self, limit: u32) -> StoreResult<Vec<LeaderboardEntry>> {
         let rows = query(
             "SELECT username, rating, games, wins, country FROM users
-             WHERE games > 0 AND banned_until IS NULL
+             WHERE games > 0 AND (banned_until IS NULL OR banned_until <= $2)
              ORDER BY rating DESC, wins DESC, username ASC LIMIT $1",
         )
         .bind(limit as i64)
+        .bind(crate::now())
         .fetch_all(&self.pool)
         .await?;
         Ok(rows
@@ -355,10 +356,11 @@ impl PgStore {
 
     pub async fn rank_of(&self, user_id: i64) -> StoreResult<Option<u32>> {
         let row = query(
-            "SELECT (SELECT COUNT(*) FROM users o WHERE o.games > 0 AND o.banned_until IS NULL AND o.rating > u.rating) AS above
+            "SELECT (SELECT COUNT(*) FROM users o WHERE o.games > 0 AND (o.banned_until IS NULL OR o.banned_until <= $2) AND o.rating > u.rating) AS above
              FROM users u WHERE u.id = $1 AND u.games > 0",
         )
         .bind(user_id)
+        .bind(crate::now())
         .fetch_optional(&self.pool)
         .await?;
         Ok(row.map(|r| r.get::<i64, _>("above") as u32 + 1))
