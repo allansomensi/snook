@@ -59,98 +59,171 @@ pub fn ball_color_in(id: BallId, p: &Palette) -> [u8; 3] {
 const IVORY: [u8; 3] = [246, 242, 228];
 const INK: [u8; 3] = [20, 20, 20];
 
-const DIGITS: [[u8; 7]; 10] = [
-    [0b01110, 0b10001, 0b10011, 0b10101, 0b11001, 0b10001, 0b01110],
-    [0b00100, 0b01100, 0b00100, 0b00100, 0b00100, 0b00100, 0b01110],
-    [0b01110, 0b10001, 0b00001, 0b00010, 0b00100, 0b01000, 0b11111],
-    [0b11110, 0b00001, 0b00001, 0b01110, 0b00001, 0b00001, 0b11110],
-    [0b00010, 0b00110, 0b01010, 0b10010, 0b11111, 0b00010, 0b00010],
-    [0b11111, 0b10000, 0b11110, 0b00001, 0b00001, 0b10001, 0b01110],
-    [0b00110, 0b01000, 0b10000, 0b11110, 0b10001, 0b10001, 0b01110],
-    [0b11111, 0b00001, 0b00010, 0b00100, 0b01000, 0b01000, 0b01000],
-    [0b01110, 0b10001, 0b10001, 0b01110, 0b10001, 0b10001, 0b01110],
-    [0b01110, 0b10001, 0b10001, 0b01111, 0b00001, 0b00010, 0b01100],
-];
-
-/// True if the glyph cell at (`a`, `b`) (tangent-plane coordinates) is inked.
-fn number_ink(number: u8, a: f32, b: f32) -> bool {
-    let (digits, count) = if number >= 10 {
-        ([(number / 10) as usize, (number % 10) as usize], 2)
-    } else {
-        ([number as usize, 0], 1)
-    };
-    let cols = count * 5 + (count - 1);
-    let cell = 1.05 / 7.0;
-    let width = cols as f32 * cell;
-    let col = ((a + width / 2.0) / cell).floor();
-    let row = ((0.525 - b) / cell).floor();
-    if col < 0.0 || row < 0.0 || col >= cols as f32 || row >= 7.0 {
-        return false;
-    }
-    let (col, row) = (col as usize, row as usize);
-    let (digit, x) = (col / 6, col % 6);
-    x != 5 && DIGITS[digits[digit]][row] & (1 << (4 - x)) != 0
+/// A ball's number, rasterised from the game's bold font with real
+/// anti-aliasing (a 5x7 bitmap font looked blocky up close): coverage 0..1
+/// on a canvas centred on the number circle.
+struct Label {
+    w: usize,
+    h: usize,
+    cov: Vec<f32>,
+    /// Size of a canvas pixel in spot-radius units.
+    scale: f32,
 }
 
-/// Colour of a ball's surface in direction `p` (mesh-local, unit length).
-/// Numbers sit on local ±Z; stripes run around the band |x| < 0.5.
-fn ball_surface(id: BallId, p: Vec3, pal: &Palette) -> [u8; 3] {
+impl Label {
+    fn new(number: u8) -> Label {
+        const PX: f32 = 192.0;
+        let font = fontdue::Font::from_bytes(
+            &include_bytes!("../assets/DejaVuSans-Bold.ttf")[..],
+            fontdue::FontSettings::default(),
+        )
+        .expect("bundled font");
+        let text = number.to_string();
+        // Lay the digits out on a baseline, a little tighter than the font.
+        let mut glyphs = Vec::new();
+        let mut pen = 0.0f32;
+        for c in text.chars() {
+            let (m, bitmap) = font.rasterize(c, PX);
+            glyphs.push((pen.round() as i32 + m.xmin, m, bitmap));
+            pen += m.advance_width * 0.94;
+        }
+        let x0 = glyphs.iter().map(|(x, _, _)| *x).min().unwrap_or(0);
+        let x1 = glyphs.iter().map(|(x, m, _)| x + m.width as i32).max().unwrap_or(1);
+        let top = glyphs.iter().map(|(_, m, _)| m.ymin + m.height as i32).max().unwrap_or(1);
+        let bottom = glyphs.iter().map(|(_, m, _)| m.ymin).min().unwrap_or(0);
+        let (gw, gh) = ((x1 - x0) as usize, (top - bottom) as usize);
+        // 6 and 9 are underlined, as on real balls, so they can't be confused.
+        let underline = matches!(number, 6 | 9);
+        let (bar_gap, bar_h) = ((gh as f32 * 0.07) as usize, (gh as f32 * 0.10).max(2.0) as usize);
+        let extra = if underline { bar_gap + bar_h } else { 0 };
+        let pad = 4;
+        let (w, h) = (gw + pad * 2, gh + extra + pad * 2);
+        let mut cov = vec![0.0f32; w * h];
+        for (x, m, bitmap) in &glyphs {
+            let ox = (x - x0) as usize + pad;
+            let oy = (top - (m.ymin + m.height as i32)) as usize + pad;
+            for r in 0..m.height {
+                for c in 0..m.width {
+                    let v = bitmap[r * m.width + c] as f32 / 255.0;
+                    let cell = &mut cov[(oy + r) * w + ox + c];
+                    *cell = cell.max(v);
+                }
+            }
+        }
+        if underline {
+            let bw = (gw as f32 * 0.8) as usize;
+            let bx = pad + (gw - bw) / 2;
+            for r in 0..bar_h {
+                for c in 0..bw {
+                    cov[(pad + gh + bar_gap + r) * w + bx + c] = 1.0;
+                }
+            }
+        }
+        // The digits fill about 60% of the circle's height (narrower for two).
+        let height = (gh + extra) as f32;
+        let scale = (1.16 / height).min(1.52 / gw as f32);
+        Label { w, h, cov, scale }
+    }
+
+    /// Ink coverage at (`a`, `b`) (right and up, in spot-radius units), bilinear.
+    fn sample(&self, a: f32, b: f32) -> f32 {
+        let x = a / self.scale + self.w as f32 / 2.0 - 0.5;
+        let y = -b / self.scale + self.h as f32 / 2.0 - 0.5;
+        let (xf, yf) = (x.floor(), y.floor());
+        let (fx, fy) = (x - xf, y - yf);
+        let at = |cx: f32, cy: f32| -> f32 {
+            if cx < 0.0 || cy < 0.0 || cx >= self.w as f32 || cy >= self.h as f32 {
+                0.0
+            } else {
+                self.cov[cy as usize * self.w + cx as usize]
+            }
+        };
+        let top = at(xf, yf) + (at(xf + 1.0, yf) - at(xf, yf)) * fx;
+        let bottom = at(xf, yf + 1.0) + (at(xf + 1.0, yf + 1.0) - at(xf, yf + 1.0)) * fx;
+        top + (bottom - top) * fy
+    }
+}
+
+/// How much of a pixel `px` wide lies on the inside of an edge `d` away
+/// (positive inside): a smooth, alias-free boundary.
+fn coverage(d: f32, px: f32) -> f32 {
+    (d / px.max(1e-6) + 0.5).clamp(0.0, 1.0)
+}
+
+fn mix(a: [f32; 3], b: [u8; 3], t: f32) -> [f32; 3] {
+    [0, 1, 2].map(|i| a[i] + (b[i] as f32 - a[i]) * t)
+}
+
+/// Colour of a ball's surface in direction `p` (mesh-local, unit length),
+/// for a texel covering `px` radians. Numbers sit on local ±Z; stripes run
+/// around the band |x| < 0.5.
+fn ball_surface_f(id: BallId, p: Vec3, pal: &Palette, label: Option<&Label>, px: f32) -> [f32; 3] {
     let color = ball_color_in(id, pal);
     let ivory = pal.ivory;
+    let f = |c: [u8; 3]| c.map(|v| v as f32);
     if id == BallId::CUE {
+        // Six small red dots (they show the spin).
         let dots = [Vec3::X, -Vec3::X, Vec3::Y, -Vec3::Y, Vec3::Z, -Vec3::Z];
-        return if dots.iter().any(|d| p.dot(*d) > 0.996) { [190, 30, 30] } else { color };
+        let near = dots.iter().map(|d| p.dot(*d).clamp(-1.0, 1.0).acos()).fold(9.0, f32::min);
+        return mix(f(color), [190, 30, 30], coverage(0.0895 - near, px));
     }
+    // The body: the colour, or ivory outside a stripe's band.
+    let band = match id.kind() {
+        BallKind::Stripe => coverage(0.5 - p.x.abs(), px * (1.0 - p.x * p.x).sqrt().max(0.2)),
+        _ => 1.0,
+    };
+    let mut c = mix(f(ivory), color, band);
     // A large number circle with big, bold digits: readable from across the table.
     let spot_angle: f32 = 0.56;
     for (s, e1) in [(Vec3::Z, Vec3::X), (-Vec3::Z, -Vec3::X)] {
-        if p.dot(s) > spot_angle.cos() {
+        let angle = p.dot(s).clamp(-1.0, 1.0).acos();
+        if angle < spot_angle + px {
+            let inside = coverage(spot_angle - angle, px);
             let scale = spot_angle.sin();
             let a = p.dot(e1) / scale;
             let b = p.dot(Vec3::Y) / scale;
-            let k = if id.0 >= 10 { 1.02 } else { 0.86 };
-            let (a, b) = (a * k, b * k);
-            // Bold: a stroke also inks a little to its left and below.
-            let bold = 0.05;
-            let ink = number_ink(id.0, a, b)
-                || number_ink(id.0, a + bold, b)
-                || number_ink(id.0, a, b - bold)
-                || number_ink(id.0, a + bold, b - bold);
-            return if ink { INK } else { ivory };
+            let ink = label.map_or(0.0, |l| l.sample(a, b));
+            let face = mix(f(ivory), INK, ink);
+            c = [0, 1, 2].map(|i| c[i] + (face[i] - c[i]) * inside);
         }
     }
-    match id.kind() {
-        BallKind::Stripe if p.x.abs() > 0.5 => ivory,
-        _ => color,
-    }
+    c
+}
+
+/// [`ball_surface_f`] at the centre of a texel of a 1024-wide texture.
+#[cfg(test)]
+fn ball_surface(id: BallId, p: Vec3, pal: &Palette) -> [u8; 3] {
+    let label = (id.0 > 0).then(|| Label::new(id.0));
+    ball_surface_f(id, p, pal, label.as_ref(), std::f32::consts::TAU / 1024.0)
+        .map(|v| v.round().clamp(0.0, 255.0) as u8)
 }
 
 /// Equirectangular texture for a numbered ball, `width` pixels wide.
 pub fn ball(id: BallId, width: u16, palette: &Palette) -> Pixels {
     let w_px = width;
     let h_px = width / 2;
+    let label = (id.0 > 0).then(|| Label::new(id.0));
+    // Edges are anti-aliased analytically; two samples a side smooth the
+    // digits further and the poles, where texels are narrow.
     const SS: u32 = 2;
+    let px = std::f32::consts::TAU / w_px as f32;
     let mut rgba = Vec::with_capacity(w_px as usize * h_px as usize * 4);
     for y in 0..h_px as u32 {
         for x in 0..w_px as u32 {
-            let mut acc = [0u32; 3];
+            let mut acc = [0f32; 3];
             for sy in 0..SS {
                 for sx in 0..SS {
                     let u = (x as f32 + (sx as f32 + 0.5) / SS as f32) / w_px as f32;
                     let v = (y as f32 + (sy as f32 + 0.5) / SS as f32) / h_px as f32;
-                    let c = ball_surface(id, uv_to_dir(u, v), palette);
+                    let c = ball_surface_f(id, uv_to_dir(u, v), palette, label.as_ref(), px);
                     for k in 0..3 {
-                        acc[k] += c[k] as u32;
+                        acc[k] += c[k];
                     }
                 }
             }
-            let n = SS * SS;
-            rgba.extend_from_slice(&[
-                (acc[0] / n) as u8,
-                (acc[1] / n) as u8,
-                (acc[2] / n) as u8,
-                255,
-            ]);
+            let n = (SS * SS) as f32;
+            let px8 = acc.map(|v| (v / n).round().clamp(0.0, 255.0) as u8);
+            rgba.extend_from_slice(&[px8[0], px8[1], px8[2], 255]);
         }
     }
     Pixels { width: w_px, height: h_px, rgba }
@@ -301,9 +374,12 @@ mod tests {
 
     #[test]
     fn digits_render() {
-        assert!(number_ink(1, 0.0, 0.0));
-        assert!(!number_ink(1, -0.45, 0.0));
-        assert!(!number_ink(15, 0.0, 0.9));
+        let one = Label::new(1);
+        assert!(one.sample(0.0, 0.0) > 0.9, "the 1's stem is in the middle");
+        assert!(one.sample(-0.45, -0.1) < 0.1);
+        assert!(Label::new(15).sample(0.0, 0.9) < 0.01, "nothing above the digits");
+        // 6 and 9 are underlined.
+        assert!(Label::new(6).h > Label::new(8).h);
     }
 
     #[test]

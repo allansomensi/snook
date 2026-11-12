@@ -13,6 +13,17 @@
   installer's icon and pictures, and it appears on the menu, in the lounge
   and while the game loads.
 
+### Graphics
+- The balls' numbers are drawn with the game's bold font, anti-aliased (a
+  5x7 bitmap font looked blocky up close); 6 and 9 are underlined, as on
+  real balls; the edges of the number circle and the stripes are smooth.
+- The cue casts a soft shadow on the cloth and the balls from every lamp
+  (High and Ultra).
+- The leather around the pockets was lit from below (its faces pointed
+  down) and looked dark; the pocket walls were lit from the outside.
+- A development view (`SNOOK_DEBUG_NORMALS=1`, debug builds) paints red any
+  face lit from behind; tests check the shapes the table is made of.
+
 ### Fixes
 - Installing a newer beta over an older one with the .msi kept the old
   game: Windows Installer ignores the fourth part of a version (the beta

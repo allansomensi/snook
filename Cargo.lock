@@ -2075,6 +2075,7 @@ name = "snook"
 version = "0.1.1-beta.2"
 dependencies = [
  "embed-resource",
+ "fontdue",
  "futures-util",
  "glam 0.33.12",
  "macroquad",

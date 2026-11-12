@@ -446,7 +446,23 @@ impl Scene {
             let out3 = vec3(out.x as f32, 0.0, -out.y as f32);
             if !axis_aligned {
                 let end = clip_to_hole(&table, seg.a, seg.b);
-                jaw_wall(&mut jaws, &mut jaw_rails, &table, seg.a, end, -out);
+                // The facing looks across the throat, towards the pocket's
+                // axis (from the middle of its mouth to the hole): what side
+                // the mouth's centre is on is not reliable for side pockets.
+                let pocket = table
+                    .pockets
+                    .iter()
+                    .min_by(|x, y| {
+                        x.mouth_center.distance(mid).total_cmp(&y.mouth_center.distance(mid))
+                    })
+                    .expect("a jaw belongs to a pocket");
+                let axis =
+                    (pocket_center_of(&table, pocket.id) - pocket.mouth_center).normalize_or_zero();
+                let rel = mid - pocket.mouth_center;
+                let toward_axis = pocket.mouth_center + axis * rel.dot(axis) - mid;
+                let across =
+                    if dir.perp().dot(toward_axis) >= 0.0 { dir.perp() } else { -dir.perp() };
+                jaw_wall(&mut jaws, &mut jaw_rails, &table, seg.a, end, across);
                 continue;
             }
             // Rail cushions run on into the pocket corners (the throat and hole
@@ -690,7 +706,7 @@ impl Scene {
             for w in bands.windows(2) {
                 let (y0, c0) = w[0];
                 let (y1, _) = w[1];
-                inside.cylinder(center + Vec3::Y * y1, r, y0 - y1, 48, c0, false);
+                inside.tube_inside(center + Vec3::Y * y1, r, y0 - y1, 48, c0);
             }
             inside.disc(center - Vec3::Y * 0.11, r, 48, rgb(3, 3, 3));
             // Leather lip around the hole on the rail (cut away at the throat).
@@ -776,9 +792,18 @@ impl Scene {
                 *slot = vec4(p.x, p.y, p.z, r);
             }
         }
-        self.materials.set_shadows(self.soft_shadows, self.soft_shadows, &casters);
+        // The cue mesh runs along its local +Y from the tip (see `cue_mesh`).
+        let cue = overlay.cue.as_ref().map(|c| {
+            let butt = c.tip + c.rotation * (Vec3::Y * CUE_LENGTH);
+            (c.tip.extend(0.0061), butt.extend(0.0148))
+        });
+        self.materials.set_shadows(self.soft_shadows, self.soft_shadows, &casters, cue);
         self.materials.set_pockets(&self.holes, &self.throats);
-        for part in &self.parts {
+        let skip: Option<usize> = crate::dev::var("SNOOK_SKIP_PART").and_then(|v| v.parse().ok());
+        for (k, part) in self.parts.iter().enumerate() {
+            if skip == Some(k) {
+                continue;
+            }
             self.materials.use_lit(part.surface);
             part.mesh.draw();
         }
@@ -1058,6 +1083,9 @@ pub struct Overlay {
 }
 
 pub const RAIL_HEIGHT: f32 = RAIL_TOP;
+
+/// Length of the cue mesh, tip to butt (see `cue_mesh`).
+const CUE_LENGTH: f32 = 1.48;
 
 /// Radius of the hole drawn for a pocket: exactly where balls drop.
 fn pocket_radius_of(table: &Table, pocket: PocketId) -> f32 {

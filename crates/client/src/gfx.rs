@@ -61,6 +61,8 @@ uniform vec4 Balls[16];      // xyz = centre, w = radius (0 = empty slot)
 uniform vec4 Stage;          // x = focus: the room fades into darkness away from the table
 uniform vec4 Holes[6];       // pocket holes: x, z (world), radius
 uniform vec4 Throats[12];    // pocket throats: 4 corners (x, z) per pocket
+uniform vec4 CueA;           // the cue's tip: xyz, w = radius (0: no cue)
+uniform vec4 CueB;           // the cue's butt: xyz, w = radius
 
 // The pocket cut-outs. Extra.y selects what a surface loses:
 // 1 = the holes (cloth), 2 = holes and throats (rails, cushions),
@@ -126,6 +128,38 @@ float sphere_shadow(vec3 oc, float oc2, vec3 ld, float rad) {
     return mix(0.12, 1.0, smoothstep(rad - pen, rad + pen, d));
 }
 
+// How much of one lamp's light reaches `p` past the cue: a rod tapering
+// from CueA to CueB. The closest points of the ray towards the lamp and the
+// rod's axis give the distance; the penumbra widens with the distance to
+// the cue, like the balls' shadows.
+float cue_shadow(vec3 p, vec3 lamp) {
+    vec3 d1 = lamp - p;
+    vec3 d2 = CueB.xyz - CueA.xyz;
+    vec3 r = p - CueA.xyz;
+    float a = dot(d1, d1);
+    float e = dot(d2, d2);
+    float f = dot(d2, r);
+    float c = dot(d1, r);
+    float b = dot(d1, d2);
+    float denom = a * e - b * b;
+    float s = denom > 1e-9 ? clamp((b * f - c * e) / denom, 0.0, 1.0) : 0.0;
+    float t = (b * s + f) / e;
+    if (t < 0.0) {
+        t = 0.0;
+        s = clamp(-c / a, 0.0, 1.0);
+    } else if (t > 1.0) {
+        t = 1.0;
+        s = clamp((b - c) / a, 0.0, 1.0);
+    }
+    if (s <= 0.0) {
+        return 1.0;
+    }
+    float dist = length(p + d1 * s - (CueA.xyz + d2 * t));
+    float rad = mix(CueA.w, CueB.w, t);
+    float pen = 0.045 * s + 0.0015;
+    return mix(0.3, 1.0, smoothstep(rad - pen, rad + pen, dist));
+}
+
 // Ball shadows for the three lamps (xyz) and contact occlusion (w) at `p`.
 // One pass over the balls; balls more than ~22 cm away are skipped early,
 // and the list ends at the first empty slot.
@@ -162,6 +196,18 @@ vec4 ball_terms(vec3 p, vec3 n) {
         }
     }
     r.w = clamp(1.0 - occ * 1.3, 0.2, 1.0);
+    // The cue (not on itself: points on or next to its surface are skipped).
+    if (CueA.w > 0.0) {
+        vec3 ab = CueB.xyz - CueA.xyz;
+        float k = clamp(dot(p - CueA.xyz, ab) / dot(ab, ab), 0.0, 1.0);
+        if (length(p - CueA.xyz - ab * k) > mix(CueA.w, CueB.w, k) * 1.25) {
+            r.y *= cue_shadow(p, Lamp1);
+            if (three) {
+                r.x *= cue_shadow(p, Lamp0);
+                r.z *= cue_shadow(p, Lamp2);
+            }
+        }
+    }
     return r;
 #endif
 }
@@ -211,6 +257,14 @@ void main() {
     }
     vec3 n = normalize(v_normal);
     vec3 v = normalize(CameraPos - v_world);
+#ifdef DEBUG_NORMALS
+    // Development check: faces whose normal points away from the viewer
+    // (they are lit from behind and look dark) show up red.
+    if (dot(n, v) < -0.02) {
+        gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0);
+        return;
+    }
+#endif
     // Hemisphere ambient: a little brighter from above, a green bounce from the cloth below.
     float hemi = 0.5 + 0.5 * n.y;
     vec3 amb = Ambient.rgb * (0.55 + 0.6 * hemi) + vec3(-0.02, 0.05, 0.01) * max(-n.y, 0.0);
@@ -304,6 +358,8 @@ impl Materials {
             UniformDesc::new("Stage", UniformType::Float4),
             UniformDesc::new("Holes", UniformType::Float4).array(6),
             UniformDesc::new("Throats", UniformType::Float4).array(12),
+            UniformDesc::new("CueA", UniformType::Float4),
+            UniformDesc::new("CueB", UniformType::Float4),
         ];
         // Some old drivers reject the shadow loop; fall back to a shader
         // without it rather than failing to start.
@@ -315,7 +371,17 @@ impl Materials {
             let params =
                 || MaterialParams { pipeline_params, uniforms: uniforms.clone(), textures: vec![] };
             // SNOOK_SAFE_GRAPHICS=1 forces the basic shader (for troubleshooting).
-            let first = if crate::dev::flag("SNOOK_SAFE_GRAPHICS") { simple } else { FRAGMENT };
+            static DEBUG: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+            let debug: &'static str = DEBUG.get_or_init(|| {
+                FRAGMENT.replacen("#version 100\n", "#version 100\n#define DEBUG_NORMALS\n", 1)
+            });
+            let first = if crate::dev::flag("SNOOK_SAFE_GRAPHICS") {
+                simple
+            } else if crate::dev::flag("SNOOK_DEBUG_NORMALS") {
+                debug
+            } else {
+                FRAGMENT
+            };
             match load_material(ShaderSource::Glsl { vertex, fragment: first }, params()) {
                 Ok(m) => m,
                 Err(e) => {
@@ -377,8 +443,18 @@ impl Materials {
 
     /// Turns the analytic ball shadows / contact occlusion on or off and sets
     /// the balls that cast them.
-    pub fn set_shadows(&self, soft_shadows: bool, occlusion: bool, balls: &[Vec4; 16]) {
+    /// `cue`: the cue's tip and butt (centre and radius), when it is shown.
+    pub fn set_shadows(
+        &self,
+        soft_shadows: bool,
+        occlusion: bool,
+        balls: &[Vec4; 16],
+        cue: Option<(Vec4, Vec4)>,
+    ) {
+        let (cue_a, cue_b) = cue.filter(|_| soft_shadows).unwrap_or((Vec4::ZERO, Vec4::ZERO));
         for m in [&self.lit, &self.blended] {
+            m.set_uniform("CueA", cue_a);
+            m.set_uniform("CueB", cue_b);
             m.set_uniform(
                 "Shadows",
                 vec4(
@@ -572,6 +648,25 @@ impl MeshBuilder {
         }
     }
 
+    /// The inside of a vertical tube (a hole's wall): faces the axis.
+    pub fn tube_inside(
+        &mut self,
+        center: Vec3,
+        radius: f32,
+        height: f32,
+        segments: u32,
+        color: Color,
+    ) {
+        let ring = |y: f32, k: u32| {
+            let a = k as f32 / segments as f32 * std::f32::consts::TAU;
+            center + vec3(a.cos() * radius, y, a.sin() * radius)
+        };
+        for k in 0..segments {
+            let quad = [ring(0.0, k), ring(0.0, k + 1), ring(height, k + 1), ring(height, k)];
+            self.quad(quad, [Vec2::ZERO; 4], color);
+        }
+    }
+
     /// Flat disc facing up.
     pub fn disc(&mut self, center: Vec3, radius: f32, segments: u32, color: Color) {
         let c = self.push(center, vec2(0.5, 0.5), Vec3::Y, color);
@@ -595,12 +690,13 @@ impl MeshBuilder {
             let a1 = (k + 1) as f32 / segments as f32 * std::f32::consts::TAU;
             let d0 = vec3(a0.cos(), 0.0, a0.sin());
             let d1 = vec3(a1.cos(), 0.0, a1.sin());
+            // Counter-clockwise seen from above, so the face looks up.
             self.quad(
                 [
                     center + d0 * inner,
-                    center + d0 * outer,
-                    center + d1 * outer,
                     center + d1 * inner,
+                    center + d1 * outer,
+                    center + d0 * outer,
                 ],
                 [Vec2::ZERO; 4],
                 color,
@@ -852,5 +948,89 @@ mod split_tests {
             first.0[first.1[0] as usize].position,
             b.vertices[b.indices[0] as usize].position
         );
+    }
+}
+
+/// Every face must point the way it is seen from: a face whose normal points
+/// away from the viewer is lit from behind and looks dark (the bottom
+/// cushion, the leather around the pockets…). These check the primitives.
+#[cfg(test)]
+mod orientation_tests {
+    use super::*;
+
+    /// The normal of each triangle from its winding, with its centroid.
+    fn faces(b: &MeshBuilder) -> Vec<(Vec3, Vec3, Vec3)> {
+        b.indices
+            .as_chunks::<3>()
+            .0
+            .iter()
+            .map(|t| {
+                let [p0, p1, p2] = t.map(|i| b.vertices[i as usize].position);
+                let n = b.vertices[t[0] as usize].normal.truncate();
+                let geometric = (p1 - p0).cross(p2 - p0).normalize_or_zero();
+                ((p0 + p1 + p2) / 3.0, n, geometric)
+            })
+            .collect()
+    }
+
+    #[test]
+    fn ring_faces_up() {
+        let mut b = MeshBuilder::default();
+        b.ring(Vec3::ZERO, 0.05, 0.06, 24, WHITE);
+        for (_, n, _) in faces(&b) {
+            assert!(n.y > 0.99, "ring normal {n}");
+        }
+    }
+
+    #[test]
+    fn tube_inside_faces_the_axis_and_cylinder_faces_out() {
+        let mut b = MeshBuilder::default();
+        b.tube_inside(Vec3::ZERO, 0.06, 0.1, 24, WHITE);
+        for (c, n, _) in faces(&b) {
+            assert!(n.dot(vec3(c.x, 0.0, c.z)) < 0.0, "tube normal {n} at {c}");
+        }
+        let mut b = MeshBuilder::default();
+        b.cylinder(Vec3::ZERO, 0.06, 0.1, 24, WHITE, false);
+        for (c, n, _) in faces(&b) {
+            assert!(n.dot(vec3(c.x, 0.0, c.z)) > 0.0, "cylinder normal {n} at {c}");
+        }
+    }
+
+    #[test]
+    fn extruded_cushions_face_out_whichever_way_they_run() {
+        // A cushion profile: nose towards -out, top, back.
+        let profile = [
+            vec2(0.01, 0.0),
+            vec2(0.0, 0.03),
+            vec2(0.008, 0.04),
+            vec2(0.05, 0.04),
+            vec2(0.05, 0.0),
+        ];
+        let out = vec3(0.0, 0.0, 1.0);
+        for (a, b) in [
+            (vec3(-1.0, 0.0, 0.0), vec3(1.0, 0.0, 0.0)),
+            (vec3(1.0, 0.0, 0.0), vec3(-1.0, 0.0, 0.0)),
+        ] {
+            let mut m = MeshBuilder::default();
+            m.extrude(a, b, out, &profile, WHITE);
+            // The solid's middle: every face must point away from it.
+            let inside = vec3(0.0, 0.02, 0.03);
+            for (c, n, _) in faces(&m) {
+                assert!(n.dot(c - inside) > 0.0, "cushion face {n} at {c}");
+            }
+        }
+    }
+
+    #[test]
+    fn quads_get_the_normal_of_their_winding() {
+        let mut b = MeshBuilder::default();
+        b.quad(
+            [vec3(0.0, 0.0, 0.0), vec3(1.0, 0.0, 0.0), vec3(1.0, 0.0, -1.0), vec3(0.0, 0.0, -1.0)],
+            [Vec2::ZERO; 4],
+            WHITE,
+        );
+        for (_, n, g) in faces(&b) {
+            assert!(n.dot(g) > 0.99 && n.y > 0.99);
+        }
     }
 }
