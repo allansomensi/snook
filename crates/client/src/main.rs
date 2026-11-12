@@ -8,6 +8,7 @@
 
 mod audio;
 mod camera;
+mod channel;
 mod config;
 mod coords;
 mod countries;

@@ -17,6 +17,9 @@
 //! | `SNOOK_STRIPE_WEBHOOK_SECRET` | — | Stripe webhook signing secret |
 //! | `SNOOK_STRIPE_PRICES` | — | `code=price_id\|label;…` for coin packs and `vip_monthly` |
 //! | `SNOOK_PUBLIC_URL` | — | the server's public address (payment return pages) |
+//! | `SNOOK_GAME_NAME` | `Snook` | the game's name on the privacy policy (`/privacidade`, `/privacy`) |
+//! | `SNOOK_PRIVACY_CONTROLLER` | the developer | who is responsible for the data, on the policy |
+//! | `SNOOK_PRIVACY_CONTACT` | the repository's issues | e-mail or web address for privacy requests |
 //! | `SNOOK_DRAIN_SECS` | `240` | on SIGTERM: how long games in progress may go on before they are handed to the next server |
 //! | `SNOOK_CUP` | — | the weekly cup, e.g. `sat 20:00` (options: `60m`, `fee=100`, `utc-3`) |
 //! | `RUST_LOG` | `info` | log filter |
@@ -77,6 +80,19 @@ async fn main() {
         client_ip_header: env("SNOOK_CLIENT_IP_HEADER").map(|h| h.to_lowercase()),
         proxy_hops: env("SNOOK_PROXY_HOPS").and_then(|v| v.parse().ok()).unwrap_or(1),
         stripe: snook_server::payments::StripeConfig::from_env(),
+        privacy: {
+            let mut p = snook_server::pages::PrivacyInfo::default();
+            if let Some(v) = env("SNOOK_GAME_NAME") {
+                p.game = v;
+            }
+            if let Some(v) = env("SNOOK_PRIVACY_CONTROLLER") {
+                p.controller = v;
+            }
+            if let Some(v) = env("SNOOK_PRIVACY_CONTACT") {
+                p.contact = v;
+            }
+            p
+        },
     };
     match &config.stripe {
         Some(s) => tracing::info!("payments on ({} prices)", s.prices.len()),

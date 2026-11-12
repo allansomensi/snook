@@ -16,6 +16,12 @@ path-guid = "09226FE3-7CEA-4013-B441-D824AE8816C5"
 license = false
 eula = false
 
+[features]
+# The Microsoft Store build (see docs/MSSTORE.md): no real-money purchases
+# through the game's own payment pages (Store policy for games); coins come
+# from playing.
+store = []
+
 [build-dependencies]
 # The executable's icon and version details on Windows (see build.rs).
 embed-resource = "3"

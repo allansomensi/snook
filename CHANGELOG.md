@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased
+
+### Distribution
+- The Microsoft Store version: an MSIX package built by the *Microsoft Store*
+  workflow from release tags and sent to Partner Center as a draft
+  submission (`docs/MSSTORE.md`). It sells nothing through the game's own
+  payment pages (coins come from playing), has the C runtime built in, and
+  opens the local network ports in the firewall.
+
+### Server
+- The privacy policy, in Portuguese (`/privacidade`) and English
+  (`/privacy`); `SNOOK_GAME_NAME`, `SNOOK_PRIVACY_CONTROLLER` and
+  `SNOOK_PRIVACY_CONTACT` fill in its names.
+
 ## 0.1.1 (protocol 11)
 
 Everything in the 0.1.1 betas, and:

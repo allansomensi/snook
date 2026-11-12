@@ -326,6 +326,42 @@ mod tests {
         std::fs::write(dir.join("wix-dialog.bmp"), bmp(493, 312, &dialog)).unwrap();
     }
 
+    /// Writes the Microsoft Store package's pictures into
+    /// `crates/client/msix/Assets/` (at twice their nominal size, which the
+    /// Store recommends; Windows scales them down):
+    /// `cargo test --release -p snook export_msix_assets -- --ignored`.
+    #[test]
+    #[ignore]
+    fn export_msix_assets() {
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("msix/Assets");
+        std::fs::create_dir_all(&dir).unwrap();
+        // RGBA, transparent around the emblem: (file, width, height, emblem size).
+        for (name, w, h, e) in [
+            ("Square44x44Logo.png", 88, 88, 88),
+            ("Square150x150Logo.png", 300, 300, 216),
+            ("Wide310x150Logo.png", 620, 300, 216),
+            ("StoreLogo.png", 100, 100, 100),
+        ] {
+            let emblem = super::render(e);
+            let mut px = vec![0u8; w * h * 4];
+            let (ox, oy) = ((w - e) / 2, (h - e) / 2);
+            for y in 0..e {
+                let src = &emblem[y * e * 4..(y + 1) * e * 4];
+                let at = ((oy + y) * w + ox) * 4;
+                px[at..at + e * 4].copy_from_slice(src);
+            }
+            let mut bytes = Vec::new();
+            {
+                let mut enc = png::Encoder::new(&mut bytes, w as u32, h as u32);
+                enc.set_color(png::ColorType::Rgba);
+                enc.set_depth(png::BitDepth::Eight);
+                enc.set_compression(png::Compression::Best);
+                enc.write_header().unwrap().write_image_data(&px).unwrap();
+            }
+            std::fs::write(dir.join(name), bytes).unwrap();
+        }
+    }
+
     /// An RGB picture: `background(x, y)` with emblems `(size, x, y)` on top.
     fn picture(
         w: usize,

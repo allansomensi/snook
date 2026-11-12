@@ -790,6 +790,18 @@ impl ShopScreen {
 
     fn coins(&mut self, ui: &mut Ui, online: &mut Online, area: Rect) {
         let offers = online.offers.clone().unwrap_or_default();
+        if !crate::channel::real_money_purchases() {
+            for (i, line) in [
+                t("In this version of the game, coins are earned by playing:"),
+                t("rated games, and a bonus every day you play."),
+            ]
+            .iter()
+            .enumerate()
+            {
+                ui.text(line, area.x, area.y + 6.0 + i as f32 * 22.0, 15.0, CREAM, false);
+            }
+            return;
+        }
         if !offers.payments || offers.packs.is_empty() {
             ui.text(
                 t("Coins can't be bought on this server yet."),
@@ -898,10 +910,22 @@ impl ShopScreen {
                 GOLD,
                 true,
             );
-            let b = Rect::new(area.x, y + 24.0, 280.0f32.min(area.w), 38.0);
-            if ui.button(b, t("Manage subscription"), offers.payments) {
-                online.send(ClientMsg::ManageVip);
+            // The subscription is managed on the payment provider's pages.
+            if crate::channel::real_money_purchases() {
+                let b = Rect::new(area.x, y + 24.0, 280.0f32.min(area.w), 38.0);
+                if ui.button(b, t("Manage subscription"), offers.payments) {
+                    online.send(ClientMsg::ManageVip);
+                }
             }
+        } else if !crate::channel::real_money_purchases() {
+            ui.text(
+                t("VIP isn't sold in this version of the game."),
+                area.x,
+                y,
+                15.0,
+                MUTED,
+                false,
+            );
         } else if offers.payments && !offers.vip_price.is_empty() {
             if ui.primary_button(b, &tw("Become VIP · {p}", &[("p", &offers.vip_price)])) {
                 online.send(ClientMsg::SubscribeVip);

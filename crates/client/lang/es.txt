@@ -887,3 +887,6 @@ This replay is not available.	Esta repetición no está disponible.
 You can only give items to your friends.	Solo puedes regalar objetos a tus amigos.
 Your friend already has this item.	Tu amigo ya tiene este objeto.
 16 (VIP)	16 (VIP)
+VIP isn't sold in this version of the game.	El VIP no se vende en esta versión del juego.
+In this version of the game, coins are earned by playing:	En esta versión del juego, las monedas se ganan jugando:
+rated games, and a bonus every day you play.	partidas con rating y un bono cada día que juegas.

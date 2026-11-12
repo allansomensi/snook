@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The Microsoft Store package (MSIX) of the game. tools/msix/make-msix.ps1
+  fills in the {{...}} values (the identity comes from Partner Center:
+  Product management → Product identity) and packs it; see docs/MSSTORE.md.
+-->
+<Package
+  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:desktop2="http://schemas.microsoft.com/appx/manifest/desktop/windows10/2"
+  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+  IgnorableNamespaces="uap desktop2 rescap">
+
+  <Identity
+    Name="{{IDENTITY_NAME}}"
+    Publisher="{{PUBLISHER}}"
+    Version="{{VERSION}}"
+    ProcessorArchitecture="x64" />
+
+  <Properties>
+    <DisplayName>{{DISPLAY_NAME}}</DisplayName>
+    <PublisherDisplayName>{{PUBLISHER_DISPLAY_NAME}}</PublisherDisplayName>
+    <Logo>Assets\StoreLogo.png</Logo>
+  </Properties>
+
+  <!-- Windows 10 1809 and later (the oldest the firewall rules below need). -->
+  <Dependencies>
+    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.17763.0" MaxVersionTested="10.0.26100.0" />
+  </Dependencies>
+
+  <!-- The game's languages (it picks one from the system's). -->
+  <Resources>
+    <Resource Language="pt-BR" />
+    <Resource Language="en-US" />
+    <Resource Language="es-ES" />
+  </Resources>
+
+  <Applications>
+    <!-- A regular desktop program (full trust), as installed by the .msi. -->
+    <Application Id="Game" Executable="snook.exe" EntryPoint="Windows.FullTrustApplication">
+      <uap:VisualElements
+        DisplayName="{{DISPLAY_NAME}}"
+        Description="{{DESCRIPTION}}"
+        BackgroundColor="transparent"
+        Square150x150Logo="Assets\Square150x150Logo.png"
+        Square44x44Logo="Assets\Square44x44Logo.png">
+        <uap:DefaultTile Wide310x150Logo="Assets\Wide310x150Logo.png" />
+      </uap:VisualElements>
+      <Extensions>
+        <!-- Local network games: let the host's game and its discovery
+             beacon through the firewall on home and work networks, without
+             a prompt (ports from snook_proto: LAN_GAME_PORT, LAN_DISCOVERY_PORT). -->
+        <desktop2:Extension Category="windows.firewallRules">
+          <desktop2:FirewallRules Executable="snook.exe">
+            <desktop2:Rule Direction="in" IPProtocol="TCP" LocalPortMin="47879" LocalPortMax="47879" Profile="domainAndPrivate" />
+            <desktop2:Rule Direction="in" IPProtocol="UDP" LocalPortMin="47878" LocalPortMax="47878" Profile="domainAndPrivate" />
+          </desktop2:FirewallRules>
+        </desktop2:Extension>
+      </Extensions>
+    </Application>
+  </Applications>
+
+  <Capabilities>
+    <Capability Name="internetClient" />
+    <Capability Name="privateNetworkClientServer" />
+    <rescap:Capability Name="runFullTrust" />
+  </Capabilities>
+</Package>

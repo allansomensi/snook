@@ -746,6 +746,8 @@ impl Online {
             ServerMsg::ShopInfo { payments, packs, vip_price, vip_coins } => {
                 self.offers = Some(ShopOffers { payments, packs, vip_price, vip_coins });
             }
+            // The Store build asks for none, and opens none.
+            ServerMsg::PaymentPage { .. } if !crate::channel::real_money_purchases() => {}
             ServerMsg::PaymentPage { url } => {
                 if crate::util::open_url(&url) {
                     self.toast(t("The payment page opened in your browser."), false);

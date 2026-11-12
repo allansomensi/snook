@@ -29,6 +29,9 @@ curl --proto '=https' --tlsv1.2 -LsSf https://github.com/allansomensi/snook/rele
 powershell -ExecutionPolicy Bypass -c "irm https://github.com/allansomensi/snook/releases/latest/download/snook-installer.ps1 | iex"
 ```
 
+The Microsoft Store gets its own package (MSIX) from the same tag; see
+[MSSTORE.md](MSSTORE.md).
+
 ## Publishing a version
 
 1. Set the version in `Cargo.toml` (`[workspace.package] version`) and add a

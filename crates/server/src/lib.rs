@@ -16,6 +16,7 @@ pub mod admin;
 pub mod lan;
 pub mod limits;
 pub mod lounge;
+pub mod pages;
 pub mod payments;
 pub mod shop;
 pub mod store;
@@ -105,6 +106,8 @@ pub struct Config {
     pub proxy_hops: usize,
     /// Real-money payments (none when not configured).
     pub stripe: Option<payments::StripeConfig>,
+    /// Who the privacy policy names (`/privacidade`, `/privacy`).
+    pub privacy: pages::PrivacyInfo,
 }
 
 impl Default for Config {
@@ -118,6 +121,7 @@ impl Default for Config {
             client_ip_header: None,
             proxy_hops: 1,
             stripe: None,
+            privacy: pages::PrivacyInfo::default(),
         }
     }
 }
@@ -299,6 +303,8 @@ pub fn router(server: Arc<Server>) -> Router {
         .route("/stripe/webhook", axum::routing::post(shop::webhook))
         .route("/shop/thanks", get(shop::thanks))
         .route("/shop/cancelled", get(shop::cancelled))
+        .route("/privacidade", get(pages::privacy_pt))
+        .route("/privacy", get(pages::privacy_en))
         .merge(admin::router())
         .with_state(server)
 }
