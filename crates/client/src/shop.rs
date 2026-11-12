@@ -510,12 +510,14 @@ impl ShopScreen {
                             self.confirm = Some(Confirm { code: item.code, gift_to: None });
                             online.shop_error = None;
                         }
-                        crate::icons::draw(
-                            Icon::Coin,
-                            vec2(b.x + 16.0, b.y + b.h / 2.0),
-                            14.0,
-                            GOLD,
-                        );
+                        if ui.text_size(&label, 15.0, true).x + 48.0 < b.w {
+                            crate::icons::draw(
+                                Icon::Coin,
+                                vec2(b.x + 16.0, b.y + b.h / 2.0),
+                                14.0,
+                                GOLD,
+                            );
+                        }
                         if signed_in && !afford && ui.hovering(b) {
                             tip = Some((
                                 t("Not enough coins: get more in the Coins tab.").to_string(),

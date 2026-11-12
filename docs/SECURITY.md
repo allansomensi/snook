@@ -56,14 +56,21 @@ without consequence, take over accounts, or take the server down cheaply.
 
 ## Remaining risks
 
-- **Aim assistance in a modified game.** The server can't see what a client
+- **Aim assistance in a modified game.** (Mitigated: the server keeps each
+  player's potting by difficulty band; the staff panel lists outliers of
+  their tier for review, with replays. Nobody is banned automatically.)
+  Original note: The server can't see what a client
   draws, so a modified game could show the full guide in rated games.
   Mitigation: reports, history review in the panel; a future option is
   server-side statistics on shot accuracy.
-- **No e-mail.** Without e-mail there is no self-service password reset;
+- **E-mail (partly addressed).** Players can set a recovery e-mail (offered
+  from the payment checkout), change their password and delete their
+  account (anonymised). The server still sends no e-mail itself; staff
+  verify by the recovery e-mail and reset from the panel. Original note: Without e-mail there is no self-service password reset;
   staff can reset a password from the panel after verifying the player some
   other way.
-- **One instance.** The lounge is in memory: a restart ends games in progress
+- **One instance (deploys addressed).** Games are saved after every stroke
+  and handed to the next server on SIGTERM. Original note: The lounge is in memory: a restart ends games in progress
   (accounts and results are safe). Fine for this size; scaling out would need
   a shared message bus.
 - **macroquad soundness advisory (RUSTSEC-2025-0035).** The game's engine

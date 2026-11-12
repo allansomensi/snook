@@ -46,6 +46,9 @@ pub fn router() -> Router<Arc<Server>> {
         .route("/admin/api/reports", get(reports))
         .route("/admin/api/reports/{id}", post(resolve_report))
         .route("/admin/api/audit", get(audit))
+        .route("/admin/api/metrics", get(metrics))
+        .route("/admin/api/aim", get(aim_review))
+        .route("/admin/api/replay/{id}", get(replay))
         .route("/admin/api/announce", post(announce))
         .route("/admin/api/motd", post(motd))
         .layer(middleware::from_fn(security_headers))
@@ -152,7 +155,110 @@ fn user_json(u: &User, online: bool) -> Value {
         "ban_reason": u.ban_reason,
         "muted_until": u.muted_until,
         "online": online,
+        "recovery_email": u.recovery_email,
+        "deleted_at": u.deleted_at,
+        "abandons": u.abandons,
     })
+}
+
+/// Active players, games, new accounts, retention, the funnel, revenue
+/// and the queue: what to build next is a decision made on these.
+async fn metrics(State(server): State<Arc<Server>>, headers: HeaderMap) -> ApiResult {
+    staff(&server, &headers).await?;
+    let m = server.store.metrics(now()).await?;
+    let waits: Vec<u32> = server.with(|l| l.queue_waits.iter().copied().collect());
+    let avg_wait =
+        if waits.is_empty() { 0.0 } else { waits.iter().sum::<u32>() as f64 / waits.len() as f64 };
+    let mut sorted = waits.clone();
+    sorted.sort_unstable();
+    let median = sorted.get(sorted.len() / 2).copied().unwrap_or(0);
+    Ok(Json(json!({
+        "metrics": m,
+        "queue": { "pairs": waits.len() / 2, "avg_wait_secs": avg_wait, "median_wait_secs": median },
+        "draining": server.with(|l| l.is_draining()),
+    })))
+}
+
+/// The aim-assistance review queue: players whose potting on hard shots
+/// (thin cuts over long distances) is far above the players of their tier.
+/// Nobody is banned by this: it is a list to look at, with the replays.
+async fn aim_review(State(server): State<Arc<Server>>, headers: HeaderMap) -> ApiResult {
+    staff(&server, &headers).await?;
+    let hard: Vec<usize> =
+        (0..snook_proto::replay::BANDS).filter(|b| snook_proto::replay::is_hard_band(*b)).collect();
+    let rows = server.store.aim_rows(&hard, AIM_MIN_ATTEMPTS).await?;
+    Ok(Json(json!({
+        "min_attempts": AIM_MIN_ATTEMPTS,
+        "flagged": flag_outliers(&rows),
+        "players": rows.len(),
+    })))
+}
+
+/// Hard shots a player must have taken before being compared.
+const AIM_MIN_ATTEMPTS: u32 = 40;
+
+/// Players above the 99th percentile of their tier on hard shots (and with
+/// a rate no honest player keeps up), most suspicious first.
+pub fn flag_outliers(rows: &[crate::store::AimRow]) -> Vec<Value> {
+    use std::collections::BTreeMap;
+    let rate = |r: &crate::store::AimRow| r.made as f64 / r.attempts.max(1) as f64;
+    let mut by_tier: BTreeMap<Tier, Vec<f64>> = BTreeMap::new();
+    for r in rows {
+        by_tier.entry(Tier::of(r.rating)).or_default().push(rate(r));
+    }
+    for v in by_tier.values_mut() {
+        v.sort_by(f64::total_cmp);
+    }
+    let p99 = |v: &Vec<f64>| {
+        v[((v.len() as f64 * 0.99).ceil() as usize).saturating_sub(1).min(v.len() - 1)]
+    };
+    let mut out: Vec<(f64, Value)> = rows
+        .iter()
+        .filter_map(|r| {
+            let tier = Tier::of(r.rating);
+            let rates = &by_tier[&tier];
+            let mean = rates.iter().sum::<f64>() / rates.len() as f64;
+            let sd =
+                (rates.iter().map(|x| (x - mean).powi(2)).sum::<f64>() / rates.len() as f64).sqrt();
+            let x = rate(r);
+            // With few players in a tier the percentile is the player
+            // themself: compare with the tier's spread and a hard floor.
+            let threshold = if rates.len() >= 100 { p99(rates) } else { mean + 3.0 * sd.max(0.05) };
+            (x >= threshold.max(0.45) && x > mean).then(|| {
+                let z = (x - mean) / sd.max(0.02);
+                (
+                    z,
+                    json!({
+                        "username": r.username, "rating": r.rating, "tier": tier.name(),
+                        "attempts": r.attempts, "made": r.made, "rate": x,
+                        "tier_mean": mean, "tier_players": rates.len(), "z": z,
+                    }),
+                )
+            })
+        })
+        .collect();
+    out.sort_by(|a, b| b.0.total_cmp(&a.0));
+    out.into_iter().map(|(_, v)| v).collect()
+}
+
+/// A stored game (to download, or to watch in the game: staff can open any
+/// replay from the player's profile).
+async fn replay(
+    State(server): State<Arc<Server>>,
+    headers: HeaderMap,
+    Path(id): Path<i64>,
+) -> ApiResult {
+    staff(&server, &headers).await?;
+    let r = server
+        .store
+        .replay(id)
+        .await?
+        .ok_or_else(|| err(StatusCode::NOT_FOUND, "No replay for that match."))?;
+    Ok(Json(json!({
+        "id": r.id, "players": r.players, "ratings": r.ratings, "winner": r.winner,
+        "rated": r.rated, "at": r.at, "seed": r.replay.seed, "breaker": r.replay.breaker,
+        "strokes": r.replay.strokes,
+    })))
 }
 
 #[derive(Deserialize)]
@@ -277,6 +383,8 @@ async fn user_detail(
 ) -> ApiResult {
     staff(&server, &headers).await?;
     let u = find(&server, &name).await?;
+    let (career, recovery) =
+        tokio::join!(server.store.career(u.id), server.store.payment_email(u.id));
     let (history, reports, achievements, wallet, ledger, payments) = tokio::join!(
         server.store.history(u.id, 50),
         server.store.reports_about(u.id, 50),
@@ -292,6 +400,7 @@ async fn user_detail(
             json!({
                 "opponent": h.opponent, "won": h.won, "reason": h.reason, "rated": h.rated,
                 "delta": h.delta, "rating_after": h.rating_after, "at": h.at,
+                "match_id": h.match_id, "replay": h.replay,
             })
         })
         .collect();
@@ -303,6 +412,8 @@ async fn user_detail(
         "wallet": wallet?,
         "ledger": ledger?,
         "payments": payments?,
+        "career": career?,
+        "payment_email": recovery?,
     })))
 }
 
@@ -555,4 +666,42 @@ async fn motd(
     server.with(|l| l.set_motd(&body.text));
     log(&server, &s, "motd", "lounge", &clean_text(&body.text, 300)).await;
     Ok(Json(json!({ "ok": true })))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::flag_outliers;
+    use crate::store::AimRow;
+
+    #[test]
+    fn only_far_outliers_are_flagged() {
+        // A tier of honest players around 20–35% on hard shots, and one at 80%.
+        let mut rows: Vec<AimRow> = (0..60)
+            .map(|k| AimRow {
+                user_id: k,
+                username: format!("p{k}"),
+                rating: 1550,
+                attempts: 100,
+                made: 20 + (k as u32 % 16),
+            })
+            .collect();
+        rows.push(AimRow {
+            user_id: 99,
+            username: "aimbot".into(),
+            rating: 1560,
+            attempts: 120,
+            made: 96,
+        });
+        // A strong player in a higher tier is compared with that tier, not this one.
+        rows.push(AimRow {
+            user_id: 100,
+            username: "master".into(),
+            rating: 1750,
+            attempts: 80,
+            made: 30,
+        });
+        let flagged = flag_outliers(&rows);
+        assert_eq!(flagged.len(), 1, "{flagged:?}");
+        assert_eq!(flagged[0]["username"], "aimbot");
+    }
 }

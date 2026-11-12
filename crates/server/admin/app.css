@@ -55,3 +55,5 @@ pre { white-space: pre-wrap; background: #0c0806; border: 1px solid var(--line);
 @media (max-width: 640px) { header { gap: 8px; } main { padding: 10px; } }
 a { color: var(--blue); }
 .row select { max-width: 220px; }
+
+.bar { display: inline-block; height: 10px; min-width: 2px; max-width: 70%; background: #e8bf61; border-radius: 3px; vertical-align: middle; }

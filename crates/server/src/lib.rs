@@ -1323,7 +1323,15 @@ async fn report(
         }
         auth.registered(&key_);
     }
-    let context = server.with(|l| l.report_context(&me.username, &target.username));
+    let mut context = server.with(|l| l.report_context(&me.username, &target.username));
+    // The latest game between the two goes with the report: the staff can
+    // watch it again instead of taking anyone's word for it.
+    if let Ok(history) = server.store.history(me.id, 30).await
+        && let Some(game) =
+            history.iter().find(|h| h.opponent.eq_ignore_ascii_case(&target.username) && h.replay)
+    {
+        context = format!("{context}\nReplay: match #{} ({})", game.match_id, game.at);
+    }
     let r = NewReport {
         reporter: me.id,
         target: target.id,

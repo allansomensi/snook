@@ -1,5 +1,36 @@
 # Changelog
 
+## Unreleased (protocol 11)
+
+### Game
+- A detailed pool hall (panelling, damask paper, moldings, plank floor, rug,
+  tin ceiling, bar with bottles and stools, racks, chalkboard, dartboard,
+  posters, jukebox, neon) with baked lighting; turned table legs, rounded
+  rail edge, apron lip; finer cloth on Ultra.
+- No more freeze when cloth or balls change: textures are made on another
+  thread and uploaded a few per frame.
+- Shop: 98 items in 7 categories (new: frames, VIP name colours, winning
+  effects), a clear confirmation (price, coins before/after), a success
+  card, a rotating 3D preview on the table, gifts to friends.
+- VIP crown in the ranking and profiles; profile rating chart, career
+  numbers, abandon rate, replays, account dialog (recovery e-mail,
+  password, deletion).
+- Lounge: featured game ("on TV"), restart notice, invitation codes,
+  tournaments with entry fees and the Arena format; system notifications.
+- Translations moved to `lang/*.txt`; Spanish added.
+
+### Server
+- Accounts: change password, recovery e-mail (offered from checkout),
+  deletion by anonymising (LGPD); matches no longer cascade on delete.
+- Graceful drain on SIGTERM (`SNOOK_DRAIN_SECS`, `maxShutdownDelaySeconds`);
+  games are saved after every stroke and continue on the next server.
+- Replays (seed + strokes), per-match statistics, rating history.
+- Coins for rated games (daily cap), daily bonus, anti-farm for repeated
+  pairs; tournament fees and prizes (70/20, 10% house); weekly cup
+  (`SNOOK_CUP`); VIP 16-player brackets and waiting-list priority.
+- Staff panel: metrics (DAU, games, retention, funnel, revenue, queue
+  wait), aim-assistance review queue, replays attached to reports.
+
 ## 0.1.0
 
 First public version.

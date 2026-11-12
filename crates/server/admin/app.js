@@ -187,6 +187,42 @@ const views = {
       el("h2", {}, "Online (" + d.players.length + ")"), table(["Player", "Rating", "Status", "Country"], players));
   },
 
+  async metrics() {
+    const d = await api("/metrics");
+    const m = d.metrics;
+    const stat = (n, l) => el("div", { class: "card stat" }, el("div", { class: "n" }, n), el("div", { class: "l" }, l));
+    const pct = (x) => (Math.round(x * 10) / 10) + "%";
+    const f = m.funnel;
+    const funnel = (n) => f[0] ? Math.round(n * 100 / f[0]) + "%" : "—";
+    const maxActive = Math.max(1, ...m.days.map((x) => x[1]));
+    const bars = m.days.map(([day, active, games, accounts]) => el("tr", {},
+      el("td", {}, fmtDate(day * 86400).split(",")[0]),
+      el("td", {}, barOf(active / maxActive), " " + active),
+      el("td", {}, games), el("td", {}, accounts)));
+    const revenue = m.revenue.map(([cur, cents, n]) => el("tr", {},
+      el("td", {}, cur.toUpperCase()), el("td", {}, (cents / 100).toFixed(2)), el("td", {}, n)));
+    return el("div", {},
+      d.draining ? el("p", { class: "error" }, "The server is restarting (draining): no new games.") : null,
+      el("div", { class: "grid" },
+        stat(pct(m.retention_d1), "Back the next day"), stat(pct(m.retention_d7), "Back after 7 days"),
+        stat(Math.round(d.queue.avg_wait_secs) + " s", "Avg wait in the queue"), stat(d.queue.median_wait_secs + " s", "Median wait"),
+        stat(f[0], "Accounts (30 days)"), stat(funnel(f[1]), "Played 1 game"), stat(funnel(f[2]), "Played 5 games")),
+      el("p", { class: "muted" }, "The funnel starts at the account: installs are not counted (the game sends nothing before signing in)."),
+      el("h2", {}, "Last 30 days"), table(["Day", "Active players", "Games", "New accounts"], bars),
+      el("h2", {}, "Revenue (30 days)"), revenue.length ? table(["Currency", "Amount", "Payments"], revenue) : el("p", { class: "muted" }, "No payments."));
+  },
+
+  async aim() {
+    const d = await api("/aim");
+    const rows = d.flagged.map((r) => el("tr", { class: "click", onclick: () => showUser(r.username) },
+      el("td", {}, r.username), el("td", {}, r.rating + " · " + r.tier),
+      el("td", {}, r.made + " / " + r.attempts), el("td", {}, Math.round(r.rate * 100) + "%"),
+      el("td", {}, Math.round(r.tier_mean * 100) + "% (" + r.tier_players + ")"), el("td", {}, r.z.toFixed(1))));
+    return el("div", {},
+      el("p", { class: "muted" }, "Pots of hard shots (cuts of 45° or more, over 1.5 m) compared with the players of the same tier. Only players with " + d.min_attempts + " or more hard shots count (" + d.players + " now). Nobody is punished by this list: open the player, watch their games (replays open from their profile in the game), and decide."),
+      rows.length ? table(["Player", "Rating", "Hard pots", "Rate", "Tier average", "Deviations"], rows) : el("p", { class: "muted" }, "Nobody stands out."));
+  },
+
   async audit() {
     const d = await api("/audit");
     return table(["When", "Staff", "Action", "Target", "Details"], d.entries.map((a) => el("tr", {},
@@ -267,6 +303,26 @@ function shopDialog(name) {
     el("button", { onclick: closeModal }, "Cancel")));
 }
 
+/// A bar for a chart (sized from script: the panel allows no inline styles).
+function barOf(fraction) {
+  const b = el("div", { class: "bar" });
+  b.style.width = Math.round(Math.max(0, Math.min(1, fraction)) * 100) + "%";
+  return b;
+}
+
+/// A stored game as a file (the strokes; staff watch it in the game from the
+/// player's profile).
+async function downloadReplay(id) {
+  try {
+    const r = await api("/replay/" + id);
+    const blob = new Blob([JSON.stringify(r, null, 2)], { type: "application/json" });
+    const a = el("a", { href: URL.createObjectURL(blob), download: "snook-match-" + id + ".json" });
+    document.body.append(a);
+    a.click();
+    a.remove();
+  } catch (e) { toast(e.message); }
+}
+
 async function showUser(name) {
   view = "users";
   document.querySelectorAll("nav button").forEach((b) => b.classList.toggle("active", b.dataset.view === "users"));
@@ -280,7 +336,8 @@ async function showUser(name) {
   const history = d.history.map((h) => el("tr", {},
     el("td", {}, fmtDate(h.at)), el("td", {}, h.opponent), el("td", {}, h.won ? "won" : "lost"),
     el("td", {}, h.reason.replaceAll("_", " ")), el("td", {}, h.rated ? (h.delta > 0 ? "+" : "") + h.delta : "casual"),
-    el("td", {}, h.rating_after)));
+    el("td", {}, h.rating_after),
+    el("td", {}, h.replay ? el("a", { href: "#", onclick: (e) => { e.preventDefault(); downloadReplay(h.match_id); } }, "#" + h.match_id) : "")));
   const reports = d.reports.map((r) => el("div", { class: "card report" },
     el("div", { class: "head" }, el("b", {}, r.reason + " · by " + r.reporter), el("span", { class: "muted" }, fmtDate(r.created_at))),
     r.details ? el("p", {}, r.details) : null, r.context ? el("pre", {}, r.context) : null));
@@ -291,6 +348,9 @@ async function showUser(name) {
       el("p", {}, "Rating ", el("b", {}, u.rating), " (" + u.tier + ", peak " + u.peak_rating + ") · ",
         u.games + " rated games, " + u.wins + " wins · " + u.casual_games + " casual"),
       el("p", { class: "muted" }, "Country " + (u.country || "—") + " · joined " + fmtDate(u.created_at) + " · last seen " + ago(u.last_seen)),
+      el("p", { class: "muted" }, "Recovery e-mail: " + (u.recovery_email || "—") + " · e-mail of the last payment: " + (d.payment_email || "—") +
+        " · games left unfinished: " + u.abandons + (d.career && d.career.shots ? " · potting " + Math.round(d.career.potting_shots * 100 / d.career.shots) + "%, best run " + d.career.best_run : "")),
+      u.deleted_at ? el("p", { class: "error" }, "Account deleted " + fmtDate(u.deleted_at) + " (anonymised).") : null,
       banned ? el("p", { class: "error" }, "Banned " + until(u.banned_until) + (u.ban_reason ? ": " + u.ban_reason : "")) : null,
       muted ? el("p", { class: "error" }, "Muted until " + fmtDate(u.muted_until)) : null,
       el("div", { class: "actions" },
@@ -314,7 +374,7 @@ async function showUser(name) {
     el("h2", {}, "Reports about this player (" + d.reports.length + ")"),
     reports.length ? reports : el("p", { class: "muted" }, "None."),
     el("h2", {}, "Recent games"),
-    history.length ? table(["When", "Opponent", "Result", "How", "Rating", "After"], history) : el("p", { class: "muted" }, "None."),
+    history.length ? table(["When", "Opponent", "Result", "How", "Rating", "After", "Replay"], history) : el("p", { class: "muted" }, "None."),
     el("h2", {}, "Achievements (" + d.achievements.length + ")"),
     el("p", { class: "muted" }, d.achievements.map((a) => a[0]).join(", ") || "None.")));
 }
