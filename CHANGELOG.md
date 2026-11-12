@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.1.1 (protocol 11)
+
+Everything in the 0.1.1 betas, and:
+
+### Fixes
+- Tournaments: a player who withdrew from a knockout while waiting for their
+  next opponent stayed in it (held from other games, then pulled into the
+  match). They now lose that match by walkover and are free at once.
+- The ranking left out for good anyone whose temporary ban had ended.
+- Staff panel sign-in: spaces around the name got around the per-account
+  attempt limit; unknown names now take as long as wrong passwords.
+- A free VIP month was recorded with the month's coins, which a reversal
+  would have taken back without them ever being given.
+- The settings file (it holds the session token) is created private from
+  the start.
+- Translations: texts starting with `#` were read as comments ("#3 in the
+  world" stayed in English on the profile).
+- Shop: a VIP perk that wrapped onto a third line overlapped the next one;
+  long category names ran into their item count.
+- Profile: the replay button covered the date of each game.
+
 ## 0.1.1-beta.4 (protocol 11)
 
 ### Game

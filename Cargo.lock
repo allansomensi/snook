@@ -2072,7 +2072,7 @@ dependencies = [
 
 [[package]]
 name = "snook"
-version = "0.1.1-beta.4"
+version = "0.1.1"
 dependencies = [
  "embed-resource",
  "fontdue",
@@ -2093,7 +2093,7 @@ dependencies = [
 
 [[package]]
 name = "snook_core"
-version = "0.1.1-beta.4"
+version = "0.1.1"
 dependencies = [
  "glam 0.33.12",
  "libm",
@@ -2103,7 +2103,7 @@ dependencies = [
 
 [[package]]
 name = "snook_proto"
-version = "0.1.1-beta.4"
+version = "0.1.1"
 dependencies = [
  "glam 0.33.12",
  "serde",
@@ -2113,7 +2113,7 @@ dependencies = [
 
 [[package]]
 name = "snook_server"
-version = "0.1.1-beta.4"
+version = "0.1.1"
 dependencies = [
  "argon2",
  "axum",

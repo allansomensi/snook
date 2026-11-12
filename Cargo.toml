@@ -4,7 +4,7 @@ exclude = ["vendor"]
 members = ["crates/core", "crates/proto", "crates/server", "crates/client"]
 
 [workspace.package]
-version = "0.1.1-beta.4"
+version = "0.1.1"
 edition = "2024"
 rust-version = "1.95"
 license = "MIT"
