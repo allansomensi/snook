@@ -71,8 +71,10 @@ jobs:
   msix:
     name: Build the MSIX
     needs: changes
-    # Final versions only (v0.1.1, not v0.1.1-beta.1).
-    if: needs.changes.outputs.run == 'true' && !contains(github.ref_name, '-')
+    # Tags: final versions only (v0.1.1, not v0.1.1-beta.1).
+    if: >-
+      needs.changes.outputs.run == 'true' &&
+      !(startsWith(github.ref, 'refs/tags/') && contains(github.ref_name, '-'))
     runs-on: windows-2022
     steps:
       - uses: actions/checkout@v5
