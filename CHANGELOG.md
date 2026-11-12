@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.1.1-beta.2
+## 0.1.1-beta.3
 
 ### Distribution
 - Releases are built and published by dist: a Windows installer (`.msi`,
@@ -25,6 +25,10 @@
   face lit from behind; tests check the shapes the table is made of.
 
 ### Fixes
+- Buying coins or VIP on Windows opened Stripe's "This link is incomplete"
+  page: the game opened the address with Explorer, which drops everything
+  after `#`, and Stripe needs that part. It is now opened with
+  ShellExecute, which passes the whole address.
 - Text never runs past the edge of the panel it is in: it is made a little
   smaller and, if that is not enough, cut with "…" ("Computador (Difícil)
   vence!" used to overflow the game-over panel).
