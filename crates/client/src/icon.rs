@@ -280,7 +280,7 @@ mod tests {
             }
             bytes
         };
-        for size in [64, 128, 256, 512] {
+        for size in [64, 128, 256, 512, 1024] {
             std::fs::write(dir.join(format!("snookered-{size}.png")), png(size)).unwrap();
         }
         // A .ico with PNG entries (Windows Vista and later).
