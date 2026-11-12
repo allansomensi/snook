@@ -43,8 +43,8 @@ pub struct Scene {
     /// Drawn after the pockets: leather rims and diamond sights.
     rail_details: Vec<Part>,
     floor_shadow: Part,
-    /// Warm light from the wall lamps on the walls (blended; not on the dark stage).
-    room_glow: Option<Part>,
+    /// The pool hall around the table (none on the dark stage).
+    room: Vec<crate::room::RoomPart>,
     balls: Vec<gfx::Model>,
     cue: gfx::Model,
     ghost: gfx::Model,
@@ -55,6 +55,17 @@ pub struct Scene {
     /// Cue meshes by (cue, chalk) design.
     cues: HashMap<(String, String), gfx::Model>,
     pub lamp_visible: bool,
+    /// The cloth and balls on the table now, and those being made.
+    looks: Looks,
+    wanted: Looks,
+    /// Parts drawn with the cloth texture.
+    felt_parts: Vec<usize>,
+    ball_tex_size: u16,
+    felt_size: u16,
+    /// New textures being made on another thread.
+    making: Option<std::sync::mpsc::Receiver<Made>>,
+    /// Made textures waiting to go to the GPU, a few per frame.
+    uploading: Option<(Made, Vec<Texture2D>)>,
     lamp_count: u32,
     /// Dark stage around the table (see `Scene::new`).
     focus: f32,
@@ -81,249 +92,31 @@ impl Scene {
             Quality::Ultra => (1024, 64),
         };
         let white = gfx::white_texture();
-        let felt = upload(textures::felt(looks.cloth), true);
+        let felt_size = felt_size(quality);
+        let felt = upload(textures::felt_sized(looks.cloth, felt_size), true);
         // Dark mahogany rails and body.
         let rail_wood =
             upload(textures::fine_wood([0.17, 0.075, 0.045], [0.05, 0.022, 0.014], 11), true);
         let body_wood =
             upload(textures::fine_wood([0.13, 0.06, 0.035], [0.04, 0.018, 0.012], 17), true);
-        let floor = upload(textures::floor(), true);
         let shadow = upload(textures::shadow(), false);
 
         let mut parts = Vec::new();
-        let mut add = |b: MeshBuilder, tex: &Texture2D, surface: Surface| {
+        let mut add = |b: MeshBuilder, tex: &Texture2D, surface: Surface| -> usize {
             parts.push(Part { mesh: b.build(tex), surface });
+            parts.len() - 1
         };
 
-        // --- Room -----------------------------------------------------------
-        let mut b = MeshBuilder::default();
-        b.quad_world_uv(
-            [
-                vec3(-7.0, 0.0, 6.0),
-                vec3(7.0, 0.0, 6.0),
-                vec3(7.0, 0.0, -6.0),
-                vec3(-7.0, 0.0, -6.0),
-            ],
-            WHITE,
-            0.45,
+        // --- Room (not on the dark stage) ------------------------------------
+        let half_table = vec2(
+            table.spec.length as f32 / 2.0 + table.spec.rail_width as f32 + 0.05,
+            table.spec.width as f32 / 2.0 + table.spec.rail_width as f32 + 0.05,
         );
-        // On the dark stage there is no room at all: just the table.
-        if !focused {
-            add(b, &floor, Surface::lit(0.25, 20.0, 0.0, 0.12));
-        }
-
-        let mut walls = MeshBuilder::default();
-        let mut panels = MeshBuilder::default();
-        let wall_color = rgb(92, 34, 30);
-        for (center, size) in [
-            (vec3(0.0, 1.6, -4.0), vec3(14.0, 3.2, 0.1)),
-            (vec3(0.0, 1.6, 4.0), vec3(14.0, 3.2, 0.1)),
-            (vec3(-5.5, 1.6, 0.0), vec3(0.1, 3.2, 8.0)),
-            (vec3(5.5, 1.6, 0.0), vec3(0.1, 3.2, 8.0)),
-        ] {
-            walls.cuboid(center, size, 0.0, wall_color, 1.0);
-            let inset = center - center.normalize_or_zero() * 0.06 * vec3(1.0, 0.0, 1.0);
-            panels.cuboid(
-                vec3(inset.x, 0.5, inset.z),
-                vec3(size.x.max(0.12), 1.0, size.z.max(0.12)),
-                0.0,
-                WHITE,
-                0.8,
-            );
-        }
-        if !focused {
-            add(walls, &white, Surface::MATTE);
-            add(panels, &body_wood, Surface::WOOD);
-        }
-
-        // Back bar with shelves and bottles (skipped on Low).
-        let mut bar = MeshBuilder::default();
-        bar.cuboid(vec3(0.0, 0.53, -3.55), vec3(4.0, 1.06, 0.6), 0.0, WHITE, 0.8);
-        for shelf in 0..2 {
-            bar.cuboid(
-                vec3(0.0, 1.55 + shelf as f32 * 0.45, -3.86),
-                vec3(3.6, 0.03, 0.22),
-                0.0,
-                WHITE,
-                0.8,
-            );
-        }
-        if detailed_room && !focused {
-            add(bar, &body_wood, Surface::WOOD);
-        }
-        let mut bottles = MeshBuilder::default();
-        let colors = [
-            rgb(40, 110, 40),
-            rgb(140, 80, 25),
-            rgb(200, 190, 160),
-            rgb(110, 25, 25),
-            rgb(30, 60, 120),
-        ];
-        for shelf in 0..2 {
-            for k in 0..14 {
-                let h = 0.22 + (k % 3) as f32 * 0.04;
-                let y = 1.565 + shelf as f32 * 0.45;
-                let c = vec3(-1.6 + k as f32 * 0.245, y, -3.83);
-                bottles.cylinder(c, 0.034, h, 12, colors[(k + shelf * 2) % colors.len()], true);
-                bottles.cylinder(
-                    c + Vec3::Y * h,
-                    0.012,
-                    0.07,
-                    8,
-                    colors[(k + shelf * 2) % colors.len()],
-                    true,
-                );
-            }
-        }
-        if detailed_room && !focused {
-            add(bottles, &white, Surface::lit(1.2, 60.0, 0.3, 0.5));
-        }
-
-        // --- A cosy pool hall (only around the table, never on the dark stage)
-        // Cue racks with cues on both side walls, a bead scoreboard, framed
-        // pictures, warm wall lights, bar stools and a rug under the table.
-        let mut decor_wood = MeshBuilder::default();
-        let mut decor = MeshBuilder::default();
-        let mut decor_metal = MeshBuilder::default();
-        let mut glowing = MeshBuilder::default();
-        let mut glow_pools = MeshBuilder::default();
-        let wall_x = 5.45;
-        for side in [-1.0f32, 1.0] {
-            let x = side * (wall_x - 0.06);
-            // Rack: a foot rail with sockets and a bracket near the top.
-            decor_wood.cuboid(vec3(x, 0.10, 0.0), vec3(0.12, 0.06, 1.9), 0.0, WHITE, 0.8);
-            decor_wood.cuboid(vec3(x, 1.30, 0.0), vec3(0.10, 0.05, 1.9), 0.0, WHITE, 0.8);
-            decor_wood.cuboid(
-                vec3(side * (wall_x - 0.015), 0.75, 0.0),
-                vec3(0.03, 1.35, 2.0),
-                0.0,
-                WHITE,
-                0.8,
-            );
-            // Nine cues, leaning a little, each with its own butt.
-            let butts = [
-                rgb(35, 20, 12),
-                rgb(90, 30, 25),
-                rgb(20, 20, 24),
-                rgb(60, 35, 18),
-                rgb(25, 45, 70),
-            ];
-            for k in 0..9 {
-                let z = -0.84 + k as f32 * 0.21;
-                let at = vec3(x + side * 0.0, 0.13, z);
-                let butt = butts[(k + if side > 0.0 { 2 } else { 0 }) % butts.len()];
-                decor.frustum_at(at, 0.0, 0.0148, 0.12, 0.0145, 10, butt);
-                decor.frustum_at(at, 0.12, 0.0145, 0.37, 0.0135, 10, rgb(20, 20, 24));
-                decor.frustum_at(at, 0.37, 0.0135, 0.67, 0.0118, 10, butt);
-                decor.frustum_at(at, 0.67, 0.0118, 1.43, 0.0064, 10, rgb(222, 190, 135));
-                decor.frustum_at(at, 1.43, 0.0064, 1.45, 0.0063, 10, rgb(240, 238, 228));
-                decor.frustum_at(at, 1.45, 0.0063, 1.456, 0.0060, 10, rgb(40, 80, 150));
-            }
-            // A wall light on each side of the rack, and its warm pool of light.
-            for z in [-1.55f32, 1.55] {
-                let at = vec3(side * (wall_x - 0.04), 1.95, z);
-                decor_metal.cuboid(at, vec3(0.03, 0.16, 0.10), 0.0, rgb(150, 112, 52), 1.0);
-                glowing.frustum_at(
-                    at + vec3(-side * 0.09, -0.02, 0.0),
-                    0.0,
-                    0.075,
-                    0.12,
-                    0.035,
-                    16,
-                    rgb(255, 214, 150),
-                );
-                let c = vec3(side * (wall_x - 0.005), 1.95, z);
-                let (h, w) = (1.1, 0.9);
-                glow_pools.quad(
-                    [
-                        c + vec3(0.0, -h, -w),
-                        c + vec3(0.0, -h, w),
-                        c + vec3(0.0, h, w),
-                        c + vec3(0.0, h, -w),
-                    ],
-                    [vec2(0.0, 1.0), vec2(1.0, 1.0), vec2(1.0, 0.0), vec2(0.0, 0.0)],
-                    Color::new(1.0, 0.72, 0.42, 0.20),
-                );
-            }
-        }
-        // Bead scoreboard above the left rack: a frame, two wires, beads.
-        {
-            let x = -(wall_x - 0.05);
-            decor_wood.cuboid(vec3(x, 2.25, 0.0), vec3(0.05, 0.42, 1.7), 0.0, WHITE, 0.8);
-            for (k, y) in [2.16f32, 2.34].into_iter().enumerate() {
-                decor_metal.cuboid(
-                    vec3(x + 0.035, y, 0.0),
-                    vec3(0.008, 0.008, 1.5),
-                    0.0,
-                    rgb(170, 160, 140),
-                    1.0,
-                );
-                for b in 0..20 {
-                    // Some beads pushed to the left: a game in progress.
-                    let pushed = if k == 0 { 6 } else { 4 };
-                    let z = if b < pushed {
-                        -0.72 + b as f32 * 0.062
-                    } else {
-                        -0.20 + b as f32 * 0.046
-                    };
-                    let color = if (b / 5) % 2 == 0 { rgb(235, 225, 200) } else { rgb(40, 28, 20) };
-                    decor.cuboid(vec3(x + 0.04, y, z), vec3(0.04, 0.05, 0.035), 0.0, color, 1.0);
-                }
-            }
-        }
-        // Framed pictures above the right rack: old tournament posters.
-        for (k, z) in [-0.75f32, 0.0, 0.75].into_iter().enumerate() {
-            let x = wall_x - 0.04;
-            let c = vec3(x, 2.15, z);
-            decor_wood.cuboid(c, vec3(0.04, 0.62, 0.48), 0.0, WHITE, 0.6);
-            let (paper, ink) = [
-                (rgb(196, 178, 140), rgb(120, 40, 30)),
-                (rgb(170, 190, 170), rgb(30, 70, 50)),
-                (rgb(200, 170, 120), rgb(40, 40, 60)),
-            ][k];
-            decor.cuboid(c + vec3(-0.025, 0.0, 0.0), vec3(0.01, 0.52, 0.38), 0.0, paper, 1.0);
-            // A big ball and a band of title, in the poster's ink.
-            decor.cuboid(c + vec3(-0.032, 0.06, 0.0), vec3(0.005, 0.2, 0.2), 0.0, ink, 1.0);
-            decor.cuboid(c + vec3(-0.032, -0.17, 0.0), vec3(0.005, 0.05, 0.3), 0.0, ink, 1.0);
-        }
-        // Bar stools along the bar.
-        for k in 0..5 {
-            let c = vec3(-1.6 + k as f32 * 0.8, 0.0, -3.0);
-            for (dx, dz) in [(-0.12f32, -0.12f32), (0.12, -0.12), (-0.12, 0.12), (0.12, 0.12)] {
-                decor_metal.cylinder(c + vec3(dx, 0.0, dz), 0.012, 0.72, 8, rgb(60, 55, 50), false);
-            }
-            decor_metal.cuboid(
-                c + vec3(0.0, 0.3, 0.0),
-                vec3(0.3, 0.015, 0.3),
-                0.0,
-                rgb(60, 55, 50),
-                1.0,
-            );
-            decor.cylinder(c + vec3(0.0, 0.72, 0.0), 0.2, 0.07, 20, rgb(110, 30, 26), true);
-        }
-        // A rug under the table: a dark border and a deep green field.
-        let mut rug = MeshBuilder::default();
-        for (hx, hz, y, color) in
-            [(2.35f32, 1.75f32, 0.003f32, rgb(70, 22, 20)), (2.2, 1.6, 0.004, rgb(28, 52, 38))]
-        {
-            rug.quad(
-                [vec3(-hx, y, hz), vec3(hx, y, hz), vec3(hx, y, -hz), vec3(-hx, y, -hz)],
-                [Vec2::ZERO; 4],
-                color,
-            );
-        }
-        if !focused {
-            add(decor_wood, &body_wood, Surface::WOOD);
-            add(decor, &white, Surface::lit(0.6, 40.0, 0.05, 0.25));
-            add(decor_metal, &white, Surface::lit(1.3, 70.0, 0.1, 0.5));
-            add(glowing, &white, Surface::UNLIT);
-            add(rug, &white, Surface::MATTE);
-        }
-        let room_glow = (!focused).then(|| Part {
-            mesh: glow_pools.build(&upload(textures::glow(), false)),
-            surface: Surface::UNLIT,
-        });
-
+        let room = if focused {
+            Vec::new()
+        } else {
+            crate::room::build(quality, half_table, &white, &body_wood)
+        };
         // Billiard lamp: three green glass shades on a brass bar, glowing inside.
         let mut glass = MeshBuilder::default();
         let mut brass = MeshBuilder::default();
@@ -363,20 +156,7 @@ impl Scene {
                 1.0,
             );
         }
-        // Ceiling, so the lamp hangs from something.
-        let mut ceiling = MeshBuilder::default();
-        ceiling.quad(
-            [
-                vec3(-7.0, 3.2, -6.0),
-                vec3(7.0, 3.2, -6.0),
-                vec3(7.0, 3.2, 6.0),
-                vec3(-7.0, 3.2, 6.0),
-            ],
-            [Vec2::ZERO; 4],
-            rgb(52, 36, 28),
-        );
         let mut lamp_parts = vec![
-            Part { mesh: ceiling.build(&white), surface: Surface::MATTE },
             Part { mesh: glass.build(&white), surface: Surface::lit(0.9, 90.0, 0.35, 0.8) },
             Part { mesh: brass.build(&white), surface: Surface::lit(1.0, 50.0, 0.1, 0.6) },
         ];
@@ -406,7 +186,7 @@ impl Scene {
             WHITE,
             0.6,
         );
-        add(bed, &felt, Surface::MATTE.cut(1.0));
+        let mut felt_parts = vec![add(bed, &felt, Surface::MATTE.cut(1.0))];
 
         // Cushions: a sloped rubber profile extruded along every cushion segment.
         let profile = [
@@ -476,8 +256,8 @@ impl Scene {
                 rgb(205, 215, 205),
             );
         }
-        add(cushions, &felt, Surface::MATTE.cut(2.0));
-        add(jaws, &felt, Surface::MATTE);
+        felt_parts.push(add(cushions, &felt, Surface::MATTE.cut(2.0)));
+        felt_parts.push(add(jaws, &felt, Surface::MATTE));
         add(jaw_rails, &white, Surface::lit(0.6, 50.0, 0.1, 0.3));
 
         // Table body: one solid piece with rounded outer corners: the rail
@@ -524,22 +304,90 @@ impl Scene {
                 mb.indices.extend_from_slice(&[idx[0], idx[1], idx[2], idx[0], idx[2], idx[3]]);
             };
             let across = (bo - bi) * 1.2;
+            // The outer edge of the rail is rounded (a quarter circle of
+            // radius `round`), and the apron ends in a small lip.
+            let round = if quality == Quality::Low { 0.0 } else { 0.014 };
+            let out2 = |p: Vec2, d: f32| p + vec2(normal_out.x, normal_out.z) * d;
+            let (oi0, oi1) = (out2(o0, -round), out2(o1, -round));
             // Rail top.
             quad(
                 &mut body,
-                [v3(i0, top), v3(i1, top), v3(o1, top), v3(o0, top)],
+                [v3(i0, top), v3(i1, top), v3(oi1, top), v3(oi0, top)],
                 [vec2(u0, 0.0), vec2(u1, 0.0), vec2(u1, across), vec2(u0, across)],
                 Vec3::Y,
                 wood,
             );
+            if round > 0.0 {
+                let steps = if quality == Quality::Ultra { 5 } else { 3 };
+                for s in 0..steps {
+                    let a0 = s as f32 / steps as f32 * std::f32::consts::FRAC_PI_2;
+                    let a1 = (s + 1) as f32 / steps as f32 * std::f32::consts::FRAC_PI_2;
+                    // From the top (a = 0) down to the side (a = 90°).
+                    let at = |p: Vec2, a: f32| {
+                        let q = out2(p, -round + round * a.sin());
+                        vec3(q.x, top - round + round * a.cos(), q.y)
+                    };
+                    let n = |a: f32| (Vec3::Y * a.cos() + normal_out * a.sin()).normalize_or_zero();
+                    let v = |a: f32| across + a * round;
+                    let idx = [
+                        body.push(at(o0, a0), vec2(u0, v(a0)), n(a0), wood),
+                        body.push(at(o1, a0), vec2(u1, v(a0)), n(a0), wood),
+                        body.push(at(o1, a1), vec2(u1, v(a1)), n(a1), wood),
+                        body.push(at(o0, a1), vec2(u0, v(a1)), n(a1), wood),
+                    ];
+                    body.indices
+                        .extend_from_slice(&[idx[0], idx[1], idx[2], idx[0], idx[2], idx[3]]);
+                }
+            }
             // Outer side, rail and apron in one.
+            let lip = if quality == Quality::Low { 0.0 } else { 0.035 };
             quad(
                 &mut body,
-                [v3(o0, bottom), v3(o1, bottom), v3(o1, top), v3(o0, top)],
+                [
+                    v3(o0, bottom + lip),
+                    v3(o1, bottom + lip),
+                    v3(o1, top - round),
+                    v3(o0, top - round),
+                ],
                 [vec2(u0, 0.0), vec2(u1, 0.0), vec2(u1, apron * 1.2), vec2(u0, apron * 1.2)],
                 normal_out,
                 wood,
             );
+            if lip > 0.0 {
+                // A rounded lip standing a little proud at the bottom of the apron.
+                let (l0, l1) = (out2(o0, 0.012), out2(o1, 0.012));
+                quad(
+                    &mut body,
+                    [
+                        v3(o0, bottom + lip),
+                        v3(o1, bottom + lip),
+                        v3(l1, bottom + lip - 0.008),
+                        v3(l0, bottom + lip - 0.008),
+                    ],
+                    [vec2(u0, 0.0), vec2(u1, 0.0), vec2(u1, 0.02), vec2(u0, 0.02)],
+                    (Vec3::Y + normal_out).normalize_or_zero(),
+                    wood,
+                );
+                quad(
+                    &mut body,
+                    [
+                        v3(l0, bottom),
+                        v3(l1, bottom),
+                        v3(l1, bottom + lip - 0.008),
+                        v3(l0, bottom + lip - 0.008),
+                    ],
+                    [vec2(u0, 0.0), vec2(u1, 0.0), vec2(u1, 0.04), vec2(u0, 0.04)],
+                    normal_out,
+                    wood,
+                );
+                quad(
+                    &mut body,
+                    [v3(o0, bottom), v3(o1, bottom), v3(l1, bottom), v3(l0, bottom)],
+                    [Vec2::ZERO; 4],
+                    -Vec3::Y,
+                    wood,
+                );
+            }
             // Inner side of the rail (behind the cushions; open at the pockets).
             quad(
                 &mut body,
@@ -600,18 +448,52 @@ impl Scene {
         add(body, &rail_wood, Surface::WOOD.cut(2.0));
         add(cast, &white, Surface::lit(1.6, 90.0, 0.12, 0.7).cut(2.0));
 
-        // Legs.
+        // Legs: turned balusters with a square block under the apron, a
+        // ring and a foot (square posts on Low).
         let mut legs = MeshBuilder::default();
         let leg_h = bottom;
         for sx in [1.0f32, -1.0] {
             for sz in [1.0f32, -1.0] {
+                let at = vec3(sx * (l / 2.0 - 0.02), 0.0, sz * (w / 2.0 - 0.02));
+                if quality == Quality::Low {
+                    legs.cuboid(
+                        at + Vec3::Y * leg_h / 2.0,
+                        vec3(0.19, leg_h, 0.19),
+                        0.0,
+                        WHITE,
+                        1.2,
+                    );
+                    continue;
+                }
+                let block = 0.16;
                 legs.cuboid(
-                    vec3(sx * (l / 2.0 - 0.04), leg_h / 2.0, sz * (w / 2.0 - 0.04)),
-                    vec3(0.19, leg_h, 0.19),
+                    at + Vec3::Y * (leg_h - block / 2.0),
+                    vec3(0.2, block, 0.2),
                     0.0,
                     WHITE,
                     1.2,
                 );
+                let h = leg_h - block;
+                let profile = [
+                    (0.0, 0.0),
+                    (0.0, 0.105),
+                    (0.025, 0.11),
+                    (0.05, 0.1),
+                    (0.07, 0.075),
+                    (0.11, 0.07),
+                    (0.16, 0.085),
+                    (0.22, 0.1),
+                    (0.30, 0.105),
+                    (0.36, 0.095),
+                    (0.40, 0.07),
+                    (h * 0.75, 0.058),
+                    (h * 0.8, 0.068),
+                    (h * 0.84, 0.072),
+                    (h * 0.88, 0.06),
+                    (h - 0.015, 0.068),
+                    (h, 0.085),
+                ];
+                legs.lathe(at, &profile, if quality == Quality::Ultra { 36 } else { 20 }, WHITE);
             }
         }
         add(legs, &body_wood, Surface::WOOD);
@@ -720,11 +602,9 @@ impl Scene {
 
         // --- Balls and cue --------------------------------------------------
         let r = spec.ball_radius as f32;
-        let balls = BallId::all()
-            .map(|id| {
-                let tex = upload(textures::ball(id, ball_tex, &looks.balls), false);
-                gfx::sphere_mesh(r, &tex, ball_segments)
-            })
+        let balls = ball_pixels(ball_tex, &looks.balls)
+            .into_iter()
+            .map(|p| gfx::sphere_mesh(r, &upload(p, false), ball_segments))
             .collect();
         let cue = cue_mesh("cue_classic", "chalk_blue", &white);
         let ghost = gfx::sphere_mesh_tinted(r, &white, 32, Color::new(1.0, 1.0, 1.0, 0.28));
@@ -745,7 +625,7 @@ impl Scene {
             throats,
             rail_details,
             floor_shadow,
-            room_glow,
+            room,
             balls,
             cue,
             ghost,
@@ -755,10 +635,79 @@ impl Scene {
             sinking: HashMap::new(),
             cues: HashMap::new(),
             lamp_visible: !focused,
+            looks: looks.clone(),
+            wanted: looks.clone(),
+            felt_parts,
+            ball_tex_size: ball_tex,
+            felt_size,
+            making: None,
+            uploading: None,
             lamp_count: if quality == Quality::Low { 1 } else { 3 },
             focus: if focused { 1.0 } else { 0.0 },
             soft_shadows: matches!(quality, Quality::High | Quality::Ultra),
         }
+    }
+
+    /// Dresses the table with another cloth or ball set. The textures are
+    /// made on another thread and sent to the GPU a few at a time, so the
+    /// game never stops (buying an item used to freeze it for a second).
+    pub fn set_looks(&mut self, looks: &Looks) {
+        if *looks == self.wanted {
+            return;
+        }
+        self.wanted = looks.clone();
+        let (tx, rx) = std::sync::mpsc::channel();
+        let cloth = (looks.cloth != self.looks.cloth).then_some(looks.cloth);
+        let balls = (looks.balls != self.looks.balls).then_some(looks.balls);
+        let (felt_size, ball_size) = (self.felt_size, self.ball_tex_size);
+        let target = looks.clone();
+        std::thread::spawn(move || {
+            let felt = cloth.map(|c| textures::felt_sized(c, felt_size));
+            let balls = balls.map(|p| ball_pixels(ball_size, &p));
+            let _ = tx.send(Made { looks: target, felt, balls });
+        });
+        // A newer request replaces one still being made.
+        self.making = Some(rx);
+        self.uploading = None;
+    }
+
+    /// Takes finished textures and puts them on the table.
+    fn update_looks(&mut self) {
+        if let Some(rx) = &self.making {
+            match rx.try_recv() {
+                Ok(made) => {
+                    self.making = None;
+                    self.uploading = Some((made, Vec::new()));
+                }
+                Err(std::sync::mpsc::TryRecvError::Empty) => {}
+                Err(std::sync::mpsc::TryRecvError::Disconnected) => self.making = None,
+            }
+        }
+        let Some((made, done)) = self.uploading.as_mut() else { return };
+        // A few textures a frame (a big ball texture is a few megabytes).
+        let mut budget = 4;
+        if let Some(felt) = made.felt.take() {
+            let tex = upload(felt, true);
+            for &i in &self.felt_parts {
+                self.parts[i].mesh.set_texture(&tex);
+            }
+            budget -= 1;
+        }
+        if let Some(balls) = made.balls.as_mut() {
+            while budget > 0 && !balls.is_empty() {
+                done.push(upload(balls.remove(0), false));
+                budget -= 1;
+            }
+            if !balls.is_empty() {
+                return;
+            }
+            // The whole set at once: never two sets on the table.
+            for (mesh, tex) in self.balls.iter_mut().zip(done.iter()) {
+                mesh.set_texture(tex);
+            }
+        }
+        self.looks = made.looks.clone();
+        self.uploading = None;
     }
 
     pub fn ball_radius(&self) -> f32 {
@@ -767,6 +716,7 @@ impl Scene {
 
     /// Draws the whole 3D scene.
     pub fn draw(&mut self, cam: &SceneCamera, balls: &[Ball], dt: f32, overlay: &Overlay) {
+        self.update_looks();
         set_camera(cam);
         self.materials.set_frame(cam.eye, self.lamps, 1.55, self.lamp_count, self.focus);
         let mut casters = [Vec4::ZERO; 16];
@@ -783,11 +733,15 @@ impl Scene {
             self.materials.use_lit(part.surface);
             part.mesh.draw();
         }
+        for part in self.room.iter().filter(|p| !p.blended) {
+            self.materials.use_lit(part.surface);
+            part.mesh.draw();
+        }
         if self.focus < 0.5 {
             self.materials.use_blended(Surface::UNLIT);
             self.floor_shadow.mesh.draw();
-            if let Some(glow) = &self.room_glow {
-                glow.mesh.draw();
+            for part in self.room.iter().filter(|p| p.blended) {
+                part.mesh.draw();
             }
         }
         if !self.soft_shadows {
@@ -985,6 +939,35 @@ impl Scene {
     pub fn pocket_radius(&self, pocket: PocketId) -> f32 {
         pocket_radius_of(&self.table, pocket)
     }
+}
+
+/// Textures made away from the main thread (see [`Scene::set_looks`]).
+struct Made {
+    looks: Looks,
+    felt: Option<textures::Pixels>,
+    balls: Option<Vec<textures::Pixels>>,
+}
+
+fn felt_size(quality: Quality) -> u16 {
+    if quality == Quality::Ultra { 1024 } else { 512 }
+}
+
+/// The sixteen ball textures, made side by side on all cores.
+fn ball_pixels(size: u16, palette: &textures::Palette) -> Vec<textures::Pixels> {
+    let ids: Vec<BallId> = BallId::all().collect();
+    let threads = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(2).clamp(1, 8);
+    let chunk = ids.len().div_ceil(threads);
+    std::thread::scope(|s| {
+        let handles: Vec<_> = ids
+            .chunks(chunk)
+            .map(|part| {
+                s.spawn(move || {
+                    part.iter().map(|id| textures::ball(*id, size, palette)).collect::<Vec<_>>()
+                })
+            })
+            .collect();
+        handles.into_iter().flat_map(|h| h.join().expect("ball texture")).collect()
+    })
 }
 
 /// What the shop changes on the table itself.

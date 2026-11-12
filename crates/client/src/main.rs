@@ -28,6 +28,7 @@ mod play;
 mod profile;
 mod ranking;
 mod reactions;
+mod room;
 mod scene;
 mod settings;
 mod setup;
@@ -376,16 +377,22 @@ async fn main() {
         hud.aim_sensitivity = config.aim_sensitivity;
         hud.zoom = rig.zoom_level();
         controls.sensitivity = config.aim_sensitivity;
-        // New cloth or balls from the shop: rebuild the table.
+        // New cloth or balls from the shop: dress the table again (in the
+        // background). Online, the table is the host's (or the higher
+        // rated player's).
         if std::mem::take(&mut online.looks_changed) {
             config.save();
-            scene = Scene::new(
-                Table::default(),
-                config.quality,
-                config.focused_scene,
-                &scene::Looks::of(&config.cloth, &config.balls),
-            );
         }
+        let table_look = current
+            .as_ref()
+            .filter(|m| m.is_online() && !match_from_lan)
+            .map(|_| &online.table_look)
+            .filter(|l| !l[0].is_empty());
+        let looks = match table_look {
+            Some(l) => scene::Looks::of(&l[0], &l[1]),
+            None => scene::Looks::of(&config.cloth, &config.balls),
+        };
+        scene.set_looks(&looks);
         // Offline, the people at the table play with this player's cue.
         if let Some(m) = current.as_mut().filter(|m| !m.is_online()) {
             for seat in 0..2 {

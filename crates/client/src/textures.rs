@@ -203,19 +203,25 @@ fn image(size: u16, f: impl Fn(f32, f32) -> [u8; 3]) -> Pixels {
     Pixels { width: size, height: size, rgba }
 }
 
-/// Billiard cloth: a deep tournament green, almost uniform, with very gentle
-/// large-scale variation and a fine nap that shows up close.
-/// Cloth of the given base colour (sRGB): soft mottling and a fine nap.
-pub fn felt(base: [u8; 3]) -> Pixels {
+/// Cloth at a given size; the larger one (Ultra) has a finer, woven nap.
+pub fn felt_sized(base: [u8; 3], size: u16) -> Pixels {
     // The classic green [24, 96, 48] maps to the original tones.
     let b = base.map(|c| c as f32 / 255.0);
     let dark = [b[0] * 0.90, b[1] * 0.95, b[2] * 0.90];
     let light = [b[0] * 1.06, b[1] * 1.06, b[2] * 1.02];
-    image(512, move |u, v| {
+    let fine = size >= 1024;
+    image(size, move |u, v| {
         let n = fbm(u * 4.0, v * 4.0, 4, 3, 3);
         let nap = fbm(u * 96.0, v * 96.0, 96, 7, 2) - 0.5;
         let c = lerp3(dark, light, n);
-        let k = 1.0 + nap * 0.07;
+        let mut k = 1.0 + nap * 0.07;
+        if fine {
+            // The weave: a very faint cross-hatch that only shows up close.
+            let weave = ((u * 640.0 * std::f32::consts::TAU).sin()
+                * (v * 640.0 * std::f32::consts::TAU).sin())
+                * 0.012;
+            k += weave + (noise(u * 256.0, v * 256.0, 256, 19) - 0.5) * 0.03;
+        }
         c.map(|x| (x as f32 * k).round().clamp(0.0, 255.0) as u8)
     })
 }
@@ -250,16 +256,273 @@ pub fn fine_wood(light: [f32; 3], dark: [f32; 3], seed: u32) -> Pixels {
     Pixels { width: N, height: N, rgba }
 }
 
-/// Plank floor.
-pub fn floor() -> Pixels {
-    image(256, |u, v| {
-        let planks = 4.0;
+/// Plank floor: staggered boards of slightly different tones, fine grain,
+/// dark seams and end joints. Tileable; `size` 256 or 512.
+pub fn floor_sized(size: u16) -> Pixels {
+    image(size, |u, v| {
+        let planks = 6.0;
         let plank = (v * planks).floor();
         let within = v * planks - plank;
-        let tone = hash(plank as i32, 0, 7) * 0.3;
-        let grain = fbm(u * 2.0 + plank * 0.37, within * 3.0, 4, 11, 3) * 0.4;
-        let seam = if within < 0.025 { 0.45 } else { 0.0 };
-        lerp3([0.34, 0.21, 0.12], [0.13, 0.08, 0.05], tone + grain + seam)
+        // Each board starts somewhere else along its length.
+        let offset = hash(plank as i32, 3, 41);
+        let along = (u + offset).fract() * 2.0;
+        let board = along.floor();
+        let x = along - board;
+        let id = (plank as i32) * 7 + board as i32;
+        let tone = (hash(id, 0, 7) - 0.5) * 0.35;
+        let grain = fbm(u * 2.0 + plank * 0.37, within * 4.0 + hash(id, 1, 9), 4, 11, 4) - 0.5;
+        let streak = noise(u * 64.0, within * 3.0 + plank, 64, 23) - 0.5;
+        let mut t = 0.42 + tone + grain * 0.55 + streak * 0.18;
+        // Seams between boards and end joints.
+        let seam = !(0.018..=0.985).contains(&within) as u8 as f32;
+        let joint = !(0.004..=0.996).contains(&x) as u8 as f32;
+        t += (seam + joint).min(1.0) * 0.45;
+        lerp3([0.42, 0.26, 0.14], [0.11, 0.065, 0.035], t)
+    })
+}
+
+/// Damask wallpaper: deep green with a slightly lighter, satin pattern of
+/// medallions and fine gold stripes. Tileable.
+pub fn wallpaper() -> Pixels {
+    let base = [0.085, 0.16, 0.12];
+    let satin = [0.14, 0.24, 0.17];
+    let gold = [0.45, 0.36, 0.17];
+    image(512, move |u, v| {
+        // Two medallions per tile, offset like a brick pattern.
+        let cell = |u: f32, v: f32| -> f32 {
+            let (x, y) = (u * 2.0 - 1.0, v * 2.0 - 1.0);
+            let r = (x * x * 1.6 + y * y).sqrt();
+            let a = y.atan2(x);
+            let petals = 0.36 + 0.10 * (a * 4.0).cos() + 0.04 * (a * 8.0).cos();
+            let outline = 1.0 - ((r - petals).abs() / 0.025).clamp(0.0, 1.0);
+            let heart = 1.0 - (r / 0.12).clamp(0.0, 1.0);
+            let leaf = {
+                let ly = (y.abs() - 0.62).abs();
+                let lx = x.abs();
+                (1.0 - (lx * lx * 30.0 + ly * ly * 90.0).sqrt().clamp(0.0, 1.0)) * 0.8
+            };
+            outline.max(heart * 0.9).max(leaf)
+        };
+        let m1 = cell(u.fract(), (v * 2.0).fract());
+        let m2 = cell((u + 0.5).fract(), (v * 2.0 + 0.5).fract()) * 0.55;
+        let pattern = m1.max(m2);
+        let mut c = lerp3(base, satin, pattern * 0.85 + fbm(u * 8.0, v * 8.0, 8, 5, 2) * 0.15);
+        // Fine stripes at the edges of the tile.
+        let stripe = ((u - 0.02).abs() < 0.004) || ((u - 0.98).abs() < 0.004);
+        if stripe {
+            c = lerp3(gold, gold, 0.0);
+        }
+        c
+    })
+}
+
+/// Pressed tin ceiling: raised squares with a round boss, catching the light
+/// from one side. Tileable.
+pub fn tin_ceiling() -> Pixels {
+    image(256, |u, v| {
+        let height = |u: f32, v: f32| -> f32 {
+            let (x, y) = ((u.fract() - 0.5).abs(), (v.fract() - 0.5).abs());
+            let square = 1.0 - ((x.max(y) - 0.38) / 0.04).clamp(0.0, 1.0);
+            let r = (x * x + y * y).sqrt();
+            let boss = 1.0 - ((r - 0.16) / 0.05).clamp(0.0, 1.0);
+            let ring = 1.0 - ((r - 0.27).abs() / 0.015).clamp(0.0, 1.0);
+            square * 0.6 + boss * 0.5 + ring * 0.3
+        };
+        let e = 1.0 / 256.0;
+        let dx = height(u + e, v) - height(u - e, v);
+        let dy = height(u, v + e) - height(u, v - e);
+        let shade = (0.5 + (dx + dy) * 6.0).clamp(0.0, 1.0);
+        lerp3([0.20, 0.15, 0.11], [0.38, 0.30, 0.22], shade)
+    })
+}
+
+/// A rug for under the table (not tiled: the whole rug, 2:1): a dark red
+/// border with a gold line, a deep green field and a medallion.
+pub fn rug() -> Pixels {
+    const W: u16 = 1024;
+    const H: u16 = 512;
+    let mut rgba = Vec::with_capacity(W as usize * H as usize * 4);
+    for y in 0..H {
+        for x in 0..W {
+            let (u, v) = (x as f32 / W as f32, y as f32 / H as f32);
+            // Distance to the edge, in rug units (the rug is 2:1).
+            let edge = (u.min(1.0 - u) * 2.0).min(v.min(1.0 - v));
+            let field = [0.07, 0.17, 0.12];
+            let border = [0.32, 0.06, 0.05];
+            let gold = [0.52, 0.40, 0.18];
+            let wool = fbm(u * 64.0, v * 32.0, 32, 77, 2) - 0.5;
+            let mut c = if edge < 0.012 {
+                // Fringe-ish dark edge.
+                [0.18, 0.05, 0.04]
+            } else if edge < 0.09 {
+                // Border with a running diamond pattern.
+                let t = ((u + v) * 60.0).sin() * ((u - v) * 60.0).sin();
+                let k = (t > 0.3) as u8 as f32;
+                [0, 1, 2].map(|i| border[i] + (gold[i] - border[i]) * k * 0.45)
+            } else if (edge - 0.095).abs() < 0.006 || (edge - 0.13).abs() < 0.004 {
+                gold
+            } else {
+                // The field, with a medallion in the middle.
+                let (cx, cy) = ((u - 0.5) * 2.0, v - 0.5);
+                let r = (cx * cx + cy * cy).sqrt();
+                let a = cy.atan2(cx);
+                let star = 0.17 + 0.025 * (a * 8.0).cos() + 0.01 * (a * 16.0).cos();
+                if r < star {
+                    let inner = r / star;
+                    if (inner - 0.55).abs() < 0.05 || inner < 0.18 {
+                        gold
+                    } else if inner < 0.55 {
+                        field
+                    } else {
+                        border
+                    }
+                } else if (r - star - 0.02).abs() < 0.006 {
+                    gold
+                } else {
+                    let corner =
+                        ((u - 0.5).abs() * 2.0 - 0.72).max(0.0) + ((v - 0.5).abs() - 0.28).max(0.0);
+                    if corner > 0.0 && (corner * 40.0).fract() < 0.18 { gold } else { field }
+                }
+            };
+            for ch in c.iter_mut() {
+                *ch = (*ch * (1.0 + wool * 0.25)).clamp(0.0, 1.0);
+            }
+            let px = c.map(|x| (x * 255.0) as u8);
+            rgba.extend_from_slice(&[px[0], px[1], px[2], 255]);
+        }
+    }
+    Pixels { width: W, height: H, rgba }
+}
+
+/// A chalkboard with the scores of the night (tally marks and lines).
+pub fn chalkboard() -> Pixels {
+    image(256, |u, v| {
+        let board = [0.10, 0.13, 0.11];
+        let chalk = [0.78, 0.80, 0.76];
+        let dust = fbm(u * 6.0, v * 6.0, 6, 3, 3);
+        let mut c = [0, 1, 2].map(|i| board[i] + dust * 0.06);
+        // Wiped arcs and lines of chalk.
+        let line = |y: f32| (v - y).abs() < 0.006 && u > 0.1 && u < 0.9;
+        let tally = |row: f32, n: u32| -> bool {
+            (0..n).any(|k| {
+                let x = 0.42 + k as f32 * 0.045;
+                if k % 5 == 4 {
+                    let t = (u - (x - 0.18)) / 0.2;
+                    (0.0..=1.0).contains(&t) && (v - (row + 0.06 - t * 0.12)).abs() < 0.007
+                } else {
+                    (u - x).abs() < 0.006 && (v - row).abs() < 0.06
+                }
+            })
+        };
+        let name_block = |row: f32| {
+            u > 0.12
+                && u < 0.32
+                && (v - row).abs() < 0.03
+                && noise(u * 60.0, v * 60.0, 60, 9) > 0.45
+        };
+        if line(0.16) || line(0.5) || line(0.84) || (u - 0.37).abs() < 0.005 && v > 0.2 && v < 0.8 {
+            c = chalk;
+        }
+        for (row, n) in [(0.32, 9), (0.66, 6)] {
+            if tally(row, n) || name_block(row) {
+                c = chalk;
+            }
+        }
+        let px = [0, 1, 2].map(|i| c[i]);
+        lerp3(px, px, 0.0)
+    })
+}
+
+/// A dartboard seen face on (sectors, rings, bull), for a disc with polar UVs.
+pub fn dartboard() -> Pixels {
+    image(256, |u, v| {
+        let (x, y) = (u * 2.0 - 1.0, v * 2.0 - 1.0);
+        let r = (x * x + y * y).sqrt();
+        let a = y.atan2(x) + std::f32::consts::PI / 20.0;
+        let sector = ((a / std::f32::consts::TAU * 20.0).floor() as i32).rem_euclid(2);
+        let black = [0.06, 0.06, 0.06];
+        let cream = [0.86, 0.80, 0.66];
+        let red = [0.70, 0.08, 0.08];
+        let green = [0.05, 0.42, 0.18];
+        let ring = |c0: [f32; 3], c1: [f32; 3]| if sector == 0 { c0 } else { c1 };
+        let c = if r > 0.98 {
+            [0.15, 0.10, 0.07]
+        } else if r > 0.80 {
+            black
+        } else if r > 0.74 {
+            ring(red, green)
+        } else if r > 0.48 {
+            ring(black, cream)
+        } else if r > 0.43 {
+            ring(red, green)
+        } else if r > 0.08 {
+            ring(black, cream)
+        } else if r > 0.04 {
+            green
+        } else {
+            red
+        };
+        let wire = ((a / std::f32::consts::TAU * 20.0).fract() < 0.02 && r > 0.08 && r < 0.80) as u8
+            as f32;
+        lerp3(c, [0.75, 0.75, 0.72], wire * 0.7)
+    })
+}
+
+/// A vintage poster: aged paper, a big numbered ball and title bands.
+pub fn poster(k: u32) -> Pixels {
+    let papers = [[0.80, 0.72, 0.55], [0.70, 0.76, 0.68], [0.82, 0.70, 0.50]];
+    let inks = [[0.48, 0.13, 0.10], [0.10, 0.26, 0.20], [0.14, 0.15, 0.30]];
+    let balls = [[0.85, 0.65, 0.05], [0.60, 0.10, 0.10], [0.10, 0.20, 0.55]];
+    let (paper, ink, ball) = (papers[k as usize % 3], inks[k as usize % 3], balls[k as usize % 3]);
+    image(256, move |u, v| {
+        let age = fbm(u * 5.0, v * 5.0, 5, 13 + k, 3);
+        let mut c = [0, 1, 2].map(|i| paper[i] * (0.85 + age * 0.2));
+        let edge = u.min(1.0 - u).min(v.min(1.0 - v));
+        if edge < 0.05 {
+            c = [0, 1, 2].map(|i| c[i] * 0.8);
+        }
+        if (edge - 0.07).abs() < 0.006 {
+            c = ink;
+        }
+        // The ball, with its number circle.
+        let (bx, by) = (u - 0.5, (v - 0.42) * 1.0);
+        let r = (bx * bx + by * by).sqrt();
+        if r < 0.24 {
+            let light = 1.0 - ((bx + 0.08).powi(2) + (by + 0.1).powi(2)).sqrt() * 1.6;
+            c = [0, 1, 2].map(|i| ball[i] * (0.55 + light.max(0.0) * 0.6));
+            if r < 0.09 {
+                c = [0.95, 0.93, 0.86];
+                let ink_mark = number_ink(8, bx / 0.09 * 0.8, -by / 0.09 * 0.8);
+                if ink_mark {
+                    c = [0.08, 0.08, 0.08];
+                }
+            }
+        }
+        // Title and subtitle bands.
+        if (v - 0.78).abs() < 0.035
+            && u > 0.15
+            && u < 0.85
+            && noise(u * 40.0, 1.0, 40, 3 + k) > 0.35
+        {
+            c = ink;
+        }
+        if (v - 0.87).abs() < 0.015 && u > 0.25 && u < 0.75 && noise(u * 70.0, 2.0, 70, 7 + k) > 0.4
+        {
+            c = ink;
+        }
+        lerp3(c, c, 0.0)
+    })
+}
+
+/// A bottle label: paper with a coloured band and a dark title.
+pub fn label() -> Pixels {
+    image(64, |u, v| {
+        let band = (v - 0.5).abs() < 0.12;
+        let paper = [0.86, 0.80, 0.64];
+        let c = if band { [0.55, 0.12, 0.10] } else { paper };
+        let text =
+            (v - 0.25).abs() < 0.04 && u > 0.2 && u < 0.8 && noise(u * 20.0, 0.0, 20, 4) > 0.4;
+        if text { lerp3([0.1, 0.08, 0.06], [0.1, 0.08, 0.06], 0.0) } else { lerp3(c, c, 0.0) }
     })
 }
 
@@ -331,7 +594,7 @@ mod tests {
 
     #[test]
     fn textures_have_expected_size_and_tile() {
-        let f = felt([24, 96, 48]);
+        let f = felt_sized([24, 96, 48], 512);
         assert_eq!(f.rgba.len(), 512 * 512 * 4);
         // Tileable noise: first and last columns are close.
         let px = |x: usize, y: usize| f.rgba[(y * 512 + x) * 4 + 1] as i32;

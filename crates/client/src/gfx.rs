@@ -539,6 +539,99 @@ impl MeshBuilder {
         }
     }
 
+    /// A turned shape (a lathe): `profile` is (height, radius) pairs from the
+    /// bottom up; normals follow the curve, so it shades smoothly.
+    pub fn lathe(&mut self, at: Vec3, profile: &[(f32, f32)], segments: u32, color: Color) {
+        let n = profile.len();
+        if n < 2 {
+            return;
+        }
+        // The slope at each ring, averaged with its neighbours.
+        let normal_2d = |i: usize| -> Vec2 {
+            let a = profile[i.saturating_sub(1)];
+            let b = profile[(i + 1).min(n - 1)];
+            let (dy, dr) = (b.0 - a.0, b.1 - a.1);
+            vec2(dy, -dr).normalize_or_zero()
+        };
+        let first = self.vertices.len();
+        for k in 0..=segments {
+            let a = k as f32 / segments as f32 * std::f32::consts::TAU;
+            let (sin, cos) = a.sin_cos();
+            for (i, &(y, r)) in profile.iter().enumerate() {
+                let nn = normal_2d(i);
+                let normal = vec3(cos * nn.x, nn.y, sin * nn.x).normalize_or_zero();
+                let uv = vec2(k as f32 / segments as f32, y);
+                self.push(at + vec3(cos * r, y, sin * r), uv, normal, color);
+            }
+        }
+        let stride = n as u16;
+        let base = first as u16;
+        for k in 0..segments as u16 {
+            for i in 0..(n as u16 - 1) {
+                let a = base + k * stride + i;
+                let b = base + (k + 1) * stride + i;
+                self.indices.extend_from_slice(&[a, a + 1, b + 1, a, b + 1, b]);
+            }
+        }
+        // Closed ends where the profile meets the axis are already closed;
+        // a flat top cap where it doesn't.
+        let (ty, tr) = profile[n - 1];
+        if tr > 1e-4 {
+            self.disc(at + Vec3::Y * ty, tr, segments, color);
+        }
+    }
+
+    /// A flat rectangle split into `nu` × `nv` cells (so baked lighting can
+    /// vary across it), with texture coordinates in metres × `uv_scale`.
+    #[allow(clippy::too_many_arguments)]
+    pub fn grid(
+        &mut self,
+        origin: Vec3,
+        u: Vec3,
+        v: Vec3,
+        nu: u32,
+        nv: u32,
+        color: Color,
+        uv_scale: f32,
+    ) {
+        let normal = u.cross(v).normalize_or_zero();
+        let (lu, lv) = (u.length(), v.length());
+        let first = self.vertices.len() as u16;
+        for j in 0..=nv {
+            for i in 0..=nu {
+                let (fu, fv) = (i as f32 / nu as f32, j as f32 / nv as f32);
+                let p = origin + u * fu + v * fv;
+                self.push(p, vec2(fu * lu, fv * lv) * uv_scale, normal, color);
+            }
+        }
+        let row = (nu + 1) as u16;
+        for j in 0..nv as u16 {
+            for i in 0..nu as u16 {
+                let a = first + j * row + i;
+                self.indices.extend_from_slice(&[a, a + 1, a + row + 1, a, a + row + 1, a + row]);
+            }
+        }
+    }
+
+    /// Multiplies every vertex colour by `light(position, normal)` (baked
+    /// lighting for the room, which is drawn unlit).
+    pub fn bake(&mut self, light: impl Fn(Vec3, Vec3) -> Vec3) {
+        for v in &mut self.vertices {
+            let l = light(v.position, v.normal.truncate());
+            for (k, c) in v.color.iter_mut().take(3).enumerate() {
+                *c = (*c as f32 * l[k].clamp(0.0, 1.0)).round() as u8;
+            }
+        }
+    }
+
+    pub fn len(&self) -> usize {
+        self.vertices.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.vertices.is_empty()
+    }
+
     /// Vertical cylinder (open or capped on top).
     pub fn cylinder(
         &mut self,
@@ -707,6 +800,13 @@ pub struct Model {
 }
 
 impl Model {
+    /// Draws with another texture from now on (the geometry stays).
+    pub fn set_texture(&mut self, texture: &Texture2D) {
+        for m in &mut self.parts {
+            m.texture = Some(texture.clone());
+        }
+    }
+
     pub fn draw(&self) {
         for m in &self.parts {
             draw_mesh(m);
