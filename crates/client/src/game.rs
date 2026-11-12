@@ -101,6 +101,10 @@ pub use snook_core::stats::ShotStats;
 pub struct Match {
     /// Each player's cue and chalk (shop codes).
     pub cue_looks: [(String, String); 2],
+    /// Each player's winning effect (shop codes).
+    pub effects: [String; 2],
+    /// A game just won on the 8: (winner, the pocket), for the effect.
+    pub win_effect: Option<(usize, snook_core::PocketId)>,
     /// Each player's numbers this game.
     pub stats: [ShotStats; 2],
     /// The shot being shown was taken with the cue ball in hand.
@@ -129,6 +133,11 @@ pub struct Match {
     /// Esc was already used this frame (to cancel a stroke being charged).
     pub escape_used: bool,
     seed: u64,
+    /// A stored game being watched again: the strokes still to play.
+    pub script: Option<std::collections::VecDeque<snook_proto::replay::Stroke>>,
+    /// The exact shot the computer (or a replay) plays, not rebuilt from
+    /// the power bar (which would round it).
+    forced_shot: Option<Shot>,
     events_seen: usize,
     demo_timer: f32,
 }
@@ -231,6 +240,8 @@ impl Match {
             last_report: None,
             stats: [ShotStats::default(); 2],
             cue_looks: Default::default(),
+            effects: Default::default(),
+            win_effect: None,
             shot_in_hand: false,
             guide: settings.guide,
             games_played: 0,
@@ -242,11 +253,34 @@ impl Match {
             replay: None,
             escape_used: false,
             seed,
+            script: None,
+            forced_shot: None,
             events_seen: 0,
             demo_timer: 0.0,
         };
         m.begin_turn();
         m
+    }
+
+    /// Watches a stored game again, stroke by stroke.
+    pub fn replay_of(info: &snook_proto::ReplayInfo, guide: AimGuide) -> Match {
+        let settings = MatchSettings {
+            mode: MatchMode::Demo,
+            names: info.players.clone(),
+            guide,
+            shot_clock: None,
+        };
+        let mut m = Match::new(&settings, info.replay.seed);
+        m.game = info.replay.start();
+        m.names = info.players.clone();
+        m.script = Some(info.replay.strokes.iter().copied().collect());
+        m.begin_turn();
+        m
+    }
+
+    /// Watching a stored game.
+    pub fn is_replay(&self) -> bool {
+        self.script.is_some()
     }
 
     /// A match on the server, from its `MatchStarted` message.
@@ -279,6 +313,8 @@ impl Match {
                 (players[0].cue.clone(), players[0].chalk.clone()),
                 (players[1].cue.clone(), players[1].chalk.clone()),
             ],
+            effects: [players[0].effect.clone(), players[1].effect.clone()],
+            win_effect: None,
             game,
             names: [players[0].username.clone(), players[1].username.clone()],
             controllers,
@@ -333,6 +369,8 @@ impl Match {
             replay: None,
             escape_used: false,
             seed: match_id,
+            script: None,
+            forced_shot: None,
             events_seen: 0,
             demo_timer: 0.0,
         };
@@ -465,7 +503,47 @@ impl Match {
     }
 
     fn begin_turn(&mut self) {
+        // A replay: the next stroke decides the turn.
+        let mut scripted = None;
+        while let Some(script) = self.script.as_mut() {
+            use snook_proto::replay::Stroke;
+            match script.pop_front() {
+                Some(Stroke::Shot { shot, called, cue_ball, .. }) => {
+                    scripted = Some(AiDecision { shot, called_pocket: called, cue_ball });
+                    break;
+                }
+                Some(Stroke::TimeFoul) => {
+                    let name = self.names[self.game.current_player()].clone();
+                    self.notify(tw("{name} ran out of time.", &[("name", &name)]), false);
+                    self.game.time_foul();
+                }
+                Some(stroke @ (Stroke::Resign { seat } | Stroke::Abandon { seat })) => {
+                    if matches!(stroke, Stroke::Abandon { .. }) {
+                        self.game.abandon(seat % 2);
+                    } else {
+                        self.game.resign(seat % 2);
+                    }
+                    let name = self.names[seat % 2].clone();
+                    self.notify(tw("{name} resigned.", &[("name", &name)]), true);
+                    self.phase = Phase::GameOver;
+                    return;
+                }
+                None => {
+                    self.phase = Phase::GameOver;
+                    return;
+                }
+            }
+        }
         let computer = match self.current_controller() {
+            Controller::Computer(_) if scripted.is_some() => Some(ComputerTurn {
+                result: Arc::new(Mutex::new(scripted)),
+                decision: None,
+                elapsed: 0.0,
+                start_yaw: 0.0,
+                think: 0.5,
+                waited: 0.0,
+                first_miss: 0.0,
+            }),
             Controller::Computer(level) => {
                 let result = Arc::new(Mutex::new(None));
                 let slot = result.clone();
@@ -534,7 +612,7 @@ impl Match {
             return false;
         }
         self.replay = None;
-        let shot = self.shot_from_aim();
+        let shot = self.forced_shot.take().unwrap_or_else(|| self.shot_from_aim());
         match self.game.prepare_shot(&shot, self.called_pocket) {
             Ok(pending) => {
                 if let Some(o) = self.online.as_mut() {
@@ -669,7 +747,7 @@ impl Match {
         self.notices.retain(|n| n.ttl > 0.0);
         // Computer-vs-computer matches restart by themselves.
         let all_computers = self.controllers.iter().all(|c| matches!(c, Controller::Computer(_)));
-        if all_computers && matches!(self.phase, Phase::GameOver) {
+        if all_computers && self.script.is_none() && matches!(self.phase, Phase::GameOver) {
             self.demo_timer += dt;
             if self.demo_timer > 4.0 {
                 self.demo_timer = 0.0;
@@ -791,6 +869,7 @@ impl Match {
         if t > stroke_start + AI_STROKE_TIME + 0.35 {
             self.aim.yaw = decision.shot.yaw;
             self.aim.power = target_power;
+            self.forced_shot = Some(decision.shot);
             if !self.shoot() {
                 self.called_pocket = Some(PocketId::FootLeft);
                 self.shoot();
@@ -874,6 +953,13 @@ impl Match {
     }
 
     fn after_shot(&mut self, report: &ShotReport) {
+        if let Some(over) = report.game_over
+            && over.reason == snook_core::GameOverReason::PocketedEight
+            && let Some((_, pocket)) =
+                report.pocketed.iter().find(|(b, _)| *b == snook_core::BallId::EIGHT)
+        {
+            self.win_effect = Some((over.winner, *pocket));
+        }
         if let Some(over) = report.game_over {
             self.wins[over.winner] += 1;
             self.games_played += 1;
@@ -1372,6 +1458,48 @@ mod tests {
         assert_eq!(s.in_hand_rate(), 20);
     }
 
+    #[test]
+    fn a_replay_plays_the_stored_game_exactly() {
+        use snook_proto::replay::{Replay, Stroke};
+        // A game played by the computer, recorded stroke by stroke.
+        let mut replay = Replay::new(77, 0);
+        let mut game = replay.start();
+        for k in 0..6 {
+            if game.game_over().is_some() {
+                break;
+            }
+            let d = ai::decide(&game, Difficulty::Hard, k);
+            let stroke = Stroke::Shot {
+                shot: d.shot,
+                called: d.called_pocket,
+                cue_ball: d.cue_ball,
+                timeout: false,
+            };
+            snook_proto::replay::apply(&mut game, &stroke).unwrap();
+            replay.strokes.push(stroke);
+        }
+        let info = snook_proto::ReplayInfo {
+            match_id: 1,
+            players: ["a".into(), "b".into()],
+            countries: Default::default(),
+            ratings: [1200, 1200],
+            winner: 0,
+            rated: false,
+            at: 0,
+            replay: replay.clone(),
+        };
+        let mut m = Match::replay_of(&info, AimGuide::Full);
+        assert!(m.is_replay());
+        for _ in 0..20_000 {
+            if m.script.as_ref().is_some_and(|s| s.is_empty()) && matches!(m.phase, Phase::GameOver)
+            {
+                break;
+            }
+            m.update(0.02);
+        }
+        assert_eq!(m.game, game, "the same table at the end");
+    }
+
     fn players() -> [PlayerInfo; 2] {
         let p = |n: &str| PlayerInfo {
             username: n.into(),
@@ -1387,6 +1515,7 @@ mod tests {
             chalk: String::new(),
             frame: String::new(),
             name_style: String::new(),
+            effect: String::new(),
         };
         [p("me"), p("them")]
     }

@@ -226,6 +226,9 @@ pub struct PlayerInfo {
     pub frame: String,
     #[serde(default)]
     pub name_style: String,
+    /// What happens when they win on the 8 (shop code; empty: nothing).
+    #[serde(default)]
+    pub effect: String,
 }
 
 impl PlayerInfo {
@@ -1121,6 +1124,7 @@ mod tests {
             chalk: String::new(),
             frame: String::new(),
             name_style: String::new(),
+            effect: String::new(),
         };
         let msg = ServerMsg::MatchStarted {
             match_id: 7,

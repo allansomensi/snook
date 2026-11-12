@@ -122,15 +122,24 @@ impl Ranking {
             }
             let tier = snook_proto::Tier::of(e.rating);
             let color = if mine { GOLD } else { tier_color(tier) };
-            ui.name_with_flag(
+            let name_w = ui.name_with_flag(
                 &e.username,
                 &e.country,
                 color,
                 r.x + 70.0,
                 ty - 1.0,
                 15.0,
-                r.w - 400.0,
+                r.w - 420.0,
             );
+            if e.vip {
+                // VIP members: the crown, as everywhere else.
+                crate::icons::draw(
+                    Icon::Crown,
+                    vec2(r.x + 70.0 + name_w + 13.0, ty + 7.0),
+                    13.0,
+                    GOLD,
+                );
+            }
             ui.text(&e.rating.to_string(), r.x + r.w - 300.0, ty, 15.0, CREAM, true);
             ui.text(t(tier.name()), r.x + r.w - 210.0, ty + 1.0, 13.0, tier_color(tier), false);
             ui.text(&e.games.to_string(), r.x + r.w - 130.0, ty + 1.0, 13.0, MUTED, false);

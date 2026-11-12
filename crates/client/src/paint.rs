@@ -41,3 +41,7 @@ pub fn draw_line(x1: f32, y1: f32, x2: f32, y2: f32, t: f32, c: Color) {
 pub fn draw_triangle(a: Vec2, b: Vec2, c: Vec2, color: Color) {
     mq::draw_triangle(a, b, c, fade(color));
 }
+
+pub fn draw_ellipse(x: f32, y: f32, w: f32, h: f32, c: Color) {
+    mq::draw_ellipse(x, y, w, h, 0.0, fade(c));
+}

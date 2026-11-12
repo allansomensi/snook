@@ -37,6 +37,10 @@ pub enum Icon {
     Coin,
     /// The VIP crown.
     Crown,
+    /// A wrapped present.
+    Gift,
+    /// A tick.
+    Check,
 }
 
 fn arc(c: Vec2, r: f32, from: f32, to: f32, w: f32, color: Color) {
@@ -284,6 +288,18 @@ pub fn draw(icon: Icon, c: Vec2, s: f32, color: Color) {
             draw_triangle(p(-0.7, 0.25), p(-0.7, -0.55), p(-0.25, 0.25), color);
             draw_triangle(p(-0.35, 0.25), p(0.0, -0.75), p(0.35, 0.25), color);
             draw_triangle(p(0.7, 0.25), p(0.7, -0.55), p(0.25, 0.25), color);
+        }
+        Icon::Gift => {
+            draw_rectangle(c.x - 0.7 * h, c.y - 0.2 * h, 1.4 * h, 0.95 * h, color);
+            draw_rectangle(c.x - 0.8 * h, c.y - 0.45 * h, 1.6 * h, 0.3 * h, color);
+            let ribbon = Color::new(color.r * 0.55, color.g * 0.35, color.b * 0.3, color.a);
+            draw_rectangle(c.x - 0.12 * h, c.y - 0.45 * h, 0.24 * h, 1.2 * h, ribbon);
+            arc(p(-0.28, -0.62), 0.24 * h, 0.0, std::f32::consts::TAU, w, color);
+            arc(p(0.28, -0.62), 0.24 * h, 0.0, std::f32::consts::TAU, w, color);
+        }
+        Icon::Check => {
+            line(p(-0.62, 0.0), p(-0.18, 0.48), w * 1.5, color);
+            line(p(-0.18, 0.48), p(0.66, -0.52), w * 1.5, color);
         }
         Icon::Eye => {
             // Almond outline (two arcs) and the iris.

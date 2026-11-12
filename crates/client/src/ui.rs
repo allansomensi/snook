@@ -56,6 +56,27 @@ pub fn name_color(p: &snook_proto::PlayerInfo) -> Color {
     tier_color(p.tier())
 }
 
+/// A VIP name style (two colours), if the player has one.
+pub fn name_style(p: &snook_proto::PlayerInfo) -> Option<(Color, Color)> {
+    if !p.vip {
+        return None;
+    }
+    match snook_proto::shop::item(&p.name_style)?.look {
+        snook_proto::shop::Look::Name(Some((a, b))) => {
+            Some((Color::from_rgba(a[0], a[1], a[2], 255), Color::from_rgba(b[0], b[1], b[2], 255)))
+        }
+        _ => None,
+    }
+}
+
+/// A player's name in their colour (their VIP style, else their tier's).
+pub fn draw_name(ui: &Ui, p: &snook_proto::PlayerInfo, x: f32, y: f32, size: f32) {
+    match name_style(p) {
+        Some((a, b)) => ui.styled_text(&p.username, x, y, size, a, b, true),
+        None => ui.text(&p.username, x, y, size, name_color(p), true),
+    }
+}
+
 /// State of a [`Ui::drag_area`].
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Drag {
@@ -240,6 +261,26 @@ impl Ui {
                 ..Default::default()
             },
         );
+    }
+
+    /// Text in two colours (a VIP name style): the second one as a soft
+    /// glow around the first.
+    #[allow(clippy::too_many_arguments)]
+    pub fn styled_text(
+        &self,
+        text: &str,
+        x: f32,
+        y: f32,
+        size: f32,
+        a: Color,
+        b: Color,
+        bold: bool,
+    ) {
+        let glow = Color::new(b.r, b.g, b.b, 0.5);
+        for (dx, dy) in [(-0.8, 0.0), (0.8, 0.0), (0.0, 0.8), (0.0, -0.8)] {
+            self.text(text, x + dx, y + dy, size, glow, bold);
+        }
+        self.text(text, x, y, size, a, bold);
     }
 
     pub fn text_centered(&self, text: &str, cx: f32, y: f32, size: f32, color: Color, bold: bool) {
@@ -871,8 +912,37 @@ impl Ui {
         max_w: f32,
     ) -> f32 {
         let crown = if p.vip { size + 4.0 } else { 0.0 };
-        let w =
-            self.name_with_flag(&p.username, &p.country, name_color(p), x, y, size, max_w - crown);
+        let w = match name_style(p) {
+            Some((a, b)) => {
+                let fh = (size * 0.78).round();
+                let mut used = 0.0;
+                if crate::flags::draw(&p.country, x, y + (size - fh) / 2.0 + 1.0, fh) {
+                    used = crate::flags::width(fh) + 6.0;
+                }
+                let name = self.ellipsize(&p.username, max_w - crown - used, size);
+                self.styled_text(&name, x + used, y, size, a, b, true);
+                used + self.text_size(&name, size, true).x
+            }
+            None => self.name_with_flag(
+                &p.username,
+                &p.country,
+                name_color(p),
+                x,
+                y,
+                size,
+                max_w - crown,
+            ),
+        };
+        // The shop frame: a thin line of its colours under the name.
+        if let Some(snook_proto::shop::Look::Frame { a, b, .. }) =
+            snook_proto::shop::item(&p.frame).map(|i| i.look)
+            && p.frame != "frame_none"
+        {
+            let ca = Color::from_rgba(a[0], a[1], a[2], 220);
+            let cb = Color::from_rgba(b[0], b[1], b[2], 220);
+            crate::paint::draw_rectangle(x, y + size + 1.0, w * 0.5, 2.0, ca);
+            crate::paint::draw_rectangle(x + w * 0.5, y + size + 1.0, w * 0.5, 2.0, cb);
+        }
         if p.vip {
             // VIP members: a small gold crown after the name.
             crate::icons::draw(

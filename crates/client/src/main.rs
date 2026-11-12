@@ -12,6 +12,7 @@ mod config;
 mod coords;
 mod countries;
 mod dev;
+mod effects;
 mod flags;
 mod game;
 mod gfx;
@@ -22,6 +23,7 @@ mod icons;
 mod lan;
 mod menu;
 mod net;
+mod notify;
 mod online;
 mod paint;
 mod play;
@@ -250,6 +252,12 @@ async fn main() {
     let mut ranking = Ranking::default();
     let mut profile = ProfileScreen::default();
     let mut shop = shop::ShopScreen::default();
+    // The shop item being tried on the 3D table, and since when.
+    let mut shop_preview: Option<(&'static str, f32)> = None;
+    // Winning effects playing over the table.
+    let mut win_effects: Vec<effects::WinEffect> = Vec::new();
+    // System notifications for a player in another window.
+    let mut notifier = notify::Notifier::default();
     // Where the profile and ranking go back to.
     let mut back_to_lounge = false;
     let mut settings_open = options.settings;
@@ -351,6 +359,20 @@ async fn main() {
                 match_from_lan = true;
             }
         }
+        notifier.update();
+        for net in [Some(&mut online), lan.as_mut().map(|l| &mut l.net)].into_iter().flatten() {
+            if let Some(text) = net.attention.take() {
+                notifier.tell(&text);
+            }
+        }
+        // A stored game to watch again (from the profile).
+        if let Some(replay) = online.replay.take()
+            && !current.as_ref().is_some_and(|m| m.is_online())
+        {
+            current = Some(Match::replay_of(&replay, config.guide));
+            hud = Hud::new(config.show_help);
+            rig.reset();
+        }
         let in_online_match = current.as_ref().is_some_and(|m| m.is_online());
         if in_online_match != was_online_match {
             hud = Hud::new(config.show_help);
@@ -388,12 +410,21 @@ async fn main() {
             .filter(|m| m.is_online() && !match_from_lan)
             .map(|_| &online.table_look)
             .filter(|l| !l[0].is_empty());
-        let looks = match table_look {
+        let mut looks = match table_look {
             Some(l) => scene::Looks::of(&l[0], &l[1]),
             None => scene::Looks::of(&config.cloth, &config.balls),
         };
+        // Trying an item from the shop on the table.
+        let previewing =
+            shop_preview.filter(|_| matches!(screen, Screen::Shop) && current.is_none());
+        if let Some((code, _)) = previewing {
+            let cloth = if code.starts_with("cloth") { code } else { config.cloth.as_str() };
+            let balls = if code.starts_with("balls") { code } else { config.balls.as_str() };
+            looks = scene::Looks::of(cloth, balls);
+        }
         scene.set_looks(&looks);
-        // Offline, the people at the table play with this player's cue.
+        // Offline, the people at the table play with this player's cue
+        // (and win with their effect).
         if let Some(m) = current.as_mut().filter(|m| !m.is_online()) {
             for seat in 0..2 {
                 if m.controllers[seat] == game::Controller::Human {
@@ -401,10 +432,34 @@ async fn main() {
                     if m.cue_looks[seat] != look {
                         m.cue_looks[seat] = look;
                     }
+                    if m.effects[seat] != config.effect {
+                        m.effects[seat] = config.effect.clone();
+                    }
                 }
             }
         }
+        // A game won on the 8: the winner's effect over the pocket.
+        if let Some(m) = current.as_mut()
+            && let Some((seat, pocket)) = m.win_effect.take()
+        {
+            let at = coords::surface(scene.pocket_center(pocket), 0.04);
+            win_effects.extend(effects::WinEffect::of(&m.effects[seat], at));
+        }
         let mut cam = rig.update(dt, current.as_ref(), get_time() as f32);
+        // The shop's 3D preview: the camera turns slowly around the table.
+        if let Some((_, since)) = previewing {
+            let a = (get_time() as f32 - since) * 0.22 + 0.6;
+            let close =
+                shop_preview.is_some_and(|(c, _)| c.starts_with("cue") || c.starts_with("chalk"));
+            let (radius, height) = if close { (1.35, 1.25) } else { (2.9, 1.75) };
+            cam.eye = vec3(a.cos() * radius * 1.15, height, a.sin() * radius * 0.8);
+            cam.target = if close {
+                vec3(-0.55, coords::TABLE_HEIGHT + 0.05, 0.0)
+            } else {
+                vec3(0.0, coords::TABLE_HEIGHT - 0.1, 0.0)
+            };
+            cam.up = Vec3::Y;
+        }
         // Development aid: SNOOK_CAM="eye x,y,z,target x,y,z" fixes the camera.
         if let Some(v) = crate::dev::var("SNOOK_CAM")
             .map(|v| v.split(',').filter_map(|x| x.trim().parse::<f32>().ok()).collect::<Vec<_>>())
@@ -437,11 +492,40 @@ async fn main() {
             // the GPU (and the battery) drawing it behind.
             None if matches!(screen, Screen::LanLounge)
                 || (matches!(screen, Screen::Online) && online.signed_in()) => {}
-            None => scene.draw(&cam, &menu_rack, dt, &Overlay::default()),
+            None => {
+                let mut overlay = Overlay::default();
+                if let Some((code, _)) =
+                    previewing.filter(|(c, _)| c.starts_with("cue") || c.starts_with("chalk"))
+                {
+                    // The cue lined up behind the cue ball.
+                    let cue = if code.starts_with("cue") { code } else { config.cue.as_str() };
+                    let chalk =
+                        if code.starts_with("chalk") { code } else { config.chalk.as_str() };
+                    if let Some(ball) = menu_rack.iter().find(|b| b.id == snook_core::BallId::CUE) {
+                        let params = snook_core::PhysicsParams::default();
+                        let pose = scene.cue_pose(
+                            &params,
+                            ball.position,
+                            0.0,
+                            0.08,
+                            ::glam::DVec2::ZERO,
+                            0.03,
+                        );
+                        overlay.cue = Some(pose);
+                        overlay.cue_look = (cue.to_string(), chalk.to_string());
+                    }
+                }
+                scene.draw(&cam, &menu_rack, dt, &overlay)
+            }
         }
 
         // From here on: the 2D interface, in interface units.
         ui::begin_ui_camera();
+        if !win_effects.is_empty() {
+            let k = ui::ui_scale();
+            let scale = ui::vh() * 0.22;
+            win_effects.retain_mut(|e| e.draw(dt, cam.project(e.at).map(|p| p / k), scale));
+        }
         if config.vignette {
             draw_texture_ex(
                 &vignette,
@@ -495,10 +579,12 @@ async fn main() {
                         hud_draw(&mut hud, &mut ui, m, controls.aiming(), &mut hud_opacity, dt);
                     match action {
                         HudAction::MainMenu => {
+                            // Back from a replay: to the profile it was opened from.
+                            let replay = m.is_replay();
                             current = None;
                             hud = Hud::new(config.show_help);
                             rig.reset();
-                            screen = Screen::Menu;
+                            screen = if replay { Screen::Profile } else { Screen::Menu };
                         }
                         HudAction::Lounge => {
                             if match_from_lan {
@@ -664,6 +750,21 @@ async fn main() {
                             }
                             RankingAction::None => {}
                         },
+                        Screen::Shop if shop_preview.is_some() => {
+                            let (code, _) = shop_preview.expect("checked");
+                            match shop.preview_bar(&mut ui, &mut online, code) {
+                                shop::PreviewAction::None => {}
+                                shop::PreviewAction::Close => {
+                                    shop.show_item(code);
+                                    shop_preview = None;
+                                }
+                                shop::PreviewAction::Buy => {
+                                    shop.show_item(code);
+                                    shop.ask_to_buy(code);
+                                    shop_preview = None;
+                                }
+                            }
+                        }
                         Screen::Shop => match shop.draw(&mut ui, &mut online) {
                             shop::ShopAction::Back => {
                                 next = Some(if back_to_lounge && online.signed_in() {
@@ -671,6 +772,9 @@ async fn main() {
                                 } else {
                                     Screen::Menu
                                 })
+                            }
+                            shop::ShopAction::Preview(code) => {
+                                shop_preview = Some((code, get_time() as f32));
                             }
                             shop::ShopAction::None => {}
                         },
@@ -759,6 +863,9 @@ async fn main() {
         }
         // Achievements, friend requests, declined invitations…
         let toast_bottom = if current.is_some() { ui::vh() - 92.0 } else { ui::vh() - 20.0 };
+        if current.is_none() && !settings_open && online.draw_email_offer(&mut ui, &mut config) {
+            config.save();
+        }
         online.draw_toasts(&ui, toast_bottom);
         if let Some(l) = &lan {
             l.net.draw_toasts(&ui, toast_bottom);

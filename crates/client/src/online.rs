@@ -145,6 +145,8 @@ pub struct Online {
     table_private: bool,
     table_password: String,
     joining: Option<(u64, String)>,
+    /// An invitation code being typed.
+    code_input: String,
     tournaments: Vec<TournamentInfo>,
     selected_tournament: Option<u64>,
     tournament_form: Option<TournamentForm>,
@@ -160,6 +162,35 @@ pub struct Online {
     pub rtt: Option<std::time::Duration>,
     ping_sent: Option<std::time::Instant>,
     ping_timer: f32,
+    /// A purchase sent to the server and not answered yet (item code).
+    pub buying: Option<String>,
+    /// The last purchase the server confirmed: (item, given to).
+    pub bought: Option<(String, Option<String>)>,
+    /// The last thing the server refused while buying.
+    pub shop_error: Option<String>,
+    /// The account page, as the server last sent it.
+    pub account: Option<AccountView>,
+    /// The e-mail of a payment, offered as the recovery e-mail.
+    pub email_offer: Option<String>,
+    /// Games that can be watched again, and how many are kept (0: all).
+    pub replays: Option<(Vec<snook_proto::HistoryEntry>, u32)>,
+    /// A replay to watch (opened by the replays screen).
+    pub replay: Option<Box<snook_proto::ReplayInfo>>,
+    /// The game on the lounge's TV.
+    pub featured: Option<snook_proto::FeaturedMatch>,
+    /// A code friends can use to sit at this player's table.
+    pub invite_code: Option<String>,
+    /// The server restarts at this time (no new games until then).
+    pub draining: Option<std::time::Instant>,
+    /// Something happened that a player in another window should notice.
+    pub attention: Option<String>,
+}
+
+/// The account page.
+#[derive(Debug, Clone, Default)]
+pub struct AccountView {
+    pub recovery_email: Option<String>,
+    pub payment_email: Option<String>,
 }
 
 const MAX_RECONNECTS: u32 = 15;
@@ -219,6 +250,7 @@ impl Online {
             table_private: false,
             table_password: String::new(),
             joining: None,
+            code_input: String::new(),
             tournaments: Vec::new(),
             selected_tournament: None,
             tournament_form: None,
@@ -236,6 +268,17 @@ impl Online {
             rtt: None,
             ping_sent: None,
             ping_timer: 0.0,
+            buying: None,
+            bought: None,
+            shop_error: None,
+            account: None,
+            email_offer: None,
+            replays: None,
+            replay: None,
+            featured: None,
+            invite_code: None,
+            draining: None,
+            attention: None,
         }
     }
 
@@ -458,7 +501,15 @@ impl Online {
                 }
                 match self.players.iter_mut().find(|p| p.username == player.username) {
                     Some(p) => *p = player,
-                    None => self.players.push(player),
+                    None => {
+                        // A friend just came online.
+                        if self.friends.friends.iter().any(|f| f.player.username == player.username)
+                        {
+                            self.attention =
+                                Some(tw("{name} is online.", &[("name", &player.username)]));
+                        }
+                        self.players.push(player)
+                    }
                 }
             }
             ServerMsg::PlayerLeft { username } => {
@@ -494,6 +545,7 @@ impl Online {
                     self.send(ClientMsg::AnswerInvite { from, accept: true });
                     return save;
                 }
+                self.attention = Some(tw("{name} invites you to play.", &[("name", &from)]));
                 self.incoming.retain(|(f, _)| *f != from);
                 self.incoming.push((from, rated));
             }
@@ -563,6 +615,11 @@ impl Online {
                 table_look,
             } => {
                 self.table_look = table_look;
+                if !spectating && current.as_ref().is_none_or(|m| m.match_id() != match_id) {
+                    let other = &players[1 - seat.min(1)].username;
+                    self.attention =
+                        Some(tw("Your game against {name} is starting.", &[("name", other)]));
+                }
                 self.outgoing = None;
                 self.queue = None;
                 if !spectating {
@@ -604,10 +661,64 @@ impl Online {
                     m.notify(text, true);
                 }
             }
+            ServerMsg::Error { message } if self.buying.is_some() => {
+                self.buying = None;
+                self.shop_error = Some(crate::i18n::server_text(&message));
+            }
             ServerMsg::Error { message } => match current.as_mut() {
                 Some(m) if m.is_online() => m.handle_server(ServerMsg::Error { message }),
                 _ => self.toast(crate::i18n::server_text(&message), false),
             },
+            ServerMsg::ItemBought { code, gift_to } => {
+                self.buying = None;
+                self.bought = Some((code, gift_to));
+            }
+            ServerMsg::GiftReceived { from, code } => {
+                let name = snook_proto::shop::item(&code).map(|i| t(i.name)).unwrap_or(&code);
+                self.toast(
+                    tw("{from} gave you {item}!", &[("from", &from), ("item", &name)]),
+                    true,
+                );
+                self.attention =
+                    Some(tw("{from} gave you {item}!", &[("from", &from), ("item", &name)]));
+            }
+            ServerMsg::CoinsEarned { amount, reason } => {
+                let why = match reason.as_str() {
+                    "daily" => t("daily bonus"),
+                    "win" => t("for the win"),
+                    "game" => t("for the game"),
+                    "prize" => t("tournament prize"),
+                    "refund" => t("entry fee back"),
+                    _ => "",
+                };
+                self.toast(tw("+{n} coins · {why}", &[("n", &amount), ("why", &why)]), true);
+            }
+            ServerMsg::Account { recovery_email, payment_email } => {
+                // After a payment, without a recovery e-mail: offer the one paid with.
+                if recovery_email.is_none() && !config.email_offer_declined {
+                    self.email_offer = payment_email.clone();
+                }
+                self.account = Some(AccountView { recovery_email, payment_email });
+            }
+            ServerMsg::AccountDeleted => {
+                self.auto_resume = false;
+                self.me = None;
+                self.conn = None;
+                self.token.clear();
+                config.token.clear();
+                config.username.clear();
+                save = true;
+                self.stage = Stage::SignIn;
+                self.error = Some(t("Your account was deleted.").to_string());
+            }
+            ServerMsg::Replays { games, limit } => self.replays = Some((games, limit)),
+            ServerMsg::Replay { replay } => self.replay = Some(replay),
+            ServerMsg::Featured { featured } => self.featured = featured,
+            ServerMsg::InviteCode { code } => self.invite_code = Some(code),
+            ServerMsg::Draining { secs } => {
+                self.draining =
+                    Some(std::time::Instant::now() + std::time::Duration::from_secs(secs as u64));
+            }
             ServerMsg::Wallet { coins, vip_until, owned, equipped } => {
                 let wallet = WalletView { coins, vip_until, owned, equipped };
                 // The items in use, as the server allows them now.
@@ -721,6 +832,50 @@ impl Online {
         config.save();
         self.stage = Stage::Idle;
         self.connect();
+    }
+
+    /// After a payment: "use this e-mail to recover your account?". Returns
+    /// true if the settings changed.
+    pub fn draw_email_offer(&mut self, ui: &mut Ui, config: &mut Config) -> bool {
+        let Some(email) = self.email_offer.clone() else { return false };
+        let sw = crate::ui::vw();
+        let sh = crate::ui::vh();
+        let w = 460.0f32.min(sw - 20.0);
+        let r = Rect::new((sw - w) / 2.0, sh / 2.0 - 110.0, w, 220.0);
+        draw_rectangle(0.0, 0.0, sw, sh, Color::new(0.0, 0.0, 0.0, 0.5));
+        ui.panel(r);
+        ui.block(Rect::new(0.0, 0.0, sw, sh));
+        ui.text(t("Protect your purchases"), r.x + 20.0, r.y + 18.0, 19.0, GOLD, true);
+        let text = tw(
+            "Use {email} to recover your account if you ever forget your password?",
+            &[("email", &email)],
+        );
+        for (k, line) in ui.wrap(&text, w - 40.0, 14.0).iter().enumerate() {
+            ui.text(line, r.x + 20.0, r.y + 56.0 + k as f32 * 19.0, 14.0, CREAM, false);
+        }
+        ui.text(
+            t("You can change it any time in your profile (Account)."),
+            r.x + 20.0,
+            r.y + 122.0,
+            12.0,
+            MUTED,
+            false,
+        );
+        let half = (w - 50.0) / 2.0;
+        let mut changed = false;
+        if ui.button(Rect::new(r.x + 20.0, r.y + r.h - 54.0, half, 38.0), t("No, thanks"), true) {
+            self.email_offer = None;
+            config.email_offer_declined = true;
+            changed = true;
+        }
+        if ui.primary_button(
+            Rect::new(r.x + 30.0 + half, r.y + r.h - 54.0, half, 38.0),
+            t("Use this e-mail"),
+        ) {
+            self.send(ClientMsg::SetRecoveryEmail { email });
+            self.email_offer = None;
+        }
+        changed
     }
 
     /// Short messages (achievements, declined invitations…), on top of everything.
@@ -1157,6 +1312,55 @@ impl Online {
             }
             log_top += mh + 8.0;
         }
+        // The server is about to restart.
+        if let Some(until) = self.draining {
+            let left = until.saturating_duration_since(std::time::Instant::now()).as_secs();
+            let text = tw(
+                "The server restarts in {m}:{s} for an update. Games in progress go on.",
+                &[("m", &(left / 60)), ("s", &format!("{:02}", left % 60))],
+            );
+            let lines = ui.wrap(&text, right_panel.w - 44.0, 13.0);
+            let r = Rect::new(
+                right_panel.x + 12.0,
+                log_top,
+                right_panel.w - 24.0,
+                lines.len() as f32 * 16.0 + 14.0,
+            );
+            rrect(r, 6.0, Color::new(1.0, 0.56, 0.44, 0.14));
+            rrect_lines(r, 6.0, 1.0, ALERT);
+            for (k, l) in lines.iter().enumerate() {
+                ui.text(l, r.x + 10.0, r.y + 7.0 + k as f32 * 16.0, 13.0, CREAM, true);
+            }
+            log_top += r.h + 8.0;
+        }
+        // The featured game: anyone can watch it.
+        if let Some(f) = self.featured.clone()
+            && !self.lan
+        {
+            let r = Rect::new(right_panel.x + 12.0, log_top, right_panel.w - 24.0, 52.0);
+            rrect(r, 8.0, Color::new(0.0, 0.0, 0.0, 0.3));
+            rrect_lines(r, 8.0, 1.0, BORDER);
+            let live = 0.5 + 0.5 * (get_time() as f32 * 2.5).sin();
+            draw_circle(r.x + 14.0, r.y + 14.0, 4.0, Color::new(1.0, 0.3, 0.25, 0.5 + 0.5 * live));
+            ui.text(t("ON TV"), r.x + 24.0, r.y + 7.0, 11.0, ALERT, true);
+            let avg = (f.players[0].rating + f.players[1].rating) / 2;
+            let sub = tw("{n} watching · avg {r}", &[("n", &f.spectators), ("r", &avg)]);
+            ui.text(&sub, r.x + 74.0, r.y + 7.0, 11.0, MUTED, false);
+            let half = (r.w - 110.0) / 2.0;
+            ui.player_name(&f.players[0], r.x + 12.0, r.y + 26.0, 14.0, half - 14.0);
+            ui.text(t("vs"), r.x + 12.0 + half - 8.0, r.y + 27.0, 12.0, MUTED, false);
+            ui.player_name(&f.players[1], r.x + 22.0 + half, r.y + 26.0, 14.0, half - 14.0);
+            let mine = self
+                .me
+                .as_ref()
+                .is_some_and(|m| f.players.iter().any(|p| p.username == m.username));
+            if !mine
+                && ui.button(Rect::new(r.x + r.w - 82.0, r.y + 12.0, 72.0, 28.0), t("Watch"), true)
+            {
+                self.send(ClientMsg::WatchMatch { match_id: f.match_id });
+            }
+            log_top += r.h + 8.0;
+        }
         let input_h = 36.0;
         let log = Rect::new(
             right_panel.x + 12.0,
@@ -1416,8 +1620,48 @@ impl Online {
                         password,
                     });
                 }
-                y += 48.0;
+                y += 44.0;
+                if !self.lan {
+                    // Invite someone who isn't in the lounge yet: a short code.
+                    let half = (area.w - 8.0) / 2.0;
+                    if ui.button(Rect::new(area.x, y, half, 32.0), t("Invite with a code"), true) {
+                        self.send(ClientMsg::CreateInviteCode { rated: self.rated_games });
+                    }
+                    let input = Rect::new(area.x + half + 8.0, y, half - 70.0, 32.0);
+                    let enter = ui.text_input(37, input, &mut self.code_input, 24);
+                    if self.code_input.is_empty() && ui.focus != Some(37) {
+                        ui.text(t("Code"), input.x + 9.0, input.y + 9.0, 13.0, MUTED, false);
+                    }
+                    let ok = self.code_input.trim().len() >= 6;
+                    if (ui.button(Rect::new(input.x + input.w + 6.0, y, 64.0, 32.0), t("Join"), ok)
+                        || enter)
+                        && ok
+                    {
+                        let code = std::mem::take(&mut self.code_input);
+                        self.send(ClientMsg::JoinByCode { code });
+                    }
+                    y += 42.0;
+                }
             }
+        }
+        // The code of this player's table, to send to a friend.
+        if let Some(code) =
+            self.invite_code.clone().filter(|_| self.tables.iter().any(|t| t.host.username == me))
+        {
+            let r = Rect::new(area.x, y, area.w, 48.0);
+            rrect(r, 8.0, Color::new(0.91, 0.75, 0.38, 0.12));
+            ui.text(&code, r.x + 14.0, r.y + 10.0, 24.0, GOLD, true);
+            let link = format!("snook://join/{code}");
+            let cw = ui.text_size(&code, 24.0, true).x;
+            ui.text(&link, r.x + 30.0 + cw, r.y + 17.0, 12.0, MUTED, false);
+            if ui.button(Rect::new(r.x + r.w - 92.0, r.y + 9.0, 82.0, 30.0), t("Copy"), true) {
+                macroquad::miniquad::window::clipboard_set(&format!(
+                    "{} {link}",
+                    t("Join my table in Snook:")
+                ));
+                self.toast(t("Copied: send it to a friend."), true);
+            }
+            y += 58.0;
         }
         draw_line(area.x, y, area.x + area.w, y, 1.0, BORDER);
         y += 10.0;
@@ -1510,14 +1754,62 @@ impl Online {
                 snook_proto::MAX_NAME_LEN,
             );
             y += 44.0;
-            ui.text(t("Players"), area.x, y + 8.0, 13.0, MUTED, true);
-            let sizes = [4u32, 8, 16];
-            let labels = ["4", "8", "16"];
-            let sel = sizes.iter().position(|s| *s == form.size).unwrap_or(1);
-            if let Some(i) = ui.segmented(Rect::new(area.x + 90.0, y, 180.0, 30.0), &labels, sel) {
-                form.size = sizes[i];
+            ui.text(t("Format"), area.x, y + 8.0, 13.0, MUTED, true);
+            let formats = [t("Knockout"), t("Arena")];
+            let arena = form.format == snook_proto::TournamentFormat::Arena;
+            if let Some(i) =
+                ui.segmented(Rect::new(area.x + 90.0, y, 220.0, 30.0), &formats, arena as usize)
+            {
+                form.format = if i == 1 {
+                    snook_proto::TournamentFormat::Arena
+                } else {
+                    snook_proto::TournamentFormat::Knockout
+                };
             }
             y += 42.0;
+            if arena {
+                for line in ui.wrap(t("30 minutes: play as many games as you can. A win is 2 points, 4 from the third win in a row."), area.w, 12.0) {
+                    ui.text(&line, area.x, y, 12.0, MUTED, false);
+                    y += 16.0;
+                }
+                y += 8.0;
+            } else {
+                ui.text(t("Players"), area.x, y + 8.0, 13.0, MUTED, true);
+                let sizes = [4u32, 8, 16];
+                let labels = ["4", "8", "16 (VIP)"];
+                let sel = sizes.iter().position(|s| *s == form.size).unwrap_or(1);
+                if let Some(i) =
+                    ui.segmented(Rect::new(area.x + 90.0, y, 220.0, 30.0), &labels, sel)
+                {
+                    form.size = sizes[i];
+                }
+                y += 42.0;
+            }
+            if !self.lan {
+                ui.text(t("Entry"), area.x, y + 8.0, 13.0, MUTED, true);
+                let fees = [0u32, 50, 100, 250, 500];
+                let labels: Vec<String> = fees
+                    .iter()
+                    .map(|f| if *f == 0 { t("Free").to_string() } else { f.to_string() })
+                    .collect();
+                let labels: Vec<&str> = labels.iter().map(String::as_str).collect();
+                let sel = fees.iter().position(|f| *f == form.entry_fee).unwrap_or(0);
+                if let Some(i) =
+                    ui.segmented(Rect::new(area.x + 90.0, y, area.w - 90.0, 30.0), &labels, sel)
+                {
+                    form.entry_fee = fees[i];
+                }
+                y += 36.0;
+                if form.entry_fee > 0 {
+                    let note =
+                        t("The fees make the prize: 70% to the champion, 20% to the runner-up.");
+                    for line in ui.wrap(note, area.w, 12.0) {
+                        ui.text(&line, area.x, y, 12.0, MUTED, false);
+                        y += 16.0;
+                    }
+                }
+                y += 8.0;
+            }
             if !self.lan {
                 ui.text(t("Games"), area.x, y + 8.0, 13.0, MUTED, true);
                 let opts = [t("Rated"), t("Casual")];
@@ -1669,8 +1961,14 @@ impl Online {
         ui.pill(label, area.x + area.w - pw, area.y + 7.0, color);
         let mut y = area.y + 38.0;
         let kind = if tour.rated { t("rated games") } else { t("casual games") };
-        ui.text(
-            &tw(
+        let arena = tour.format == snook_proto::TournamentFormat::Arena;
+        let line = if arena {
+            tw(
+                "Arena · host {host} · {n} players · {kind}",
+                &[("host", &tour.host), ("n", &tour.players.len()), ("kind", &kind)],
+            )
+        } else {
+            tw(
                 "Host {host} · {n}/{size} players · {kind}",
                 &[
                     ("host", &tour.host),
@@ -1678,14 +1976,33 @@ impl Online {
                     ("size", &tour.size),
                     ("kind", &kind),
                 ],
-            ),
-            area.x,
-            y,
-            13.0,
-            MUTED,
-            false,
-        );
-        y += 24.0;
+            )
+        };
+        ui.text(&line, area.x, y, 13.0, MUTED, false);
+        y += 20.0;
+        // Entry, prizes and times.
+        let mut facts = Vec::new();
+        if tour.entry_fee > 0 {
+            facts.push(tw("Entry {n} coins", &[("n", &tour.entry_fee)]));
+            facts.push(tw("Prizes {a} + {b}", &[("a", &tour.prizes[0]), ("b", &tour.prizes[1])]));
+        }
+        let now = crate::game::unix_now();
+        if let Some(start) = tour.starts_at.filter(|_| tour.state == TournamentState::Registering) {
+            let mins = ((start - now).max(0) + 59) / 60;
+            facts.push(tw("starts in {n} min", &[("n", &mins)]));
+        }
+        if let Some(end) = tour.ends_at.filter(|_| tour.state == TournamentState::Running) {
+            let left = (end - now).max(0);
+            facts.push(tw(
+                "{m}:{s} left",
+                &[("m", &(left / 60)), ("s", &format!("{:02}", left % 60))],
+            ));
+        }
+        if !facts.is_empty() {
+            ui.text(&facts.join("  ·  "), area.x, y, 13.0, GOLD, true);
+            y += 20.0;
+        }
+        y += 4.0;
         let joined = tour.players.iter().any(|p| p.username == me);
         let is_host = tour.host == me;
         if tour.state == TournamentState::Registering {
@@ -1722,14 +2039,42 @@ impl Online {
                 } else {
                     Rect::new(area.x, y, area.w, 34.0)
                 };
-                if !full && ui.primary_button(jr, t("Join")) {
+                let label = match (full, tour.entry_fee) {
+                    (true, _) => t("Join the waiting list").to_string(),
+                    (false, 0) => t("Join").to_string(),
+                    (false, fee) => tw("Join · {n} coins", &[("n", &fee)]),
+                };
+                if ui.primary_button(jr, &label) {
                     let password = tour.private.then(|| self.tournament_password.clone());
                     self.send(ClientMsg::JoinTournament { id: tour.id, password });
-                } else if full {
-                    ui.button(jr, t("Full"), false);
                 }
             }
             y += 46.0;
+        } else if tour.state == TournamentState::Running && arena {
+            // An arena can be joined while it runs.
+            if !joined {
+                let label = match tour.entry_fee {
+                    0 => t("Join").to_string(),
+                    fee => tw("Join · {n} coins", &[("n", &fee)]),
+                };
+                if ui.primary_button(Rect::new(area.x, y, area.w, 34.0), &label) {
+                    self.send(ClientMsg::JoinTournament { id: tour.id, password: None });
+                }
+            } else {
+                ui.text(
+                    t("You are paired as soon as you and an opponent are free."),
+                    area.x,
+                    y,
+                    13.0,
+                    GOLD,
+                    false,
+                );
+                y += 20.0;
+                if ui.button(Rect::new(area.x, y, 140.0, 28.0), t("Withdraw"), true) {
+                    self.send(ClientMsg::LeaveTournament { id: tour.id });
+                }
+            }
+            y += 44.0;
         } else if tour.state == TournamentState::Running && joined {
             let alive = tour.champion.is_none()
                 && !tour.rounds.iter().flatten().any(|m| {
@@ -1766,7 +2111,32 @@ impl Online {
             y += 50.0;
         }
         let rest = Rect::new(area.x, y, area.w, area.y + area.h - y);
-        if tour.rounds.is_empty() {
+        if arena && !tour.standings.is_empty() {
+            // Points, best first; a flame for a winning streak.
+            for (k, s) in tour.standings.iter().enumerate() {
+                let ry = rest.y + k as f32 * 26.0;
+                if ry + 24.0 > rest.y + rest.h {
+                    break;
+                }
+                let color = if s.username == me { GOLD } else { CREAM };
+                ui.text(&format!("{}.", k + 1), rest.x, ry + 2.0, 13.0, MUTED, false);
+                ui.text(&s.username, rest.x + 28.0, ry, 15.0, color, true);
+                if s.streak >= 2 {
+                    let nw = ui.text_size(&s.username, 15.0, true).x;
+                    ui.text(
+                        &format!("×{}", s.streak),
+                        rest.x + 34.0 + nw,
+                        ry + 2.0,
+                        12.0,
+                        ALERT,
+                        true,
+                    );
+                }
+                let pts = tw("{n} pts · {g} games", &[("n", &s.points), ("g", &s.games)]);
+                let pw = ui.text_size(&pts, 13.0, false).x;
+                ui.text(&pts, rest.x + rest.w - pw, ry + 2.0, 13.0, MUTED, false);
+            }
+        } else if tour.rounds.is_empty() {
             // Sign-up list.
             for (k, p) in tour.players.iter().enumerate() {
                 let ry = rest.y + k as f32 * 26.0;

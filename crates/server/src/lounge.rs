@@ -282,6 +282,7 @@ pub fn player_info(user: &User, guest: bool, status: PlayerStatus) -> PlayerInfo
         chalk: String::new(),
         frame: String::new(),
         name_style: String::new(),
+        effect: String::new(),
     }
 }
 
@@ -305,6 +306,7 @@ pub fn dressed(mut info: PlayerInfo, look: &Look) -> PlayerInfo {
     info.chalk = look.chalk.clone();
     info.frame = look.frame.clone();
     info.name_style = look.name_style.clone();
+    info.effect = look.effect.clone();
     info
 }
 
