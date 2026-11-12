@@ -25,6 +25,9 @@
   face lit from behind; tests check the shapes the table is made of.
 
 ### Fixes
+- Text never runs past the edge of the panel it is in: it is made a little
+  smaller and, if that is not enough, cut with "…" ("Computador (Difícil)
+  vence!" used to overflow the game-over panel).
 - Installing a newer beta over an older one with the .msi kept the old
   game: Windows Installer ignores the fourth part of a version (the beta
   number), so it saw the same version and left the old snook.exe, whose

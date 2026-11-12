@@ -265,6 +265,10 @@ async fn main() {
         if options.on_eight {
             m.debug_on_eight();
         }
+        // Development aid: SNOOK_RESIGN=1 resigns at once (the game-over panel).
+        if crate::dev::flag("SNOOK_RESIGN") {
+            m.resign();
+        }
         current = Some(m);
     }
     if options.online {
