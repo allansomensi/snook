@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased (protocol 11)
+## 0.1.1-beta.4 (protocol 11)
 
 ### Game
 - A detailed pool hall (panelling, damask paper, moldings, plank floor, rug,
@@ -30,6 +30,55 @@
   (`SNOOK_CUP`); VIP 16-player brackets and waiting-list priority.
 - Staff panel: metrics (DAU, games, retention, funnel, revenue, queue
   wait), aim-assistance review queue, replays attached to reports.
+
+## 0.1.1-beta.3
+
+### Distribution
+- Releases are built and published by dist: a Windows installer (`.msi`,
+  with Start menu and desktop shortcuts and an uninstaller), portable
+  `.zip`/`.tar.xz` packages for Windows, macOS (Apple Silicon and Intel) and
+  Linux (x64 and ARM64), and one-line installers for the terminal (shell and
+  PowerShell). The server image has its own workflow.
+- A logo: a pool table seen from above with an "S" ball. It is the window
+  icon, the executable's icon (with version details on Windows), the
+  installer's icon and pictures, and it appears on the menu, in the lounge
+  and while the game loads.
+
+### Graphics
+- The balls' numbers are drawn with the game's bold font, anti-aliased (a
+  5x7 bitmap font looked blocky up close); 6 and 9 are underlined, as on
+  real balls; the edges of the number circle and the stripes are smooth.
+- The cue casts a soft shadow on the cloth and the balls from every lamp
+  (High and Ultra).
+- The leather around the pockets was lit from below (its faces pointed
+  down) and looked dark; the pocket walls were lit from the outside.
+- A development view (`SNOOK_DEBUG_NORMALS=1`, debug builds) paints red any
+  face lit from behind; tests check the shapes the table is made of.
+
+### Fixes
+- Buying coins or VIP on Windows opened Stripe's "This link is incomplete"
+  page: the game opened the address with Explorer, which drops everything
+  after `#`, and Stripe needs that part. It is now opened with
+  ShellExecute, which passes the whole address.
+- Text never runs past the edge of the panel it is in: it is made a little
+  smaller and, if that is not enough, cut with "…" ("Computador (Difícil)
+  vence!" used to overflow the game-over panel).
+- Installing a newer beta over an older one with the .msi kept the old
+  game: Windows Installer ignores the fourth part of a version (the beta
+  number), so it saw the same version and left the old snook.exe, whose
+  file version was also the same. Newer builds now replace older ones of the
+  same version, and snook.exe carries the beta number in its version.
+- The bottom and right cushions were darker than the others: their faces
+  were wound the other way, so the light hit them from behind.
+- The side pockets showed a black trapezoid between the jaws: the cloth
+  was cut away there, opening onto nothing. It now runs on to the hole and
+  rolls over its edge, as in the corner pockets.
+- Hover hints (tooltips, achievement cards, "Shoot!", the power hint) are
+  drawn after everything else, so panels, buttons, chat and toasts drawn
+  later no longer cover them ("Find an opponent…" used to hide under the
+  rated/casual switch, achievement cards under the match history).
+- A release built with an empty `SNOOK_SERVER` (the CI variable not set) no
+  longer ships without a game server: it keeps the public one.
 
 ## 0.1.0
 

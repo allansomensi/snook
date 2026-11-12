@@ -1,10 +1,24 @@
 [package]
 name = "snook"
-description = "Snook desktop client"
+description = "Snook: a lightweight 3D eight-ball pool game with an online lounge"
+authors = ["Allan Somensi"]
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
+repository.workspace = true
+homepage = "https://github.com/allansomensi/snook"
+readme = "../../README.md"
+
+[package.metadata.wix]
+upgrade-guid = "38A3FD0E-86A2-4518-A4AF-067047C4D793"
+path-guid = "09226FE3-7CEA-4013-B441-D824AE8816C5"
+license = false
+eula = false
+
+[build-dependencies]
+# The executable's icon and version details on Windows (see build.rs).
+embed-resource = "3"
 
 [dependencies]
 snook_core = { path = "../core" }
@@ -22,4 +36,10 @@ tokio = { version = "1", features = ["rt", "net", "time", "sync", "macros"] }
 futures-util = { version = "0.3", default-features = false, features = ["sink", "std"] }
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12", "logging"] }
 sys-locale = "0.3"
+# The balls' numbers, rasterised from the bundled font (macroquad uses it too).
+fontdue = "0.9"
 serde_json = "1"
+
+[dev-dependencies]
+# Exporting the emblem as PNG and .ico files (see src/icon.rs).
+png = "0.17"

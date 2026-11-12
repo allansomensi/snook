@@ -62,9 +62,13 @@ impl Menu {
 
         let left = (sw * 0.06).clamp(24.0, 90.0);
         let top = (sh * 0.09).clamp(20.0, 80.0);
-        ui.text("SNOOK", left + 3.0, top + 3.0, 64.0, Color::new(0.0, 0.0, 0.0, 0.6), true);
-        ui.text("SNOOK", left, top, 64.0, GOLD, true);
-        ui.text(t("eight-ball pool"), left + 4.0, top + 74.0, 17.0, CREAM, false);
+        // The emblem, then the name.
+        let size = 92.0;
+        crate::icon::draw(left - 4.0, top + 2.0, size);
+        let tx = left + size + 10.0;
+        ui.text("SNOOK", tx + 3.0, top + 3.0, 64.0, Color::new(0.0, 0.0, 0.0, 0.6), true);
+        ui.text("SNOOK", tx, top, 64.0, GOLD, true);
+        ui.text(t("eight-ball pool"), tx + 4.0, top + 74.0, 17.0, CREAM, false);
 
         // The four ways to play.
         let items = [

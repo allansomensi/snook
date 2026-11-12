@@ -36,8 +36,9 @@ docker build -t snook-server .
 docker run -p 7878:7878 -e DATABASE_URL=postgres://user:pass@host/db snook-server
 ```
 
-The image is distroless (no shell, unprivileged user, ~50 MB). The release
-workflow publishes it as `ghcr.io/<owner>/snook-server:<tag>`.
+The image is distroless (no shell, unprivileged user, ~50 MB). The Server
+image workflow publishes it as `ghcr.io/<owner>/snook-server:<tag>` when a
+release tag is pushed (see [RELEASING.md](RELEASING.md)).
 
 ## Without Docker (a VPS with systemd)
 

@@ -1,0 +1,32 @@
+# Push a tag like `v0.2.0` to publish the server image on GitHub Container
+# Registry (the game itself is built and released by release.yml, which dist
+# generates).
+name: Server image
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  server:
+    name: Server image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          # Pre-releases (v0.2.0-beta.1) don't move `latest`.
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/snook-server:${{ github.ref_name }}
+            ${{ !contains(github.ref_name, '-') && format('ghcr.io/{0}/snook-server:latest', github.repository_owner) || '' }}

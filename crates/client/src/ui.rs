@@ -128,6 +128,12 @@ pub fn begin_ui_camera() {
     set_camera(&cam);
 }
 
+/// Something drawn on top of the interface at the end of the frame.
+struct Overlay {
+    tooltip: bool,
+    draw: Box<dyn FnOnce(&Ui)>,
+}
+
 pub struct Ui {
     regular: Font,
     bold: Font,
@@ -157,6 +163,13 @@ pub struct Ui {
     repeat: Option<(KeyCode, f64)>,
     /// The field `cursor` belongs to (focus can also be set from outside).
     cursor_owner: Option<u64>,
+    /// Hover hints asked for this frame, with the opacity at the time. They
+    /// are drawn by [`Ui::draw_overlays`] after everything else, so panels,
+    /// chat and toasts drawn later in the frame never cover them.
+    overlays: std::cell::RefCell<Vec<(Overlay, f32)>>,
+    /// The panels drawn so far this frame: text that starts inside one never
+    /// runs past its edge (see [`Ui::text`]).
+    panels: std::cell::RefCell<Vec<Rect>>,
 }
 
 impl Ui {
@@ -184,11 +197,15 @@ impl Ui {
             all_selected: false,
             repeat: None,
             cursor_owner: None,
+            overlays: std::cell::RefCell::new(Vec::new()),
+            panels: std::cell::RefCell::new(Vec::new()),
         }
     }
 
     /// Call once at the start of each frame.
     pub fn begin(&mut self) {
+        self.overlays.get_mut().clear();
+        self.panels.get_mut().clear();
         self.mouse = Vec2::from(mouse_position()) / ui_scale();
         self.pressed = is_mouse_button_pressed(MouseButton::Left);
         self.released = is_mouse_button_released(MouseButton::Left);
@@ -217,16 +234,31 @@ impl Ui {
 
     /// The largest size up to `size` at which bold `text` fits in `width`.
     pub fn fit(&self, size: f32, text: &str, width: f32) -> f32 {
+        self.fit_with(size, text, width, true, 10.0)
+    }
+
+    fn fit_with(&self, size: f32, text: &str, width: f32, bold: bool, min: f32) -> f32 {
         let mut s = size;
-        while s > 10.0 && self.text_size(text, s, true).x > width {
-            s -= 1.0;
+        while s > min && self.text_size(text, s, bold).x > width {
+            s = (s - 1.0).max(min);
         }
         s
     }
 
     /// A label that fits `width`: smaller type first, then cut with "…".
     pub fn fitted(&self, text: &str, size: f32, width: f32, bold: bool) -> (String, f32) {
-        let size = self.fit(size, text, width);
+        self.fitted_with(text, size, width, bold, 10.0)
+    }
+
+    fn fitted_with(
+        &self,
+        text: &str,
+        size: f32,
+        width: f32,
+        bold: bool,
+        min: f32,
+    ) -> (String, f32) {
+        let size = self.fit_with(size, text, width, bold, min.min(size));
         if self.text_size(text, size, bold).x <= width {
             return (text.to_string(), size);
         }
@@ -246,8 +278,40 @@ impl Ui {
         vec2(d.width, size)
     }
 
-    /// Draws text with its top-left corner at (`x`, `y`).
+    /// The smallest panel drawn this frame that contains `p`.
+    fn panel_at(&self, p: Vec2) -> Option<Rect> {
+        self.panels
+            .borrow()
+            .iter()
+            .filter(|r| r.contains(p))
+            .min_by(|a, b| (a.w * a.h).total_cmp(&(b.w * b.h)))
+            .copied()
+    }
+
+    /// Text that would run `width` past the room it has is made smaller
+    /// (down to 70%), then cut with "…". Returns what to draw, its size and
+    /// how far down to move it so it stays centred on the same line.
+    fn shrink_to(&self, text: &str, size: f32, room: f32, bold: bool) -> Option<(String, f32)> {
+        if room <= 0.0 || self.text_size(text, size, bold).x <= room {
+            return None;
+        }
+        Some(self.fitted_with(text, size, room, bold, (size * 0.7).max(9.0)))
+    }
+
+    /// Draws text with its top-left corner at (`x`, `y`). Text that starts
+    /// inside a panel never runs past the panel's right edge.
     pub fn text(&self, text: &str, x: f32, y: f32, size: f32, color: Color, bold: bool) {
+        if let Some(r) = self.panel_at(vec2(x + 0.5, y + size * 0.5)) {
+            let room = r.x + r.w - 6.0 - x;
+            if let Some((t, s)) = self.shrink_to(text, size, room, bold) {
+                self.draw_text_raw(&t, x, y + (size - s) * 0.5, s, color, bold);
+                return;
+            }
+        }
+        self.draw_text_raw(text, x, y, size, color, bold);
+    }
+
+    fn draw_text_raw(&self, text: &str, x: f32, y: f32, size: f32, color: Color, bold: bool) {
         let font = if bold { &self.bold } else { &self.regular };
         draw_text_ex(
             text,
@@ -283,12 +347,22 @@ impl Ui {
         self.text(text, x, y, size, a, bold);
     }
 
+    /// Text centred on `cx`; inside a panel it stays within the panel.
     pub fn text_centered(&self, text: &str, cx: f32, y: f32, size: f32, color: Color, bold: bool) {
+        if let Some(r) = self.panel_at(vec2(cx, y + size * 0.5)) {
+            let half = (cx - r.x).min(r.x + r.w - cx) - 8.0;
+            if let Some((t, s)) = self.shrink_to(text, size, half * 2.0, bold) {
+                let w = self.text_size(&t, s, bold).x;
+                self.draw_text_raw(&t, cx - w / 2.0, y + (size - s) * 0.5, s, color, bold);
+                return;
+            }
+        }
         let w = self.text_size(text, size, bold).x;
-        self.text(text, cx - w / 2.0, y, size, color, bold);
+        self.draw_text_raw(text, cx - w / 2.0, y, size, color, bold);
     }
 
     pub fn panel(&mut self, r: Rect) {
+        self.panels.get_mut().push(r);
         self.block(r);
         // Soft drop shadow, body, a faint top sheen and a thin gold-brown edge.
         rrect(
@@ -891,15 +965,53 @@ impl Ui {
         enabled && hover && self.released
     }
 
-    /// A small dark label under (or above, near the bottom) `anchor`.
+    /// A small dark label under (or above, near the bottom) `anchor`. It is
+    /// drawn at the end of the frame, on top of the whole interface; only the
+    /// last one asked for in a frame is shown.
     pub fn tooltip(&self, text: &str, anchor: Rect) {
-        let w = self.text_size(text, 13.0, true).x + 18.0;
-        let below = anchor.y + anchor.h + 30.0 < vh();
-        let y = if below { anchor.y + anchor.h + 6.0 } else { anchor.y - 30.0 };
-        let x = (anchor.x + anchor.w / 2.0 - w / 2.0).clamp(4.0, vw() - w - 4.0);
-        let r = Rect::new(x, y, w, 24.0);
-        rrect(r, 12.0, Color::new(0.0, 0.0, 0.0, 0.85));
-        self.text(text, r.x + 9.0, r.y + 5.0, 13.0, CREAM, true);
+        let text = text.to_string();
+        let mut list = self.overlays.borrow_mut();
+        list.retain(|(o, _)| !o.tooltip);
+        list.push((
+            Overlay {
+                tooltip: true,
+                draw: Box::new(move |ui: &Ui| {
+                    let w = ui.text_size(&text, 13.0, true).x + 18.0;
+                    let below = anchor.y + anchor.h + 30.0 < vh();
+                    let y =
+                        if below { anchor.y + anchor.h + 6.0 } else { (anchor.y - 30.0).max(2.0) };
+                    let x =
+                        (anchor.x + anchor.w / 2.0 - w / 2.0).clamp(4.0, (vw() - w - 4.0).max(4.0));
+                    let r = Rect::new(x, y, w, 24.0);
+                    rrect(r, 12.0, Color::new(0.0, 0.0, 0.0, 0.9));
+                    rrect_lines(r, 12.0, 1.0, Color::new(BORDER.r, BORDER.g, BORDER.b, 0.7));
+                    ui.text(&text, r.x + 9.0, r.y + 5.0, 13.0, CREAM, true);
+                }),
+            },
+            crate::paint::opacity(),
+        ));
+    }
+
+    /// Draws `f` at the end of the frame, over the whole interface (hover
+    /// cards and hints that must never end up under a panel).
+    pub fn overlay(&self, f: impl FnOnce(&Ui) + 'static) {
+        self.overlays
+            .borrow_mut()
+            .push((Overlay { tooltip: false, draw: Box::new(f) }, crate::paint::opacity()));
+    }
+
+    /// Draws this frame's hover hints over everything drawn so far. Call
+    /// once, after the rest of the interface (in interface units).
+    pub fn draw_overlays(&self) {
+        // Hints float above everything: they are not held to any panel.
+        self.panels.borrow_mut().clear();
+        let list = std::mem::take(&mut *self.overlays.borrow_mut());
+        let before = crate::paint::opacity();
+        for (o, alpha) in list {
+            crate::paint::set_opacity(alpha);
+            (o.draw)(self);
+        }
+        crate::paint::set_opacity(before);
     }
 
     /// A flag (if any) and a player name in their tier colour. Returns the width used.
