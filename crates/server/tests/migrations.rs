@@ -21,6 +21,10 @@ fn applied_migrations_are_unchanged() {
     let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("migrations");
     for (name, expected) in APPLIED {
         let bytes = std::fs::read(dir.join(name)).unwrap_or_else(|e| panic!("{name}: {e}"));
+        // As committed (LF): a Windows checkout may have turned the line
+        // endings into CRLF, which production never sees.
+        let text = String::from_utf8(bytes).expect("UTF-8").replace("\r\n", "\n");
+        let bytes = text.into_bytes();
         let got: String = Sha256::digest(&bytes).iter().map(|b| format!("{b:02x}")).collect();
         assert_eq!(
             &got, expected,
