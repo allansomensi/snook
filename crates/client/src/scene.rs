@@ -1015,7 +1015,7 @@ impl Default for Looks {
 pub fn cue_mesh(cue: &str, chalk: &str, white: &Texture2D) -> gfx::Model {
     use snook_proto::shop::{Look, item};
     let (butt, accent, ring) = match item(cue).map(|i| i.look) {
-        Some(Look::Cue { butt, accent, ring }) => (butt, accent, ring),
+        Some(Look::Cue { butt, accent, ring, .. }) => (butt, accent, ring),
         _ => ([35, 20, 12], [20, 20, 24], [240, 238, 228]),
     };
     let chalk = match item(chalk).map(|i| i.look) {

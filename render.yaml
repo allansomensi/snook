@@ -9,6 +9,10 @@ services:
     dockerfilePath: ./Dockerfile
     healthCheckPath: /health
     autoDeploy: true
+    # A deploy no longer cuts games short: on SIGTERM the server stops
+    # starting games, tells the lounge, and lets the games in progress go on
+    # (SNOOK_DRAIN_SECS); what is left is saved and continues on the new server.
+    maxShutdownDelaySeconds: 300
     envVars:
       # Neon connection string (the direct one, not "-pooler"). Set it in the dashboard.
       - key: DATABASE_URL
@@ -23,5 +27,10 @@ services:
         value: "5"
       - key: SNOOK_SHOT_CLOCK
         value: "30"
+      - key: SNOOK_DRAIN_SECS
+        value: "270"
+      # The weekly cup (an arena organised by the server).
+      - key: SNOOK_CUP
+        value: "sat 20:00 60m"
       - key: RUST_LOG
         value: info

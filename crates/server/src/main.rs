@@ -17,6 +17,8 @@
 //! | `SNOOK_STRIPE_WEBHOOK_SECRET` | — | Stripe webhook signing secret |
 //! | `SNOOK_STRIPE_PRICES` | — | `code=price_id\|label;…` for coin packs and `vip_monthly` |
 //! | `SNOOK_PUBLIC_URL` | — | the server's public address (payment return pages) |
+//! | `SNOOK_DRAIN_SECS` | `240` | on SIGTERM: how long games in progress may go on before they are handed to the next server |
+//! | `SNOOK_CUP` | — | the weekly cup, e.g. `sat 20:00` (options: `60m`, `fee=100`, `utc-3`) |
 //! | `RUST_LOG` | `info` | log filter |
 
 use std::time::Duration;
@@ -45,6 +47,14 @@ async fn main() {
     if let Some(secs) = env("SNOOK_SHOT_CLOCK").and_then(|s| s.parse::<u64>().ok()) {
         rules.shot_clock = Duration::from_secs(secs.clamp(10, 120));
     }
+    if let Some(cup) = env("SNOOK_CUP") {
+        rules.cup = snook_server::lounge::Cup::parse(&cup);
+        match &rules.cup {
+            Some(c) => tracing::info!("weekly cup: {c:?}"),
+            None => tracing::warn!("SNOOK_CUP not understood: {cup}"),
+        }
+    }
+    let drain_secs = env("SNOOK_DRAIN_SECS").and_then(|s| s.parse::<u64>().ok()).unwrap_or(240);
     let bind = match (env("SNOOK_BIND"), env("PORT")) {
         (Some(b), _) => b,
         (None, Some(port)) => format!("0.0.0.0:{port}"),
@@ -100,12 +110,17 @@ async fn main() {
         #[cfg(not(unix))]
         let _ = ctrl_c.await;
     };
+    let serving = tokio::spawn(serve(listener, server.clone()));
     tokio::select! {
-        result = serve(listener, server) => {
-            if let Err(e) = result {
+        result = serving => {
+            if let Ok(Err(e)) = result {
                 tracing::error!("server stopped: {e}");
             }
         }
-        _ = shutdown => tracing::info!("shutting down"),
+        _ = shutdown => {
+            // Keep serving while the games in progress finish.
+            tracing::info!("shutting down: draining for up to {drain_secs} s");
+            snook_server::drain(server, drain_secs).await;
+        }
     }
 }

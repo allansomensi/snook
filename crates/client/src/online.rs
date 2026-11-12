@@ -65,6 +65,9 @@ struct TournamentForm {
     size: u32,
     rated: bool,
     password: String,
+    /// Coins to enter (0: free).
+    entry_fee: u32,
+    format: snook_proto::TournamentFormat,
 }
 
 #[derive(Default)]
@@ -105,6 +108,9 @@ pub struct Online {
     pub offers: Option<ShopOffers>,
     /// Set when the items in use changed (the table must be redrawn).
     pub looks_changed: bool,
+    /// The cloth and ball set of the current online table (shop codes;
+    /// empty: this player's own).
+    pub table_look: [String; 2],
     /// This account's achievements (for the reactions they unlock).
     achievements: Vec<String>,
     pub stage: Stage,
@@ -225,6 +231,7 @@ impl Online {
             wallet: None,
             offers: None,
             looks_changed: false,
+            table_look: Default::default(),
             achievements: Vec::new(),
             rtt: None,
             ping_sent: None,
@@ -553,7 +560,9 @@ impl Online {
                 clock_left,
                 tournament,
                 spectating,
+                table_look,
             } => {
+                self.table_look = table_look;
                 self.outgoing = None;
                 self.queue = None;
                 if !spectating {
@@ -609,6 +618,11 @@ impl Online {
                         snook_proto::shop::Category::Cue => &mut config.cue,
                         snook_proto::shop::Category::Chalk => &mut config.chalk,
                         snook_proto::shop::Category::Balls => &mut config.balls,
+                        snook_proto::shop::Category::Effect => &mut config.effect,
+                        // Only seen online.
+                        snook_proto::shop::Category::Frame | snook_proto::shop::Category::Name => {
+                            continue;
+                        }
                     };
                     if *slot != code {
                         *slot = code;
@@ -1543,6 +1557,8 @@ impl Online {
                     size: form.size,
                     rated: form.rated && !self.lan,
                     password: (!form.password.trim().is_empty()).then(|| form.password.clone()),
+                    entry_fee: form.entry_fee,
+                    format: form.format,
                 });
             }
             let cancel = ui.button(

@@ -593,6 +593,8 @@ async fn tournament_runs_to_a_champion() {
             size: 4,
             rated: false,
             password: None,
+            entry_fee: 0,
+            format: Default::default(),
         })
         .await;
     let ServerMsg::TournamentUpdated { tournament } =
@@ -830,6 +832,8 @@ async fn lounge_actions_are_rate_limited() {
         size: 4,
         rated: false,
         password: None,
+        entry_fee: 0,
+        format: Default::default(),
     })
     .await;
     let ServerMsg::TournamentUpdated { tournament } =
@@ -846,4 +850,284 @@ async fn lounge_actions_are_rate_limited() {
         })
         .await;
     assert!(matches!(next, ServerMsg::Chat { .. }), "{next:?}");
+}
+
+/// A server on its own port over `store`; returns its address and handle.
+async fn start_on(store: snook_server::store::Store) -> (String, std::sync::Arc<Server>) {
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+    let rules = Rules { max_connections_per_ip: 100, ..Rules::default() };
+    let config = Config { bind: addr, rules, ..Config::default() };
+    let server = Server::with_store(config, store).await;
+    tokio::spawn(serve(listener, server.clone()));
+    (format!("ws://{addr}/ws"), server)
+}
+
+impl Client {
+    async fn login(url: &str, name: &str, password: &str) -> Client {
+        let mut c = Client::connect(url).await;
+        c.send(ClientMsg::Login { username: name.into(), password: password.into() }).await;
+        c.expect("auth", |m| matches!(m, ServerMsg::AuthOk { .. })).await;
+        c
+    }
+
+    /// Waits until the server closes the connection.
+    async fn closed(&mut self) {
+        let deadline = tokio::time::Instant::now() + Duration::from_secs(20);
+        loop {
+            let left = deadline.saturating_duration_since(tokio::time::Instant::now());
+            match tokio::time::timeout(left, self.ws.next()).await {
+                Err(_) => panic!("the connection stayed open"),
+                Ok(None) | Ok(Some(Err(_))) | Ok(Some(Ok(Message::Close(_)))) => return,
+                Ok(Some(Ok(_))) => {}
+            }
+        }
+    }
+}
+
+/// Plays `n` shots of a game (AI on both sides); returns the game after them.
+async fn play_shots(
+    a: &mut Client,
+    b: &mut Client,
+    mut game: EightBallGame,
+    sa: usize,
+    n: usize,
+) -> EightBallGame {
+    for k in 0..n {
+        if game.game_over().is_some() {
+            break;
+        }
+        let d = ai::decide(&game, Difficulty::Hard, k as u64);
+        let turn = game.shots_taken();
+        let msg = ClientMsg::Shoot {
+            turn,
+            shot: d.shot,
+            called_pocket: d.called_pocket,
+            cue_ball: d.cue_ball,
+        };
+        if game.current_player() == sa {
+            a.send(msg).await
+        } else {
+            b.send(msg).await
+        }
+        let ServerMsg::ShotResult { end, .. } =
+            a.expect("result", |m| matches!(m, ServerMsg::ShotResult { .. })).await
+        else {
+            unreachable!()
+        };
+        b.expect("result b", |m| matches!(m, ServerMsg::ShotResult { .. })).await;
+        game = end;
+    }
+    game
+}
+
+#[tokio::test]
+async fn a_restart_hands_the_game_to_the_next_server() {
+    let store = snook_server::store::Store::memory();
+    let (url_a, server_a) = start_on(store.share().unwrap()).await;
+    let (mut alice, _) = Client::register(&url_a, "alice").await;
+    let (mut bob, _) = Client::register(&url_a, "bob").await;
+    let (game, sa, _) = start_match(&mut alice, &mut bob, "bob", "alice", true).await;
+    let game = play_shots(&mut alice, &mut bob, game, sa, 3).await;
+    assert!(game.game_over().is_none());
+
+    // The first server is told to stop: no new games, a notice, and after
+    // the drain time the game is handed over (the connections close).
+    let drain = tokio::spawn(snook_server::drain(server_a.clone(), 1));
+    alice.expect("draining", |m| matches!(m, ServerMsg::Draining { .. })).await;
+    alice.closed().await;
+    bob.closed().await;
+    drain.await.unwrap();
+
+    // The next server rebuilds the table when the players come back.
+    let (url_b, _server_b) = start_on(store).await;
+    let mut alice = Client::login(&url_b, "alice", PASSWORD).await;
+    let ServerMsg::MatchStarted { game: rebuilt, seat, rated, .. } =
+        alice.expect("game back", |m| matches!(m, ServerMsg::MatchStarted { .. })).await
+    else {
+        unreachable!()
+    };
+    assert_eq!((seat, rated), (sa, true));
+    assert_eq!(rebuilt, game, "the same table, ball for ball");
+    let mut bob = Client::login(&url_b, "bob", PASSWORD).await;
+    bob.expect("game back", |m| matches!(m, ServerMsg::MatchStarted { .. })).await;
+    // And the game goes on to the end.
+    let result = play_out(&mut alice, &mut bob, rebuilt, sa).await;
+    assert!(result.rated);
+}
+
+#[tokio::test]
+async fn account_password_recovery_email_and_deletion() {
+    let url = start(Rules::default()).await;
+    let (mut carol, _) = Client::register(&url, "carol").await;
+    carol.send(ClientMsg::ChangePassword { old: "wrong-one".into(), new: "another1".into() }).await;
+    carol.expect("wrong", |m| matches!(m, ServerMsg::Error { .. })).await;
+    carol.send(ClientMsg::ChangePassword { old: PASSWORD.into(), new: "another1".into() }).await;
+    carol.expect("changed", |m| matches!(m, ServerMsg::Notice { .. })).await;
+    let mut again = Client::login(&url, "carol", "another1").await;
+    again.send(ClientMsg::SetRecoveryEmail { email: "not an email".into() }).await;
+    again.expect("bad e-mail", |m| matches!(m, ServerMsg::Error { .. })).await;
+    again.send(ClientMsg::SetRecoveryEmail { email: " Carol@Example.com ".into() }).await;
+    let ServerMsg::Account { recovery_email, .. } =
+        again.expect("account", |m| matches!(m, ServerMsg::Account { .. })).await
+    else {
+        unreachable!()
+    };
+    assert_eq!(recovery_email.as_deref(), Some("carol@example.com"));
+
+    let (mut dave, _) = Client::register(&url, "dave").await;
+    again.send(ClientMsg::DeleteAccount { password: "another1".into() }).await;
+    again.expect("deleted", |m| matches!(m, ServerMsg::AccountDeleted)).await;
+    again.closed().await;
+    // The name is free of the old account: it can't sign in, and its profile is gone.
+    let mut c = Client::connect(&url).await;
+    c.send(ClientMsg::Login { username: "carol".into(), password: "another1".into() }).await;
+    c.expect("refused", |m| matches!(m, ServerMsg::AuthError { .. })).await;
+    dave.send(ClientMsg::Profile { username: "carol".into() }).await;
+    dave.expect("gone", |m| matches!(m, ServerMsg::Error { .. })).await;
+}
+
+#[tokio::test]
+async fn replays_coins_featured_table_and_codes() {
+    let url = start(Rules::default()).await;
+    let (mut alice, _) = Client::register(&url, "alice").await;
+    alice.expect("daily bonus", |m| matches!(m, ServerMsg::CoinsEarned { .. })).await;
+    let (mut bob, _) = Client::register(&url, "bob").await;
+    let (mut eve, _) = Client::register(&url, "eve").await;
+
+    // An invitation code: "snook://join/abc123" works as well as "ABC123".
+    alice.send(ClientMsg::CreateInviteCode { rated: true }).await;
+    let ServerMsg::InviteCode { code } =
+        alice.expect("code", |m| matches!(m, ServerMsg::InviteCode { .. })).await
+    else {
+        unreachable!()
+    };
+    assert_eq!(code.len(), 6);
+    bob.send(ClientMsg::JoinByCode { code: format!("snook://join/{}", code.to_lowercase()) }).await;
+    let ServerMsg::MatchStarted { game, seat: sa, match_id, table_look, .. } =
+        alice.expect("match", |m| matches!(m, ServerMsg::MatchStarted { .. })).await
+    else {
+        unreachable!()
+    };
+    assert_eq!(table_look[0], "cloth_green", "the host's table");
+    bob.expect("match b", |m| matches!(m, ServerMsg::MatchStarted { .. })).await;
+
+    // Anyone can watch the featured game.
+    let ServerMsg::Featured { featured } =
+        eve.expect("featured", |m| matches!(m, ServerMsg::Featured { featured: Some(_) })).await
+    else {
+        unreachable!()
+    };
+    assert_eq!(featured.unwrap().match_id, match_id);
+    eve.send(ClientMsg::WatchMatch { match_id }).await;
+    let ServerMsg::MatchStarted { spectating, .. } =
+        eve.expect("watching", |m| matches!(m, ServerMsg::MatchStarted { .. })).await
+    else {
+        unreachable!()
+    };
+    assert!(spectating);
+
+    let result = play_out(&mut alice, &mut bob, game, sa).await;
+    // Coins for a rated game played to the end.
+    let ServerMsg::CoinsEarned { amount, .. } =
+        alice.expect("coins", |m| matches!(m, ServerMsg::CoinsEarned { .. })).await
+    else {
+        unreachable!()
+    };
+    let alice_won = result.winner == sa;
+    assert_eq!(amount, if alice_won { 25 } else { 10 });
+
+    // The game can be watched again, stroke by stroke.
+    alice.send(ClientMsg::Replays).await;
+    let ServerMsg::Replays { games, limit } =
+        alice.expect("replays", |m| matches!(m, ServerMsg::Replays { .. })).await
+    else {
+        unreachable!()
+    };
+    assert_eq!((games.len(), limit), (1, 10));
+    alice.send(ClientMsg::Replay { match_id: games[0].match_id }).await;
+    let ServerMsg::Replay { replay } =
+        alice.expect("replay", |m| matches!(m, ServerMsg::Replay { .. })).await
+    else {
+        unreachable!()
+    };
+    let (end, _) = replay.replay.play(None).unwrap();
+    assert_eq!(end.game_over().map(|o| o.winner), Some(result.winner));
+    // Only the players (and staff) may.
+    eve.send(ClientMsg::Replay { match_id: games[0].match_id }).await;
+    eve.expect("not hers", |m| matches!(m, ServerMsg::Error { .. })).await;
+
+    // The profile has the rating chart and the career numbers.
+    eve.send(ClientMsg::Profile { username: "alice".into() }).await;
+    let ServerMsg::Profile { profile } =
+        eve.expect("profile", |m| matches!(m, ServerMsg::Profile { .. })).await
+    else {
+        unreachable!()
+    };
+    assert_eq!(profile.rating_history.len(), 1);
+    assert_eq!(profile.career.games, 1);
+    assert!(profile.career.shots > 0);
+}
+
+#[tokio::test]
+async fn arenas_with_an_entry_fee() {
+    let url = start(Rules::default()).await;
+    let (mut alice, _) = Client::register(&url, "alice").await;
+    let (mut bob, _) = Client::register(&url, "bob").await;
+    // The daily bonus (20 coins) pays the entry.
+    for c in [&mut alice, &mut bob] {
+        c.expect("daily bonus", |m| matches!(m, ServerMsg::CoinsEarned { .. })).await;
+    }
+    alice
+        .send(ClientMsg::CreateTournament {
+            name: "Blitz".into(),
+            size: 4,
+            rated: false,
+            password: None,
+            entry_fee: 1000,
+            format: snook_proto::TournamentFormat::Arena,
+        })
+        .await;
+    alice.expect("too dear", |m| matches!(m, ServerMsg::Error { .. })).await;
+    alice
+        .send(ClientMsg::CreateTournament {
+            name: "Blitz".into(),
+            size: 4,
+            rated: false,
+            password: None,
+            entry_fee: 10,
+            format: snook_proto::TournamentFormat::Arena,
+        })
+        .await;
+    let ServerMsg::TournamentUpdated { tournament } =
+        bob.expect("created", |m| matches!(m, ServerMsg::TournamentUpdated { .. })).await
+    else {
+        unreachable!()
+    };
+    assert_eq!((tournament.entry_fee, tournament.prizes), (10, [7, 2]));
+    bob.send(ClientMsg::JoinTournament { id: tournament.id, password: None }).await;
+    let ServerMsg::TournamentUpdated { tournament } = alice
+        .expect("joined", |m| {
+            matches!(m, ServerMsg::TournamentUpdated { tournament } if tournament.players.len() == 2)
+        })
+        .await
+    else {
+        unreachable!()
+    };
+    assert_eq!(tournament.prizes, [14, 4], "the pot grows");
+    alice.send(ClientMsg::StartTournament { id: tournament.id }).await;
+    alice.expect("paired", |m| matches!(m, ServerMsg::MatchStarted { .. })).await;
+    bob.expect("paired", |m| matches!(m, ServerMsg::MatchStarted { .. })).await;
+    alice.send(ClientMsg::Resign).await;
+    let ServerMsg::TournamentUpdated { tournament } = alice
+        .expect("standings", |m| {
+            matches!(m, ServerMsg::TournamentUpdated { tournament } if tournament.standings.iter().any(|s| s.points > 0))
+        })
+        .await
+    else {
+        unreachable!()
+    };
+    assert_eq!(tournament.standings[0].username, "bob");
+    assert_eq!((tournament.standings[0].points, tournament.standings[0].streak), (2, 1));
+    assert!(tournament.ends_at.is_some());
 }

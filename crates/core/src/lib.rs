@@ -23,5 +23,6 @@ pub use rules::{
 };
 pub mod ai;
 pub mod rating;
+pub mod stats;
 
 pub use ai::{AiDecision, Difficulty};

@@ -11,6 +11,7 @@
 //! - `GET /api/status`, `GET /api/leaderboard`: public JSON;
 //! - `/admin`: the staff panel (see [`admin`]).
 
+pub mod account;
 pub mod admin;
 pub mod lan;
 pub mod limits;
@@ -141,7 +142,7 @@ const IDLE_TIMEOUT: Duration = Duration::from_secs(75);
 const MAX_MESSAGE_BYTES: usize = 16 * 1024;
 const OUTGOING_QUEUE: usize = 512;
 /// Game sessions last this long; they are renewed when used after a day.
-const SESSION_LIFETIME: i64 = 60 * 60 * 24 * 30;
+pub(crate) const SESSION_LIFETIME: i64 = 60 * 60 * 24 * 30;
 const SESSION_RENEW_AFTER: i64 = 60 * 60 * 24;
 const RESERVED_NAMES: &[&str] =
     &["admin", "administrator", "snook", "moderator", "mod", "system", "staff", "support", "guest"];
@@ -155,10 +156,15 @@ impl Server {
             Some(_) => return Err("this build has no database support".into()),
             None => Store::memory(),
         };
+        Ok(Self::with_store(config, store).await)
+    }
+
+    /// A server on an existing store.
+    pub async fn with_store(config: Config, store: Store) -> Arc<Self> {
         let _ = store.purge_sessions(now()).await;
         let (tx, rx) = mpsc::unbounded_channel();
         let stripe = config.stripe.clone().map(payments::Stripe::new);
-        Ok(Arc::new(Server {
+        Arc::new(Server {
             stripe,
             store,
             lounge: Mutex::new(Lounge::new(config.rules.clone(), tx)),
@@ -170,7 +176,7 @@ impl Server {
             hashing: Semaphore::new(2),
             leaderboard: Mutex::new(None),
             connections: Mutex::new(HashMap::new()),
-        }))
+        })
     }
 
     /// Runs `f` with the lounge locked.
@@ -213,7 +219,7 @@ impl Server {
         {
             return list.clone();
         }
-        match self.store.leaderboard(100).await {
+        match self.store.leaderboard(100, now()).await {
             Ok(list) => {
                 *self.leaderboard.lock().unwrap_or_else(|e| e.into_inner()) =
                     Some((Instant::now(), list.clone()));
@@ -226,7 +232,7 @@ impl Server {
         }
     }
 
-    fn invalidate_leaderboard(&self) {
+    pub(crate) fn invalidate_leaderboard(&self) {
         *self.leaderboard.lock().unwrap_or_else(|e| e.into_inner()) = None;
     }
 
@@ -330,6 +336,22 @@ pub async fn serve(listener: TcpListener, server: Arc<Server>) -> std::io::Resul
     axum::serve(listener, router(server).into_make_service_with_connect_info::<SocketAddr>()).await
 }
 
+/// Stops gracefully: no new games, a notice in the lounge, and up to `secs`
+/// for the games in progress to end. Whatever is still being played then is
+/// handed to the next server (it is saved after every stroke; the players'
+/// games reconnect and the new server rebuilds the table).
+pub async fn drain(server: Arc<Server>, secs: u64) {
+    server.with(|l| l.start_drain(secs));
+    tracing::info!(secs, "draining: waiting for {} games", server.with(|l| l.running_games()));
+    let deadline = Instant::now() + Duration::from_secs(secs + 10);
+    while server.with(|l| l.running_games()) > 0 && Instant::now() < deadline {
+        tokio::time::sleep(Duration::from_secs(1)).await;
+    }
+    // Let the effect worker write what is still queued (results, saved games).
+    tokio::time::sleep(Duration::from_secs(2)).await;
+    tracing::info!("drained");
+}
+
 /// The ticker (shot clocks, tournaments), the effect worker and housekeeping.
 pub fn spawn_background(server: Arc<Server>) {
     let ticker = server.clone();
@@ -343,6 +365,8 @@ pub fn spawn_background(server: Arc<Server>) {
                 last_sweep = Instant::now();
                 ticker.auth().sweep();
                 let _ = ticker.store.purge_sessions(now()).await;
+                // Saved games nobody came back to within a day.
+                let _ = ticker.store.purge_live(now() - 86_400).await;
             }
         }
     });
@@ -375,18 +399,57 @@ async fn run_effect(server: &Arc<Server>, effect: Effect) {
                 server.with(|l| l.commit_shot(room, turn, outcome));
             });
         }
-        Effect::RecordMatch { record, keys } => match server.store.record_match(&record).await {
-            Ok(users) => {
-                server.invalidate_leaderboard();
-                for (seat, user) in users.into_iter().enumerate() {
-                    let Some(user) = user else { continue };
-                    server.with(|l| l.refresh_user(user.clone()));
-                    let rated_win = record.rated && record.winner == seat;
-                    server.check_achievements_after(&user, rated_win).await;
+        Effect::RecordMatch { record, keys, farmed } => {
+            match server.store.record_match(&record).await {
+                Ok((users, _)) => {
+                    server.invalidate_leaderboard();
+                    // Coins for a rated game played to the end (not a walkover,
+                    // not two friends farming each other).
+                    let pays = record.rated
+                        && !farmed
+                        && record.abandoned.is_none()
+                        && record.shots >= account::MIN_SHOTS_FOR_COINS;
+                    for (seat, user) in users.into_iter().enumerate() {
+                        let Some(user) = user else { continue };
+                        server.with(|l| l.refresh_user(user.clone()));
+                        let rated_win = record.rated && record.winner == seat;
+                        server.check_achievements_after(&user, rated_win).await;
+                        if pays {
+                            account::game_coins(server, &user, record.winner == seat).await;
+                            shop::push_wallet(server, &user).await;
+                        }
+                    }
                 }
+                Err(e) => tracing::error!("could not record the match {keys:?}: {e}"),
             }
-            Err(e) => tracing::error!("could not record the match {keys:?}: {e}"),
-        },
+        }
+        Effect::SaveLive(m) => {
+            if let Err(e) = server.store.save_live(&m).await {
+                tracing::warn!(room = m.id, "could not save the game in progress: {e}");
+            }
+        }
+        Effect::DeleteLive(id) => {
+            let _ = server.store.delete_live(id).await;
+        }
+        Effect::ShotStats { user_id, bands } => {
+            if let Err(e) = server.store.add_shot_stats(user_id, &bands).await {
+                tracing::warn!("shot statistics of {user_id}: {e}");
+            }
+        }
+        Effect::Pay { user_id, name, coins, reason, reference } => {
+            match server.store.credit(user_id, coins, &reason, Some(&reference), now()).await {
+                Ok(true) => {
+                    server.with(|l| {
+                        l.notify(&name, ServerMsg::CoinsEarned { amount: coins as u32, reason })
+                    });
+                    if let Ok(Some(user)) = server.store.user_by_id(user_id).await {
+                        shop::push_wallet(server, &user).await;
+                    }
+                }
+                Ok(false) => {}
+                Err(e) => tracing::error!("paying {coins} coins to {name} ({reference}): {e}"),
+            }
+        }
         Effect::RecordTournament(t) => {
             if let Err(e) = server.store.record_tournament(&t).await {
                 tracing::error!("could not record the tournament {}: {e}", t.name);
@@ -664,6 +727,9 @@ async fn authenticate(server: &Arc<Server>, msg: ClientMsg, ip: &str) -> Auth {
                 banned_until: None,
                 ban_reason: None,
                 muted_until: None,
+                recovery_email: None,
+                deleted_at: None,
+                abandons: 0,
             };
             Auth::Ok { user: Box::new(user), token: String::new(), guest: true }
         }
@@ -755,6 +821,9 @@ async fn handle_socket(server: Arc<Server>, socket: WebSocket, ip: IpAddr) {
                 | ClientMsg::Guest { .. }) => match authenticate(&server, msg, &ip_text).await {
                     Auth::Ok { user: row, token, guest } => {
                         let row = *row;
+                        if !guest {
+                            restore_live(&server, &row).await;
+                        }
                         let blocked: HashSet<i64> = if guest {
                             HashSet::new()
                         } else {
@@ -786,6 +855,7 @@ async fn handle_socket(server: Arc<Server>, socket: WebSocket, ip: IpAddr) {
                             let r = row.clone();
                             tokio::spawn(async move {
                                 s.check_achievements(&r).await;
+                                account::signed_in(&s, &r).await;
                                 shop::push_wallet(&s, &r).await;
                             });
                             if let Ok(friends) = server.store.friends(row.id).await
@@ -853,8 +923,36 @@ async fn handle_socket(server: Arc<Server>, socket: WebSocket, ip: IpAddr) {
             msg if guest && is_account_msg(&msg) => {
                 send(ServerMsg::Error { message: "Guests don't have this.".into() })
             }
+            msg @ (ClientMsg::Account
+            | ClientMsg::ChangePassword { .. }
+            | ClientMsg::SetRecoveryEmail { .. }
+            | ClientMsg::DeleteAccount { .. }) => {
+                if account::handle(&server, &me, token_in_use.as_deref(), msg, &send).await {
+                    break;
+                }
+            }
+            ClientMsg::Replays => {
+                let vip =
+                    shop::is_vip(&server.store.wallet(me.id).await.unwrap_or_default(), now());
+                let limit = if vip { 0 } else { FREE_REPLAYS };
+                let games = server
+                    .store
+                    .history(me.id, if vip { 200 } else { FREE_REPLAYS })
+                    .await
+                    .unwrap_or_default()
+                    .into_iter()
+                    .filter(|h| h.replay)
+                    .map(history_entry)
+                    .collect();
+                send(ServerMsg::Replays { games, limit });
+            }
+            ClientMsg::Replay { match_id } => match replay_for(&server, &me, match_id).await {
+                Some(replay) => send(ServerMsg::Replay { replay: Box::new(replay) }),
+                None => send(ServerMsg::Error { message: "This replay is not available.".into() }),
+            },
             msg @ (ClientMsg::Shop
             | ClientMsg::BuyItem { .. }
+            | ClientMsg::GiftItem { .. }
             | ClientMsg::Equip { .. }
             | ClientMsg::BuyCoins { .. }
             | ClientMsg::SubscribeVip
@@ -935,6 +1033,74 @@ async fn handle_socket(server: Arc<Server>, socket: WebSocket, ip: IpAddr) {
             ClientMsg::Report { username, reason, details } => {
                 report(&server, &me, &username, reason, &details, &send).await
             }
+            ClientMsg::JoinTournament { id, password } if !guest => {
+                let fee = server.with(|l| l.tournament_fee(id)) as i64;
+                let reference = format!("tour:{id}:{}", me.id);
+                if fee > 0 {
+                    match server
+                        .store
+                        .spend(me.id, fee, "tournament entry", Some(&reference), now())
+                        .await
+                    {
+                        Ok(true) => {}
+                        Ok(false) => {
+                            send(ServerMsg::Error { message: "Not enough coins.".into() });
+                            continue;
+                        }
+                        Err(e) => {
+                            tracing::error!("tournament fee: {e}");
+                            continue;
+                        }
+                    }
+                }
+                let key = lounge::key(&me.username);
+                let joined = server.with(|l| l.join_tournament(&key, id, password, fee > 0));
+                if fee > 0 {
+                    if joined == lounge::Joined::No {
+                        let _ = server
+                            .store
+                            .credit(
+                                me.id,
+                                fee,
+                                "refund",
+                                Some(&format!("refund:{reference}")),
+                                now(),
+                            )
+                            .await;
+                    }
+                    shop::push_wallet(&server, &me).await;
+                }
+            }
+            ClientMsg::CreateTournament { name, size, rated, password, entry_fee, format }
+                if !guest && entry_fee > 0 =>
+            {
+                let fee = entry_fee.min(lounge::tournaments_max_fee()) as i64;
+                let tmp = format!("tour:new:{}:{}", me.id, now_millis());
+                match server.store.spend(me.id, fee, "tournament entry", Some(&tmp), now()).await {
+                    Ok(true) => {}
+                    Ok(false) => {
+                        send(ServerMsg::Error { message: "Not enough coins.".into() });
+                        continue;
+                    }
+                    Err(e) => {
+                        tracing::error!("tournament fee: {e}");
+                        continue;
+                    }
+                }
+                let key = lounge::key(&me.username);
+                let created = server.with(|l| {
+                    l.create_tournament(
+                        &key, &name, size, rated, password, fee as u32, format, true,
+                    )
+                });
+                if created.is_none() {
+                    let _ = server
+                        .store
+                        .credit(me.id, fee, "refund", Some(&format!("refund:{tmp}")), now())
+                        .await;
+                }
+                shop::push_wallet(&server, &me).await;
+            }
             other => {
                 let name = me.username.clone();
                 server.with(|l| l.handle(&name, other));
@@ -966,6 +1132,12 @@ fn is_query_msg(msg: &ClientMsg) -> bool {
             | ClientMsg::Block { .. }
             | ClientMsg::Unblock { .. }
             | ClientMsg::Report { .. }
+            | ClientMsg::Account
+            | ClientMsg::ChangePassword { .. }
+            | ClientMsg::SetRecoveryEmail { .. }
+            | ClientMsg::DeleteAccount { .. }
+            | ClientMsg::Replays
+            | ClientMsg::Replay { .. }
     )
 }
 
@@ -986,7 +1158,64 @@ fn is_account_msg(msg: &ClientMsg) -> bool {
             | ClientMsg::BuyCoins { .. }
             | ClientMsg::SubscribeVip
             | ClientMsg::ManageVip
+            | ClientMsg::GiftItem { .. }
+            | ClientMsg::Account
+            | ClientMsg::ChangePassword { .. }
+            | ClientMsg::SetRecoveryEmail { .. }
+            | ClientMsg::DeleteAccount { .. }
+            | ClientMsg::Replays
+            | ClientMsg::Replay { .. }
+            | ClientMsg::CreateInviteCode { .. }
     )
+}
+
+/// Free players keep the replays of their last games; VIP members all of them.
+pub const FREE_REPLAYS: u32 = 10;
+
+fn history_entry(h: crate::store::HistoryRow) -> HistoryEntry {
+    HistoryEntry {
+        opponent: h.opponent,
+        opponent_country: h.opponent_country,
+        opponent_rating: h.opponent_rating,
+        won: h.won,
+        reason: parse_reason(&h.reason),
+        rated: h.rated,
+        delta: h.delta,
+        rating_after: h.rating_after,
+        tournament: h.tournament,
+        at: h.at,
+        match_id: h.match_id,
+        replay: h.replay,
+    }
+}
+
+/// A stored game's replay, for a player of that game (within their replay
+/// allowance) or staff.
+async fn replay_for(server: &Server, me: &User, match_id: i64) -> Option<snook_proto::ReplayInfo> {
+    let r = server.store.replay(match_id).await.ok().flatten()?;
+    if !me.role.is_staff() {
+        let mine = r.players.iter().any(|p| p.eq_ignore_ascii_case(&me.username));
+        if !mine {
+            return None;
+        }
+        let vip = shop::is_vip(&server.store.wallet(me.id).await.unwrap_or_default(), now());
+        if !vip {
+            let recent = server.store.history(me.id, FREE_REPLAYS).await.ok()?;
+            if !recent.iter().any(|h| h.match_id == match_id) {
+                return None;
+            }
+        }
+    }
+    Some(snook_proto::ReplayInfo {
+        match_id: r.id,
+        players: r.players,
+        countries: r.countries,
+        ratings: r.ratings,
+        winner: r.winner,
+        rated: r.rated,
+        at: r.at,
+        replay: r.replay,
+    })
 }
 
 async fn friends_msg(server: &Server, user_id: i64, list: Vec<(User, FriendState)>) -> ServerMsg {
@@ -1128,16 +1357,30 @@ async fn profile_msg(server: &Server, viewer: Option<&User>, name: &str) -> Opti
                     history: Vec::new(),
                     relation: Relation::None,
                     last_seen: 0,
+                    rating_history: Vec::new(),
+                    career: Default::default(),
+                    abandon_rate: 0,
                 }),
             });
         }
     };
+    if user.deleted_at.is_some() {
+        return None;
+    }
     let (achievements, history, rank, friends) = tokio::join!(
         server.store.achievements(user.id),
         server.store.history(user.id, 25),
         server.store.rank_of(user.id),
         server.store.friend_count(user.id),
     );
+    let (rating_history, career, wallet) = tokio::join!(
+        server.store.rating_history(user.id, 100),
+        server.store.career(user.id),
+        server.store.wallet(user.id),
+    );
+    let wallet = wallet.unwrap_or_default();
+    let played = user.games + user.casual_games;
+    let abandon_rate = (user.abandons * 100).checked_div(played).unwrap_or(0).min(100);
     let mut stats = user.stats(now());
     stats.friends = friends.unwrap_or(0);
     let relation = match viewer {
@@ -1175,38 +1418,74 @@ async fn profile_msg(server: &Server, viewer: Option<&User>, name: &str) -> Opti
     let known: HashSet<&str> = ACHIEVEMENTS.iter().map(|a| a.code).collect();
     Some(ServerMsg::Profile {
         profile: Box::new(Profile {
-            player: online
-                .clone()
-                .unwrap_or_else(|| player_info(&user, false, PlayerStatus::Available)),
+            player: online.clone().unwrap_or_else(|| {
+                // Offline: dress the card from the wallet (VIP crown, frame…).
+                let achievements: Vec<String> = achievements
+                    .as_ref()
+                    .map(|a| a.iter().map(|(c, _)| c.clone()).collect())
+                    .unwrap_or_default();
+                lounge::dressed(
+                    player_info(&user, false, PlayerStatus::Available),
+                    &shop::look_of(&wallet, &achievements, now()),
+                )
+            }),
             online: online.is_some(),
             stats,
             created_at: user.created_at,
             rank: rank.ok().flatten(),
             achievements: achievements
+                .clone()
                 .unwrap_or_default()
                 .into_iter()
                 .filter(|(c, _)| known.contains(c.as_str()))
                 .collect(),
-            history: history
-                .unwrap_or_default()
-                .into_iter()
-                .map(|h| HistoryEntry {
-                    opponent: h.opponent,
-                    opponent_country: h.opponent_country,
-                    opponent_rating: h.opponent_rating,
-                    won: h.won,
-                    reason: parse_reason(&h.reason),
-                    rated: h.rated,
-                    delta: h.delta,
-                    rating_after: h.rating_after,
-                    tournament: h.tournament,
-                    at: h.at,
-                })
-                .collect(),
+            history: history.unwrap_or_default().into_iter().map(history_entry).collect(),
             relation,
             last_seen: if relation == Relation::Friend { user.last_seen } else { 0 },
+            rating_history: rating_history.unwrap_or_default(),
+            career: career.unwrap_or_default(),
+            abandon_rate,
         }),
     })
+}
+
+fn now_millis() -> u128 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis())
+        .unwrap_or(0)
+}
+
+/// A player signing in whose game was saved by a server that went away:
+/// rebuild it here (the lounge then puts them back at the table).
+async fn restore_live(server: &Arc<Server>, user: &User) {
+    let Ok(Some(live)) = server.store.live_match_of(user.id).await else { return };
+    if server.with(|l| l.has_room(live.id as u64)) {
+        return;
+    }
+    let other = if live.players[0] == user.id { live.players[1] } else { live.players[0] };
+    let (a, b) = tokio::join!(
+        server.store.user_by_id(live.players[0]),
+        server.store.user_by_id(live.players[1])
+    );
+    let (Ok(Some(a)), Ok(Some(b))) = (a, b) else {
+        let _ = server.store.delete_live(live.id).await;
+        return;
+    };
+    let replay = live.replay.clone();
+    let rebuilt = tokio::task::spawn_blocking(move || lounge::Rebuilt::from(&replay)).await;
+    match rebuilt {
+        Ok(Ok(rebuilt)) => {
+            if server.with(|l| l.restore(&live, [a, b], rebuilt)) {
+                tracing::info!(room = live.id, other, "saved game rebuilt");
+            }
+        }
+        Ok(Err(e)) => {
+            tracing::warn!(room = live.id, "saved game could not be rebuilt: {e}");
+            let _ = server.store.delete_live(live.id).await;
+        }
+        Err(e) => tracing::error!("rebuilding a game panicked: {e}"),
+    }
 }
 
 /// Lower-case key of a username (re-exported for the admin panel).

@@ -53,23 +53,31 @@ fn wallet_msg(w: &Wallet) -> ServerMsg {
     }
 }
 
+/// What others see of a player: the VIP crown and the items in use.
+pub fn look_of(w: &Wallet, achievements: &[String], t: i64) -> Look {
+    let item = |c: Category| effective(w, achievements, c, t).to_string();
+    Look {
+        vip: is_vip(w, t),
+        cue: item(Category::Cue),
+        chalk: item(Category::Chalk),
+        cloth: item(Category::Cloth),
+        balls: item(Category::Balls),
+        frame: item(Category::Frame),
+        name_style: item(Category::Name),
+        effect: item(Category::Effect),
+    }
+}
+
+async fn achievements_of(server: &Server, id: i64) -> Vec<String> {
+    server.store.achievements(id).await.unwrap_or_default().into_iter().map(|(c, _)| c).collect()
+}
+
 /// Sends `user` their wallet and updates what others see of them.
 pub async fn push_wallet(server: &Server, user: &User) {
-    let Ok(w) = server.store.wallet(user.id).await else { return };
-    let achievements: Vec<String> = server
-        .store
-        .achievements(user.id)
-        .await
-        .unwrap_or_default()
-        .into_iter()
-        .map(|(c, _)| c)
-        .collect();
-    let t = now();
-    let look = Look {
-        vip: is_vip(&w, t),
-        cue: effective(&w, &achievements, Category::Cue, t).to_string(),
-        chalk: effective(&w, &achievements, Category::Chalk, t).to_string(),
-    };
+    let (w, achievements) =
+        tokio::join!(server.store.wallet(user.id), achievements_of(server, user.id));
+    let Ok(w) = w else { return };
+    let look = look_of(&w, &achievements, now());
     let msg = wallet_msg(&w);
     server.with(|l| {
         l.notify(&user.username, msg);
@@ -122,7 +130,7 @@ pub async fn handle(server: &Arc<Server>, me: &User, msg: ClientMsg, send: &impl
                     tracing::info!(user = me.id, item = item.code, price, "item bought");
                     // Bought to be used: put it on straight away.
                     let _ = server.store.equip(me.id, item.category.code(), item.code).await;
-                    send(ServerMsg::Notice { text: "Purchase complete.".into() });
+                    send(ServerMsg::ItemBought { code: item.code.to_string(), gift_to: None });
                     push_wallet(server, me).await;
                 }
                 Ok(BuyOutcome::AlreadyOwned) => error("You already have this item."),
@@ -133,17 +141,49 @@ pub async fn handle(server: &Arc<Server>, me: &User, msg: ClientMsg, send: &impl
                 }
             }
         }
+        ClientMsg::GiftItem { to, code } => {
+            let Some(item) = shop::item(&code) else { return error("No such item.") };
+            let Some(price) = item.coins() else {
+                return error("Only items sold for coins can be given.");
+            };
+            let Ok(Some(friend)) = server.store.user_by_name(to.trim()).await else {
+                return error("No such player.");
+            };
+            let friends = server.store.friends(me.id).await.unwrap_or_default();
+            let is_friend = friends
+                .iter()
+                .any(|(u, st)| u.id == friend.id && *st == crate::store::FriendState::Friends);
+            if !is_friend {
+                return error("You can only give items to your friends.");
+            }
+            match server.store.gift_item(me.id, friend.id, item.code, price as i64, now()).await {
+                Ok(BuyOutcome::Bought) => {
+                    tracing::info!(from = me.id, to = friend.id, item = item.code, "item given");
+                    send(ServerMsg::ItemBought {
+                        code: item.code.to_string(),
+                        gift_to: Some(friend.username.clone()),
+                    });
+                    push_wallet(server, me).await;
+                    let msg = ServerMsg::GiftReceived {
+                        from: me.username.clone(),
+                        code: item.code.to_string(),
+                    };
+                    server.with(|l| l.notify(&friend.username, msg));
+                    push_wallet(server, &friend).await;
+                }
+                Ok(BuyOutcome::AlreadyOwned) => error("Your friend already has this item."),
+                Ok(BuyOutcome::NotEnoughCoins) => error("Not enough coins."),
+                Err(e) => {
+                    tracing::error!("gift {code} from {}: {e}", me.username);
+                    error("The purchase failed; no coins were taken.")
+                }
+            }
+        }
         ClientMsg::Equip { code } => {
             let Some(item) = shop::item(&code) else { return error("No such item.") };
-            let w = server.store.wallet(me.id).await.unwrap_or_default();
-            let achievements: Vec<String> = server
-                .store
-                .achievements(me.id)
-                .await
-                .unwrap_or_default()
-                .into_iter()
-                .map(|(c, _)| c)
-                .collect();
+            let (w, achievements) =
+                tokio::join!(server.store.wallet(me.id), achievements_of(server, me.id));
+            let w = w.unwrap_or_default();
             if !shop::can_use(item, &w.owned, &achievements, is_vip(&w, now())) {
                 return error("You don't have this item.");
             }
@@ -244,6 +284,28 @@ fn str_of<'a>(v: &'a Value, key: &str) -> Option<&'a str> {
     v.get(key).and_then(Value::as_str)
 }
 
+/// The e-mail the customer gave on the payment page (a checkout session
+/// or an invoice).
+fn email_of(obj: &Value) -> Option<String> {
+    obj.pointer("/customer_details/email")
+        .and_then(Value::as_str)
+        .or_else(|| str_of(obj, "customer_email"))
+        .map(|e| e.trim().to_lowercase())
+        .filter(|e| crate::account::valid_email(e))
+}
+
+/// After a payment: a player without a recovery e-mail is offered the one
+/// they just paid with.
+async fn offer_email(server: &Server, user: &User) {
+    if user.recovery_email.is_some() {
+        return;
+    }
+    if let Ok(Some(email)) = server.store.payment_email(user.id).await {
+        let msg = ServerMsg::Account { recovery_email: None, payment_email: Some(email) };
+        server.with(|l| l.notify(&user.username, msg));
+    }
+}
+
 async fn user_of(server: &Server, obj: &Value) -> Option<User> {
     // Our own reference first, then the customer.
     let id = str_of(obj, "client_reference_id")
@@ -285,6 +347,7 @@ async fn vip_paid(
     end: i64,
     amount: i64,
     currency: &str,
+    email: Option<String>,
 ) -> Result<(), String> {
     let err = |e: crate::store::StoreError| e.to_string();
     // A month that was refunded stays refunded, whatever arrives after.
@@ -303,6 +366,7 @@ async fn vip_paid(
             currency: currency.to_string(),
             at: now(),
             refunded: false,
+            email,
         })
         .await
         .map_err(err)?;
@@ -323,6 +387,7 @@ async fn vip_paid(
     if first {
         tracing::info!(user = user.id, until = end, "VIP paid");
         notify(server, user, "Welcome to VIP!").await;
+        offer_email(server, user).await;
     } else {
         push_wallet(server, user).await;
     }
@@ -352,7 +417,9 @@ pub async fn apply_event(server: &Server, event: &Value) -> Result<(), String> {
             {
                 let amount = obj["amount_total"].as_i64().unwrap_or(0);
                 let currency = str_of(obj, "currency").unwrap_or("");
-                vip_paid(server, &user, invoice, now() + 31 * 86_400, amount, currency).await?;
+                let email = email_of(obj);
+                vip_paid(server, &user, invoice, now() + 31 * 86_400, amount, currency, email)
+                    .await?;
             }
             // Coin packs; Pix and boleto are paid later (async_payment_succeeded).
             if str_of(obj, "mode") == Some("payment")
@@ -375,6 +442,7 @@ pub async fn apply_event(server: &Server, event: &Value) -> Result<(), String> {
                         currency: str_of(obj, "currency").unwrap_or("").to_string(),
                         at: now(),
                         refunded: false,
+                        email: email_of(obj),
                     })
                     .await
                     .map_err(err)?;
@@ -392,6 +460,7 @@ pub async fn apply_event(server: &Server, event: &Value) -> Result<(), String> {
                 if applied {
                     tracing::info!(user = user.id, coins, "coins bought");
                     notify(server, &user, "Coins added to your wallet.").await;
+                    offer_email(server, &user).await;
                 }
             }
         }
@@ -410,7 +479,7 @@ pub async fn apply_event(server: &Server, event: &Value) -> Result<(), String> {
                 .unwrap_or(now() + 31 * 86_400);
             let amount = obj["amount_paid"].as_i64().unwrap_or(0);
             let currency = str_of(obj, "currency").unwrap_or("");
-            vip_paid(server, &user, invoice, end, amount, currency).await?;
+            vip_paid(server, &user, invoice, end, amount, currency, email_of(obj)).await?;
         }
         "customer.subscription.deleted" => {
             if let Some(user) = user_of(server, obj).await {

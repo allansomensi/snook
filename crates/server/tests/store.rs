@@ -3,11 +3,13 @@
 //! database (it is wiped first), e.g.
 //! `SNOOK_TEST_DATABASE_URL=postgres://snook:snook@localhost/snook_test`.
 
-use snook_core::GameOverReason;
+use snook_core::stats::ShotStats;
+use snook_core::{GameOverReason, Shot};
 use snook_proto::Role;
+use snook_proto::replay::{Replay, Stroke};
 use snook_server::store::{
-    BuyOutcome, FriendOutcome, FriendState, MatchRecord, NewReport, NewUser, Payment, SessionKind,
-    Store, TournamentRecord,
+    BuyOutcome, FriendOutcome, FriendState, LiveMatch, MatchRecord, NewReport, NewUser, Payment,
+    SessionKind, Store, TournamentRecord, day_of,
 };
 
 fn new_user<'a>(name: &'a str) -> NewUser<'a> {
@@ -50,27 +52,82 @@ async fn exercise(store: Store) {
         runout: true,
         shutout: false,
         ended_at: t,
+        replay: Some(Replay {
+            seed: u64::MAX - 5,
+            breaker: 1,
+            strokes: vec![
+                Stroke::Shot {
+                    shot: Shot::new(0.25, 3.5),
+                    called: None,
+                    cue_ball: None,
+                    timeout: false,
+                },
+                Stroke::TimeFoul,
+            ],
+        }),
+        stats: [
+            ShotStats {
+                shots: 10,
+                potting_shots: 6,
+                balls: 7,
+                fouls: 1,
+                best_run: 4,
+                ..Default::default()
+            },
+            ShotStats {
+                shots: 8,
+                potting_shots: 2,
+                balls: 2,
+                fouls: 2,
+                best_run: 1,
+                ..Default::default()
+            },
+        ],
+        abandoned: None,
     };
-    let [ua, ub] = store.record_match(&m).await.unwrap();
+    let ([ua, ub], match_id) = store.record_match(&m).await.unwrap();
     let (ua, ub) = (ua.unwrap(), ub.unwrap());
     assert_eq!((ua.rating, ua.peak_rating, ua.games, ua.wins, ua.streak), (1216, 1216, 1, 1, 1));
     assert_eq!((ua.eight_wins, ua.runouts, ua.shutouts), (1, 1, 0));
     assert_eq!((ub.rating, ub.peak_rating, ub.games, ub.wins, ub.streak), (1184, 1200, 1, 0, 0));
-    let casual = MatchRecord { rated: false, delta: [0, 0], winner: 1, ..m.clone() };
-    let [ua, ub] = store.record_match(&casual).await.unwrap();
-    assert_eq!(ua.unwrap().casual_games, 1);
+    let casual = MatchRecord {
+        rated: false,
+        delta: [0, 0],
+        winner: 1,
+        replay: None,
+        stats: Default::default(),
+        abandoned: Some(0),
+        ..m.clone()
+    };
+    let ([ua, ub], _) = store.record_match(&casual).await.unwrap();
+    let ua = ua.unwrap();
+    assert_eq!((ua.casual_games, ua.abandons), (1, 1));
     // Feats only count in rated games.
     assert_eq!(ub.unwrap().eight_wins, 0);
 
+    // Replays, end-of-game numbers and the rating chart.
+    let r = store.replay(match_id).await.unwrap().expect("replay kept");
+    assert_eq!(r.replay, m.replay.clone().unwrap());
+    assert_eq!((r.players[0].as_str(), r.ratings, r.winner), ("Alice", [1200, 1200], 0));
+    assert!(store.replay(match_id + 1).await.unwrap().is_none(), "the casual game has none");
+    let c = store.career(a.id).await.unwrap();
+    assert_eq!((c.games, c.shots, c.balls, c.best_run, c.pot_rate()), (1, 10, 7, 4, 60));
+    assert_eq!(store.rating_history(a.id, 10).await.unwrap(), vec![(t, 1216)]);
+
     let history = store.history(b.id, 10).await.unwrap();
     assert_eq!(history.len(), 2);
+    assert_eq!(
+        (history[1].match_id, history[1].replay, history[0].replay),
+        (match_id, true, false)
+    );
     assert_eq!(history[1].opponent, "Alice");
     assert_eq!((history[1].won, history[1].delta, history[1].rating_after), (false, -16, 1184));
     assert_eq!(history[1].reason, "pocketed_eight");
 
-    let lb = store.leaderboard(10).await.unwrap();
+    let lb = store.leaderboard(10, t).await.unwrap();
     assert_eq!(lb[0].username, "Alice");
     assert_eq!(lb[0].country, "BR");
+    assert!(!lb[0].vip);
     assert_eq!(store.rank_of(b.id).await.unwrap(), Some(2));
 
     // The shop: credits are applied once per reference, purchases never
@@ -106,6 +163,7 @@ async fn exercise(store: Store) {
         currency: "brl".into(),
         at: t,
         refunded: false,
+        email: Some("alice@example.com".into()),
     };
     assert!(store.record_payment(&p).await.unwrap());
     assert!(!store.record_payment(&p).await.unwrap());
@@ -116,6 +174,68 @@ async fn exercise(store: Store) {
     assert!(!store.grant_item(a.id, "cue_ebony", "staff", t).await.unwrap());
     assert_eq!(store.ledger(a.id, 10).await.unwrap().len(), 2);
     assert_eq!(store.payments_of(a.id, 10).await.unwrap().len(), 1);
+    assert_eq!(store.payment_email(a.id).await.unwrap().as_deref(), Some("alice@example.com"));
+    store.set_vip(a.id, t + 1000, false).await.unwrap();
+    assert!(store.leaderboard(10, t).await.unwrap()[0].vip, "the crown shows in the ranking");
+
+    // Coins for playing: the daily bonus once a day, games up to a cap.
+    let day = day_of(t);
+    let before = store.wallet(a.id).await.unwrap().coins;
+    assert!(store.claim_daily(a.id, day, 20).await.unwrap());
+    assert!(!store.claim_daily(a.id, day, 20).await.unwrap());
+    assert_eq!(store.earn(a.id, day, 25, 40, "win", t).await.unwrap(), 25);
+    assert_eq!(store.earn(a.id, day, 25, 40, "win", t).await.unwrap(), 15, "capped");
+    assert_eq!(store.earn(a.id, day, 25, 40, "win", t).await.unwrap(), 0);
+    assert_eq!(store.earn(a.id, day + 1, 25, 40, "win", t).await.unwrap(), 25, "a new day");
+    assert_eq!(store.wallet(a.id).await.unwrap().coins, before + 20 + 25 + 15 + 25);
+    // Spending and gifts never go below zero.
+    let coins = store.wallet(a.id).await.unwrap().coins;
+    assert!(!store.spend(a.id, coins + 1, "fee", Some("tour:1:1"), t).await.unwrap());
+    assert!(store.spend(a.id, 10, "fee", Some("tour:1:1"), t).await.unwrap());
+    assert_eq!(
+        store.gift_item(a.id, b.id, "chalk_red", 1_000_000, t).await.unwrap(),
+        BuyOutcome::NotEnoughCoins
+    );
+    assert_eq!(store.gift_item(a.id, b.id, "chalk_red", 150, t).await.unwrap(), BuyOutcome::Bought);
+    assert_eq!(
+        store.gift_item(a.id, b.id, "chalk_red", 150, t).await.unwrap(),
+        BuyOutcome::AlreadyOwned
+    );
+    assert!(store.wallet(b.id).await.unwrap().owned.contains(&"chalk_red".to_string()));
+    assert_eq!(store.wallet(a.id).await.unwrap().coins, coins - 10 - 150);
+
+    // Games in progress survive a restart.
+    let live = LiveMatch {
+        id: 1 << 40,
+        players: [a.id, b.id],
+        rated: true,
+        replay: m.replay.clone().unwrap(),
+        updated_at: t,
+    };
+    store.save_live(&live).await.unwrap();
+    let mut later = live.clone();
+    later.replay.strokes.push(Stroke::Resign { seat: 0 });
+    later.updated_at = t + 5;
+    store.save_live(&later).await.unwrap();
+    assert_eq!(store.live_match_of(b.id).await.unwrap(), Some(later.clone()));
+    assert_eq!(store.purge_live(t).await.unwrap(), 0);
+    store.delete_live(live.id).await.unwrap();
+    assert!(store.live_match_of(a.id).await.unwrap().is_none());
+
+    // Aim statistics.
+    store.add_shot_stats(a.id, &[(14, 10, 9), (2, 5, 5)]).await.unwrap();
+    store.add_shot_stats(a.id, &[(14, 10, 8)]).await.unwrap();
+    let rows = store.aim_rows(&[11, 14], 5).await.unwrap();
+    assert_eq!((rows.len(), rows[0].attempts, rows[0].made), (1, 20, 17));
+    assert!(store.aim_rows(&[11, 14], 50).await.unwrap().is_empty());
+
+    // Activity and metrics.
+    store.mark_active(a.id, day).await.unwrap();
+    store.mark_active(a.id, day).await.unwrap();
+    store.mark_active(b.id, day).await.unwrap();
+    let metrics = store.metrics(t).await.unwrap();
+    assert_eq!(metrics.days.len(), 30);
+    assert_eq!(metrics.days.last().unwrap().1, 2);
 
     // Achievements.
     let new = store.add_achievements(a.id, &["wins_1", "games_1"], t).await.unwrap();
@@ -182,6 +302,8 @@ async fn exercise(store: Store) {
             players: vec![a.id, b.id],
             winner: Some(a.id),
             finished_at: t,
+            entry_fee: 50,
+            prizes: "Alice:70".into(),
         })
         .await
         .unwrap();
@@ -189,6 +311,25 @@ async fn exercise(store: Store) {
     assert_eq!((ua.tournaments_played, ua.tournaments_won), (1, 1));
     store.set_country(a.id, "PT").await.unwrap();
     assert_eq!(store.user_by_id(a.id).await.unwrap().unwrap().country, "PT");
+
+    // Recovery e-mail, then deleting the account: it is anonymised and the
+    // opponent keeps the games.
+    store.set_recovery_email(b.id, Some("bob@example.com")).await.unwrap();
+    let (found, _) = store.search_users("bob@example.com", 0, 10).await.unwrap();
+    assert_eq!(found[0].id, b.id);
+    store.create_session("hash_b", b.id, SessionKind::Game, t, t + 100).await.unwrap();
+    store.delete_account(b.id, t).await.unwrap();
+    let gone = store.user_by_id(b.id).await.unwrap().unwrap();
+    assert_eq!(gone.username, format!("deleted-{}", b.id));
+    assert!(
+        gone.deleted_at.is_some() && gone.recovery_email.is_none() && gone.password_hash.is_empty()
+    );
+    assert!(store.session_user("hash_b", SessionKind::Game, t).await.unwrap().is_none());
+    assert!(store.user_by_name("bob").await.unwrap().is_none());
+    let history = store.history(a.id, 10).await.unwrap();
+    assert_eq!(history.len(), 2, "the other player's history stays");
+    assert_eq!(history[0].opponent, format!("deleted-{}", b.id));
+    assert!(store.leaderboard(10, t).await.unwrap().iter().all(|e| e.username != gone.username));
 }
 
 #[tokio::test]

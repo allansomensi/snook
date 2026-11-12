@@ -52,6 +52,9 @@ fn category_name(c: Category) -> &'static str {
         Category::Cue => t("Cues"),
         Category::Chalk => t("Chalk"),
         Category::Balls => t("Balls"),
+        Category::Frame => t("Frames"),
+        Category::Name => t("Name"),
+        Category::Effect => t("Effects"),
     }
 }
 
@@ -69,7 +72,7 @@ fn preview(item: &Item, r: Rect) {
             draw_circle(c.x + cloth.w * 0.18, c.y + 4.0, 9.0, Color::new(0.96, 0.95, 0.9, 1.0));
             draw_circle(c.x - cloth.w * 0.2, c.y - 6.0, 9.0, Color::new(0.85, 0.12, 0.1, 1.0));
         }
-        Look::Cue { butt, accent, ring } => {
+        Look::Cue { butt, accent, ring, .. } => {
             let (x0, x1) = (r.x + 10.0, r.x + r.w - 10.0);
             let y = c.y;
             let lerp = |k: f32| x0 + (x1 - x0) * k;
@@ -109,7 +112,7 @@ fn preview(item: &Item, r: Rect) {
             draw_rectangle(c.x - s / 2.0, c.y - s / 2.0, s, 8.0, top);
             draw_circle(c.x, c.y - s / 2.0 + 4.0, s * 0.22, Color::new(0.0, 0.0, 0.0, 0.25));
         }
-        Look::Balls { colors, eight, ivory } => {
+        Look::Balls { colors, eight, ivory, .. } => {
             // Two rows: the solids and two stripes, and the 8.
             // Seven balls in a row must fit: 7 × 2.3 radii wide.
             let rad = (r.w / 17.0).min(r.h / 5.5);
@@ -128,6 +131,7 @@ fn preview(item: &Item, r: Rect) {
                 draw_circle(x, c.y + rad * 1.4, rad * 0.42, rgb(ivory));
             }
         }
+        Look::Frame { .. } | Look::Name(_) | Look::Effect { .. } => {}
     }
 }
 

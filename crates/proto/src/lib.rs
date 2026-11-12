@@ -11,6 +11,7 @@
 mod achievements;
 mod countries;
 mod reactions;
+pub mod replay;
 pub mod shop;
 
 pub use achievements::{ACHIEVEMENTS, Achievement, Stat, Stats, month_day};
@@ -34,7 +35,7 @@ pub struct PackOffer {
 pub const SPECTATOR_SEAT: usize = 2;
 
 /// Bumped whenever messages change incompatibly.
-pub const PROTOCOL_VERSION: u32 = 10;
+pub const PROTOCOL_VERSION: u32 = 11;
 
 /// Username rules: 3–16 characters, letters, digits and underscores.
 pub fn valid_username(name: &str) -> bool {
@@ -220,6 +221,11 @@ pub struct PlayerInfo {
     pub cue: String,
     #[serde(default)]
     pub chalk: String,
+    /// Avatar frame and name style (shop codes; empty: none).
+    #[serde(default)]
+    pub frame: String,
+    #[serde(default)]
+    pub name_style: String,
 }
 
 impl PlayerInfo {
@@ -237,6 +243,9 @@ pub struct LeaderboardEntry {
     pub wins: u32,
     #[serde(default)]
     pub country: String,
+    /// A VIP member (a crown by the name).
+    #[serde(default)]
+    pub vip: bool,
 }
 
 /// Who wrote a chat line.
@@ -328,6 +337,44 @@ pub struct TournamentInfo {
     /// Rounds of the bracket, first round first (empty while registering).
     pub rounds: Vec<Vec<BracketMatch>>,
     pub champion: Option<String>,
+    /// Coins to enter (0: free). The prizes come from the pot.
+    #[serde(default)]
+    pub entry_fee: u32,
+    /// Prizes in coins for the champion and the runner-up.
+    #[serde(default)]
+    pub prizes: [u32; 2],
+    /// Organised by the server (e.g. the Saturday cup), starting at this
+    /// Unix time.
+    #[serde(default)]
+    pub starts_at: Option<i64>,
+    #[serde(default)]
+    pub format: TournamentFormat,
+    /// Arena: points so far, best first (username, points, games, on a streak).
+    #[serde(default)]
+    pub standings: Vec<ArenaStanding>,
+    /// Arena: Unix time the arena closes.
+    #[serde(default)]
+    pub ends_at: Option<i64>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TournamentFormat {
+    /// A bracket: lose once and you are out.
+    #[default]
+    Knockout,
+    /// Play as many games as you can until the time is up: a win is 2
+    /// points, 4 on a winning streak (from the third win in a row).
+    Arena,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ArenaStanding {
+    pub username: String,
+    pub points: u32,
+    pub games: u32,
+    /// Wins in a row right now (points double from the third).
+    pub streak: u32,
 }
 
 /// A finished game in a player's history.
@@ -346,6 +393,57 @@ pub struct HistoryEntry {
     pub tournament: bool,
     /// Unix time in seconds.
     pub at: i64,
+    /// The stored match (for its replay); 0 if unknown.
+    #[serde(default)]
+    pub match_id: i64,
+    /// The replay can be watched (seed and strokes were kept).
+    #[serde(default)]
+    pub replay: bool,
+}
+
+/// Lifetime numbers from every game with stored statistics.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Serialize, Deserialize)]
+pub struct CareerNumbers {
+    pub games: u32,
+    pub shots: u32,
+    pub potting_shots: u32,
+    pub balls: u32,
+    pub fouls: u32,
+    /// Most balls in one visit, in any game.
+    pub best_run: u32,
+}
+
+impl CareerNumbers {
+    /// Potting success, 0..=100.
+    pub fn pot_rate(&self) -> u32 {
+        (self.potting_shots * 100).checked_div(self.shots).unwrap_or(0)
+    }
+    /// Balls per game, times ten (one decimal).
+    pub fn balls_per_game_x10(&self) -> u32 {
+        (self.balls * 10).checked_div(self.games).unwrap_or(0)
+    }
+}
+
+/// A game that can be watched again.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ReplayInfo {
+    pub match_id: i64,
+    pub players: [String; 2],
+    pub countries: [String; 2],
+    pub ratings: [i32; 2],
+    pub winner: usize,
+    pub rated: bool,
+    pub at: i64,
+    pub replay: replay::Replay,
+}
+
+/// The game with the highest ratings being played right now (anyone may watch).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct FeaturedMatch {
+    pub match_id: u64,
+    pub players: [PlayerInfo; 2],
+    pub rated: bool,
+    pub spectators: u32,
 }
 
 /// How the viewer relates to a profile's owner.
@@ -380,6 +478,14 @@ pub struct Profile {
     /// When they were last online: only for friends (0 otherwise).
     #[serde(default)]
     pub last_seen: i64,
+    /// Rating after each rated game, oldest first (Unix time, rating).
+    #[serde(default)]
+    pub rating_history: Vec<(i64, i32)>,
+    #[serde(default)]
+    pub career: CareerNumbers,
+    /// Share of rated and casual games left unfinished, 0..=100.
+    #[serde(default)]
+    pub abandon_rate: u32,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -574,6 +680,11 @@ pub enum ClientMsg {
         rated: bool,
         #[serde(default)]
         password: Option<String>,
+        /// Coins to enter (0: free).
+        #[serde(default)]
+        entry_fee: u32,
+        #[serde(default)]
+        format: TournamentFormat,
     },
     JoinTournament {
         id: u64,
@@ -586,6 +697,43 @@ pub enum ClientMsg {
     /// The host starts the tournament early (with byes for the empty seats).
     StartTournament {
         id: u64,
+    },
+    /// The account page: recovery e-mail and the e-mail of the last payment.
+    Account,
+    ChangePassword {
+        old: String,
+        new: String,
+    },
+    /// Sets (or clears, when empty) the e-mail used to recover the account.
+    SetRecoveryEmail {
+        email: String,
+    },
+    /// Deletes the account for good (it is anonymised: the opponents keep
+    /// their history).
+    DeleteAccount {
+        password: String,
+    },
+    /// Gives a friend an item, paid with this player's coins.
+    GiftItem {
+        to: String,
+        code: String,
+    },
+    /// This player's games that can be watched again.
+    Replays,
+    /// The strokes of a stored game.
+    Replay {
+        match_id: i64,
+    },
+    /// Watches any game in progress (the featured table).
+    WatchMatch {
+        match_id: u64,
+    },
+    /// A code (and link) a friend can use to sit at this player's table.
+    CreateInviteCode {
+        rated: bool,
+    },
+    JoinByCode {
+        code: String,
     },
     Ping,
 }
@@ -682,6 +830,10 @@ pub enum ServerMsg {
         /// Sent to a spectator: `seat` is the friend being watched.
         #[serde(default)]
         spectating: bool,
+        /// The cloth and ball set of the table (shop codes; empty: each
+        /// player's own): the host's, or the higher rated player's.
+        #[serde(default)]
+        table_look: [String; 2],
     },
     OpponentAim {
         aim: AimState,
@@ -830,6 +982,51 @@ pub enum ServerMsg {
     Kicked {
         reason: String,
     },
+    /// The account page.
+    Account {
+        recovery_email: Option<String>,
+        /// The e-mail given at the last payment, offered as the recovery
+        /// e-mail when none is set.
+        payment_email: Option<String>,
+    },
+    /// The account was deleted: forget the saved session.
+    AccountDeleted,
+    /// An item was bought (for this player, or as a gift for `gift_to`).
+    ItemBought {
+        code: String,
+        #[serde(default)]
+        gift_to: Option<String>,
+    },
+    /// A friend gave this player an item.
+    GiftReceived {
+        from: String,
+        code: String,
+    },
+    /// Coins for playing (a finished game, the daily bonus, a prize).
+    CoinsEarned {
+        amount: u32,
+        reason: String,
+    },
+    Replays {
+        games: Vec<HistoryEntry>,
+        /// How many of the latest games are kept for this player (0: all).
+        limit: u32,
+    },
+    Replay {
+        replay: Box<ReplayInfo>,
+    },
+    /// The featured game in the lounge (sent when it changes).
+    Featured {
+        featured: Option<FeaturedMatch>,
+    },
+    InviteCode {
+        code: String,
+    },
+    /// The server is restarting: no new games start; games in progress go on.
+    Draining {
+        /// Seconds until the restart.
+        secs: u32,
+    },
     Pong,
 }
 
@@ -922,6 +1119,8 @@ mod tests {
             vip: false,
             cue: String::new(),
             chalk: String::new(),
+            frame: String::new(),
+            name_style: String::new(),
         };
         let msg = ServerMsg::MatchStarted {
             match_id: 7,
@@ -933,6 +1132,7 @@ mod tests {
             clock_left: 60.0,
             tournament: None,
             spectating: false,
+            table_look: Default::default(),
         };
         assert_eq!(parse_server(&msg.to_json()).unwrap(), msg);
         let c = ClientMsg::Shoot {

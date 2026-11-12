@@ -5,10 +5,12 @@ use std::sync::Mutex;
 
 use snook_proto::{LeaderboardEntry, Role};
 
+use snook_proto::CareerNumbers;
+
 use super::{
-    AuditRow, BuyOutcome, FriendOutcome, FriendState, HistoryRow, LedgerRow, MatchRecord,
-    NewReport, NewUser, Overview, Payment, ReportRow, SessionKind, StoreResult, TournamentRecord,
-    User, Wallet,
+    AimRow, AuditRow, BuyOutcome, FriendOutcome, FriendState, HistoryRow, LedgerRow, LiveMatch,
+    MatchRecord, Metrics, NewReport, NewUser, Overview, Payment, ReportRow, SessionKind,
+    StoreResult, StoredReplay, TournamentRecord, User, Wallet, day_of,
 };
 
 #[derive(Default)]
@@ -35,6 +37,13 @@ struct Inner {
     /// (user, delta, reason, reference, at)
     ledger: Vec<(i64, i64, String, Option<String>, i64)>,
     payments: Vec<Payment>,
+    live: BTreeMap<i64, LiveMatch>,
+    /// (user, band) -> (attempts, made)
+    shot_stats: HashMap<(i64, usize), (u32, u32)>,
+    /// (day, user)
+    activity: HashSet<(i64, i64)>,
+    /// user -> (daily bonus day, earned day, earned that day)
+    earnings: HashMap<i64, (i64, i64, i64)>,
 }
 
 impl Inner {
@@ -82,6 +91,9 @@ impl MemoryStore {
             banned_until: None,
             ban_reason: None,
             muted_until: None,
+            recovery_email: None,
+            deleted_at: None,
+            abandons: 0,
         };
         s.users.insert(user.id, user.clone());
         Ok(Some(user))
@@ -151,7 +163,7 @@ impl MemoryStore {
         Ok(())
     }
 
-    pub fn record_match(&self, m: &MatchRecord) -> StoreResult<[Option<User>; 2]> {
+    pub fn record_match(&self, m: &MatchRecord) -> StoreResult<([Option<User>; 2], i64)> {
         let mut s = self.lock();
         for seat in 0..2 {
             if let Some(u) = s.users.get_mut(&m.players[seat]) {
@@ -159,7 +171,222 @@ impl MemoryStore {
             }
         }
         s.matches.push(m.clone());
-        Ok([s.users.get(&m.players[0]).cloned(), s.users.get(&m.players[1]).cloned()])
+        let id = s.matches.len() as i64;
+        Ok(([s.users.get(&m.players[0]).cloned(), s.users.get(&m.players[1]).cloned()], id))
+    }
+
+    pub fn career(&self, user_id: i64) -> StoreResult<CareerNumbers> {
+        let s = self.lock();
+        let mut c = CareerNumbers::default();
+        for m in &s.matches {
+            let Some(seat) = m.players.iter().position(|p| *p == user_id) else { continue };
+            let st = &m.stats[seat];
+            if m.replay.is_none() && st.shots == 0 {
+                continue;
+            }
+            c.games += 1;
+            c.shots += st.shots;
+            c.potting_shots += st.potting_shots;
+            c.balls += st.balls;
+            c.fouls += st.fouls;
+            c.best_run = c.best_run.max(st.best_run);
+        }
+        Ok(c)
+    }
+
+    pub fn rating_history(&self, user_id: i64, limit: u32) -> StoreResult<Vec<(i64, i32)>> {
+        let s = self.lock();
+        let mut list: Vec<(i64, i32)> = s
+            .matches
+            .iter()
+            .rev()
+            .filter(|m| m.rated)
+            .filter_map(|m| {
+                let seat = m.players.iter().position(|p| *p == user_id)?;
+                Some((m.ended_at, m.ratings_after[seat]))
+            })
+            .take(limit as usize)
+            .collect();
+        list.reverse();
+        Ok(list)
+    }
+
+    pub fn replay(&self, match_id: i64) -> StoreResult<Option<StoredReplay>> {
+        let s = self.lock();
+        let Some(m) = usize::try_from(match_id - 1).ok().and_then(|i| s.matches.get(i)) else {
+            return Ok(None);
+        };
+        let Some(replay) = m.replay.clone() else { return Ok(None) };
+        let user = |seat: usize| s.users.get(&m.players[seat]);
+        Ok(Some(StoredReplay {
+            id: match_id,
+            players: [0, 1].map(|k| user(k).map(|u| u.username.clone()).unwrap_or_default()),
+            countries: [0, 1].map(|k| user(k).map(|u| u.country.clone()).unwrap_or_default()),
+            ratings: [0, 1].map(|k| m.ratings_after[k] - m.delta[k]),
+            winner: m.winner,
+            rated: m.rated,
+            at: m.ended_at,
+            replay,
+        }))
+    }
+
+    pub fn save_live(&self, m: &LiveMatch) -> StoreResult<()> {
+        self.lock().live.insert(m.id, m.clone());
+        Ok(())
+    }
+
+    pub fn delete_live(&self, id: i64) -> StoreResult<()> {
+        self.lock().live.remove(&id);
+        Ok(())
+    }
+
+    pub fn live_match_of(&self, user_id: i64) -> StoreResult<Option<LiveMatch>> {
+        Ok(self.lock().live.values().rev().find(|m| m.players.contains(&user_id)).cloned())
+    }
+
+    pub fn purge_live(&self, before: i64) -> StoreResult<u64> {
+        let mut s = self.lock();
+        let n = s.live.len();
+        s.live.retain(|_, m| m.updated_at >= before);
+        Ok((n - s.live.len()) as u64)
+    }
+
+    pub fn spend(
+        &self,
+        user_id: i64,
+        amount: i64,
+        reason: &str,
+        reference: Option<&str>,
+        at: i64,
+    ) -> StoreResult<bool> {
+        let mut s = self.lock();
+        let w = s.wallets.entry(user_id).or_default();
+        if w.coins < amount {
+            return Ok(false);
+        }
+        w.coins -= amount;
+        s.ledger.push((user_id, -amount, reason.to_string(), reference.map(str::to_string), at));
+        Ok(true)
+    }
+
+    pub fn add_shot_stats(&self, user_id: i64, bands: &[(usize, u32, u32)]) -> StoreResult<()> {
+        let mut s = self.lock();
+        for &(band, attempts, made) in bands {
+            let e = s.shot_stats.entry((user_id, band)).or_default();
+            e.0 += attempts;
+            e.1 += made;
+        }
+        Ok(())
+    }
+
+    pub fn aim_rows(&self, bands: &[usize], min: u32) -> StoreResult<Vec<AimRow>> {
+        let s = self.lock();
+        let mut rows: BTreeMap<i64, (u32, u32)> = BTreeMap::new();
+        for (&(user, band), &(a, m)) in &s.shot_stats {
+            if bands.contains(&band) {
+                let e = rows.entry(user).or_default();
+                e.0 += a;
+                e.1 += m;
+            }
+        }
+        Ok(rows
+            .into_iter()
+            .filter(|(_, (a, _))| *a >= min)
+            .filter_map(|(id, (attempts, made))| {
+                let u = s.users.get(&id).filter(|u| u.deleted_at.is_none())?;
+                Some(AimRow {
+                    user_id: id,
+                    username: u.username.clone(),
+                    rating: u.rating,
+                    attempts,
+                    made,
+                })
+            })
+            .collect())
+    }
+
+    pub fn mark_active(&self, user_id: i64, day: i64) -> StoreResult<()> {
+        self.lock().activity.insert((day, user_id));
+        Ok(())
+    }
+
+    pub fn metrics(&self, now: i64) -> StoreResult<Metrics> {
+        let s = self.lock();
+        let today = day_of(now);
+        let days = (today - 29..=today)
+            .map(|d| {
+                let active = s.activity.iter().filter(|(day, _)| *day == d).count() as i64;
+                let matches = s.matches.iter().filter(|m| day_of(m.ended_at) == d).count() as i64;
+                let new = s.users.values().filter(|u| day_of(u.created_at) == d).count() as i64;
+                (d, active, matches, new)
+            })
+            .collect();
+        let recent: Vec<&User> =
+            s.users.values().filter(|u| day_of(u.created_at) >= today - 30).collect();
+        let back = |after: i64| {
+            let eligible: Vec<&&User> =
+                recent.iter().filter(|u| day_of(u.created_at) + after <= today).collect();
+            let came = eligible
+                .iter()
+                .filter(|u| s.activity.contains(&(day_of(u.created_at) + after, u.id)))
+                .count();
+            if eligible.is_empty() { 0.0 } else { came as f64 * 100.0 / eligible.len() as f64 }
+        };
+        let games = |u: &User| u.games + u.casual_games;
+        let mut revenue: BTreeMap<String, (i64, i64)> = BTreeMap::new();
+        for p in s.payments.iter().filter(|p| !p.refunded && p.at > now - 30 * 86_400) {
+            let e = revenue.entry(p.currency.clone()).or_default();
+            e.0 += p.amount;
+            e.1 += 1;
+        }
+        Ok(Metrics {
+            days,
+            retention_d1: back(1),
+            retention_d7: back(7),
+            funnel: [
+                recent.len() as i64,
+                recent.iter().filter(|u| games(u) >= 1).count() as i64,
+                recent.iter().filter(|u| games(u) >= 5).count() as i64,
+            ],
+            revenue: revenue.into_iter().map(|(c, (a, n))| (c, a, n)).collect(),
+        })
+    }
+
+    pub fn set_recovery_email(&self, user_id: i64, email: Option<&str>) -> StoreResult<()> {
+        if let Some(u) = self.lock().users.get_mut(&user_id) {
+            u.recovery_email = email.map(str::to_string);
+        }
+        Ok(())
+    }
+
+    pub fn payment_email(&self, user_id: i64) -> StoreResult<Option<String>> {
+        let s = self.lock();
+        Ok(s.payments.iter().rev().filter(|p| p.user_id == user_id).find_map(|p| p.email.clone()))
+    }
+
+    pub fn delete_account(&self, user_id: i64, now: i64) -> StoreResult<()> {
+        let mut s = self.lock();
+        if let Some(u) = s.users.get_mut(&user_id) {
+            u.username = super::deleted_name(user_id);
+            u.password_hash = String::new();
+            u.country = String::new();
+            u.recovery_email = None;
+            u.deleted_at = Some(now);
+        }
+        s.sessions.retain(|_, v| v.0 != user_id);
+        s.friendships.retain(|(a, b), _| *a != user_id && *b != user_id);
+        s.blocks.retain(|(a, b)| *a != user_id && *b != user_id);
+        s.achievements.remove(&user_id);
+        s.shot_stats.retain(|(u, _), _| *u != user_id);
+        s.live.retain(|_, m| !m.players.contains(&user_id));
+        if let Some(w) = s.wallets.get_mut(&user_id) {
+            w.stripe_customer = None;
+            w.equipped.clear();
+        }
+        for p in s.payments.iter_mut().filter(|p| p.user_id == user_id) {
+            p.email = None;
+        }
+        Ok(())
     }
 
     pub fn add_achievements(
@@ -188,8 +415,9 @@ impl MemoryStore {
         let s = self.lock();
         Ok(s.matches
             .iter()
+            .enumerate()
             .rev()
-            .filter_map(|m| {
+            .filter_map(|(index, m)| {
                 let seat = m.players.iter().position(|p| *p == user_id)?;
                 let other = s.users.get(&m.players[1 - seat]);
                 Some(HistoryRow {
@@ -203,16 +431,21 @@ impl MemoryStore {
                     rating_after: m.ratings_after[seat],
                     tournament: m.tournament.is_some(),
                     at: m.ended_at,
+                    match_id: index as i64 + 1,
+                    replay: m.replay.is_some(),
                 })
             })
             .take(limit as usize)
             .collect())
     }
 
-    pub fn leaderboard(&self, limit: u32) -> StoreResult<Vec<LeaderboardEntry>> {
+    pub fn leaderboard(&self, limit: u32, now: i64) -> StoreResult<Vec<LeaderboardEntry>> {
         let s = self.lock();
-        let mut users: Vec<&User> =
-            s.users.values().filter(|u| u.games > 0 && u.banned_until.is_none()).collect();
+        let mut users: Vec<&User> = s
+            .users
+            .values()
+            .filter(|u| u.games > 0 && u.banned_until.is_none() && u.deleted_at.is_none())
+            .collect();
         users.sort_by(|a, b| {
             b.rating.cmp(&a.rating).then(b.wins.cmp(&a.wins)).then(a.username.cmp(&b.username))
         });
@@ -227,6 +460,7 @@ impl MemoryStore {
                 games: u.games,
                 wins: u.wins,
                 country: u.country.clone(),
+                vip: s.wallets.get(&u.id).is_some_and(|w| w.vip_until > now),
             })
             .collect())
     }
@@ -237,7 +471,12 @@ impl MemoryStore {
         let above = s
             .users
             .values()
-            .filter(|u| u.games > 0 && u.banned_until.is_none() && u.rating > me.rating)
+            .filter(|u| {
+                u.games > 0
+                    && u.banned_until.is_none()
+                    && u.deleted_at.is_none()
+                    && u.rating > me.rating
+            })
             .count();
         Ok(Some(above as u32 + 1))
     }
@@ -365,7 +604,11 @@ impl MemoryStore {
             .users
             .values()
             .rev()
-            .filter(|u| q.is_empty() || u.username.to_lowercase().contains(&q))
+            .filter(|u| {
+                q.is_empty()
+                    || u.username.to_lowercase().contains(&q)
+                    || u.recovery_email.as_deref().is_some_and(|e| e.to_lowercase() == q)
+            })
             .cloned()
             .collect();
         let total = all.len() as i64;
@@ -627,5 +870,64 @@ impl MemoryStore {
             .take(limit as usize)
             .cloned()
             .collect())
+    }
+
+    pub fn claim_daily(&self, user_id: i64, day: i64, coins: i64) -> StoreResult<bool> {
+        let mut s = self.lock();
+        let e = s.earnings.entry(user_id).or_default();
+        if e.0 >= day {
+            return Ok(false);
+        }
+        e.0 = day;
+        s.wallets.entry(user_id).or_default().coins += coins;
+        s.ledger.push((user_id, coins, "daily bonus".into(), None, day * 86_400));
+        Ok(true)
+    }
+
+    pub fn earn(
+        &self,
+        user_id: i64,
+        day: i64,
+        amount: i64,
+        cap: i64,
+        reason: &str,
+        at: i64,
+    ) -> StoreResult<i64> {
+        let mut s = self.lock();
+        let e = s.earnings.entry(user_id).or_default();
+        if e.1 != day {
+            e.1 = day;
+            e.2 = 0;
+        }
+        let given = amount.min(cap - e.2).max(0);
+        if given == 0 {
+            return Ok(0);
+        }
+        e.2 += given;
+        s.wallets.entry(user_id).or_default().coins += given;
+        s.ledger.push((user_id, given, reason.to_string(), None, at));
+        Ok(given)
+    }
+
+    pub fn gift_item(
+        &self,
+        from: i64,
+        to: i64,
+        code: &str,
+        price: i64,
+        at: i64,
+    ) -> StoreResult<BuyOutcome> {
+        let mut s = self.lock();
+        if s.wallets.get(&to).is_some_and(|w| w.owned.iter().any(|o| o == code)) {
+            return Ok(BuyOutcome::AlreadyOwned);
+        }
+        let payer = s.wallets.entry(from).or_default();
+        if payer.coins < price {
+            return Ok(BuyOutcome::NotEnoughCoins);
+        }
+        payer.coins -= price;
+        s.wallets.entry(to).or_default().owned.push(code.to_string());
+        s.ledger.push((from, -price, format!("gift {code} to {to}"), None, at));
+        Ok(BuyOutcome::Bought)
     }
 }

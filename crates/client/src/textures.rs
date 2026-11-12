@@ -35,7 +35,7 @@ impl Palette {
         let item =
             snook_proto::shop::item(code).or_else(|| snook_proto::shop::item("balls_classic"));
         match item.map(|i| i.look) {
-            Some(snook_proto::shop::Look::Balls { colors, eight, ivory }) => {
+            Some(snook_proto::shop::Look::Balls { colors, eight, ivory, .. }) => {
                 Palette { colors, eight, ivory }
             }
             _ => Palette { colors: [[255, 204, 10]; 7], eight: [22, 22, 24], ivory: IVORY },

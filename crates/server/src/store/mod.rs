@@ -14,7 +14,9 @@ pub use postgres::PgStore;
 
 use std::collections::BTreeMap;
 
-use snook_proto::{LeaderboardEntry, Role, Stats};
+use snook_core::stats::ShotStats;
+use snook_proto::replay::Replay;
+use snook_proto::{CareerNumbers, LeaderboardEntry, Role, Stats};
 
 #[derive(Debug, Clone)]
 pub struct StoreError(pub String);
@@ -56,6 +58,12 @@ pub struct User {
     pub banned_until: Option<i64>,
     pub ban_reason: Option<String>,
     pub muted_until: Option<i64>,
+    /// Where a forgotten password can be sent (set by the player).
+    pub recovery_email: Option<String>,
+    /// The account was deleted (and anonymised) at this time.
+    pub deleted_at: Option<i64>,
+    /// Games lost by leaving or by running out of reconnection time.
+    pub abandons: u32,
 }
 
 impl User {
@@ -125,6 +133,60 @@ pub struct MatchRecord {
     /// The loser never pocketed a ball of their group.
     pub shutout: bool,
     pub ended_at: i64,
+    /// The whole game (seed, breaker, strokes).
+    pub replay: Option<Replay>,
+    /// Each seat's numbers this game.
+    pub stats: [ShotStats; 2],
+    /// The seat that left the game unfinished (lost on the reconnection clock).
+    pub abandoned: Option<usize>,
+}
+
+/// A game in progress, saved after every stroke.
+#[derive(Debug, Clone, PartialEq)]
+pub struct LiveMatch {
+    pub id: i64,
+    pub players: [i64; 2],
+    pub rated: bool,
+    pub replay: Replay,
+    pub updated_at: i64,
+}
+
+/// A stored game with its replay.
+#[derive(Debug, Clone)]
+pub struct StoredReplay {
+    pub id: i64,
+    pub players: [String; 2],
+    pub countries: [String; 2],
+    pub ratings: [i32; 2],
+    pub winner: usize,
+    pub rated: bool,
+    pub at: i64,
+    pub replay: Replay,
+}
+
+/// A player's potting in the hard bands, for the aim review queue.
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct AimRow {
+    pub user_id: i64,
+    pub username: String,
+    pub rating: i32,
+    pub attempts: u32,
+    pub made: u32,
+}
+
+/// Numbers for the staff panel's metrics page.
+#[derive(Debug, Clone, Default, serde::Serialize)]
+pub struct Metrics {
+    /// (day, active players, matches, new accounts), oldest first.
+    pub days: Vec<(i64, i64, i64, i64)>,
+    /// Players active on day N who came back on day N+1 / N+7 (percent),
+    /// over the accounts created in the last 30 days.
+    pub retention_d1: f64,
+    pub retention_d7: f64,
+    /// Accounts created in the last 30 days, and how many played 1 and 5 games.
+    pub funnel: [i64; 3],
+    /// Payments in the last 30 days by currency: (currency, cents, count).
+    pub revenue: Vec<(String, i64, i64)>,
 }
 
 #[derive(Debug, Clone)]
@@ -139,6 +201,8 @@ pub struct HistoryRow {
     pub rating_after: i32,
     pub tournament: bool,
     pub at: i64,
+    pub match_id: i64,
+    pub replay: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -217,6 +281,8 @@ pub struct Payment {
     pub currency: String,
     pub at: i64,
     pub refunded: bool,
+    /// The e-mail the customer gave at checkout.
+    pub email: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize)]
@@ -257,12 +323,15 @@ pub struct TournamentRecord {
     pub players: Vec<i64>,
     pub winner: Option<i64>,
     pub finished_at: i64,
+    pub entry_fee: u32,
+    /// Who got which prize ("name:coins, …").
+    pub prizes: String,
 }
 
 /// The storage back end (one per server, so the size difference doesn't matter).
 #[allow(clippy::large_enum_variant)]
 pub enum Store {
-    Memory(MemoryStore),
+    Memory(std::sync::Arc<MemoryStore>),
     #[cfg(feature = "postgres")]
     Postgres(PgStore),
 }
@@ -279,7 +348,17 @@ macro_rules! dispatch {
 
 impl Store {
     pub fn memory() -> Store {
-        Store::Memory(MemoryStore::default())
+        Store::Memory(Default::default())
+    }
+
+    /// Another handle on the same in-memory store (tests: two servers, one
+    /// database). `None` for a database (connect again instead).
+    pub fn share(&self) -> Option<Store> {
+        match self {
+            Store::Memory(m) => Some(Store::Memory(m.clone())),
+            #[cfg(feature = "postgres")]
+            Store::Postgres(_) => None,
+        }
     }
 
     #[cfg(feature = "postgres")]
@@ -334,9 +413,83 @@ impl Store {
     pub async fn touch(&self, user_id: i64, now: i64) -> StoreResult<()> {
         dispatch!(self, s => s.touch(user_id, now))
     }
-    /// Stores a match and updates both players' numbers; returns them updated.
-    pub async fn record_match(&self, m: &MatchRecord) -> StoreResult<[Option<User>; 2]> {
+    /// Stores a match and updates both players' numbers; returns them
+    /// updated and the match id.
+    pub async fn record_match(&self, m: &MatchRecord) -> StoreResult<([Option<User>; 2], i64)> {
         dispatch!(self, s => s.record_match(m))
+    }
+    /// Lifetime numbers from the games with stored statistics.
+    pub async fn career(&self, user_id: i64) -> StoreResult<CareerNumbers> {
+        dispatch!(self, s => s.career(user_id))
+    }
+    /// (time, rating after) of the last `limit` rated games, oldest first.
+    pub async fn rating_history(&self, user_id: i64, limit: u32) -> StoreResult<Vec<(i64, i32)>> {
+        dispatch!(self, s => s.rating_history(user_id, limit))
+    }
+    pub async fn replay(&self, match_id: i64) -> StoreResult<Option<StoredReplay>> {
+        dispatch!(self, s => s.replay(match_id))
+    }
+    /// Saves (or replaces) a game in progress.
+    pub async fn save_live(&self, m: &LiveMatch) -> StoreResult<()> {
+        dispatch!(self, s => s.save_live(m))
+    }
+    pub async fn delete_live(&self, id: i64) -> StoreResult<()> {
+        dispatch!(self, s => s.delete_live(id))
+    }
+    /// The saved game in progress of this player, if any.
+    pub async fn live_match_of(&self, user_id: i64) -> StoreResult<Option<LiveMatch>> {
+        dispatch!(self, s => s.live_match_of(user_id))
+    }
+    /// Forgets saved games nobody came back to.
+    pub async fn purge_live(&self, before: i64) -> StoreResult<u64> {
+        dispatch!(self, s => s.purge_live(before))
+    }
+    /// Takes `amount` coins if the player has them; false otherwise.
+    pub async fn spend(
+        &self,
+        user_id: i64,
+        amount: i64,
+        reason: &str,
+        reference: Option<&str>,
+        at: i64,
+    ) -> StoreResult<bool> {
+        dispatch!(self, s => s.spend(user_id, amount, reason, reference, at))
+    }
+    /// Adds attempts and pots per difficulty band.
+    pub async fn add_shot_stats(
+        &self,
+        user_id: i64,
+        bands: &[(usize, u32, u32)],
+    ) -> StoreResult<()> {
+        dispatch!(self, s => s.add_shot_stats(user_id, bands))
+    }
+    /// Potting in the given bands, for every player with at least `min` attempts.
+    pub async fn aim_rows(&self, bands: &[usize], min: u32) -> StoreResult<Vec<AimRow>> {
+        dispatch!(self, s => s.aim_rows(bands, min))
+    }
+    /// Marks the player active on `day` (Unix day number).
+    pub async fn mark_active(&self, user_id: i64, day: i64) -> StoreResult<()> {
+        dispatch!(self, s => s.mark_active(user_id, day))
+    }
+    pub async fn metrics(&self, now: i64) -> StoreResult<Metrics> {
+        dispatch!(self, s => s.metrics(now))
+    }
+
+    // Accounts.
+
+    pub async fn set_recovery_email(&self, user_id: i64, email: Option<&str>) -> StoreResult<()> {
+        dispatch!(self, s => s.set_recovery_email(user_id, email))
+    }
+    /// The e-mail given at this player's latest payment.
+    pub async fn payment_email(&self, user_id: i64) -> StoreResult<Option<String>> {
+        dispatch!(self, s => s.payment_email(user_id))
+    }
+    /// Deletes an account by anonymising it: the name becomes `deleted-<id>`,
+    /// the password, e-mail, country, friends, blocks and sessions go; the
+    /// games stay (the opponents keep their history) and so do payment
+    /// records (accounting), without the e-mail.
+    pub async fn delete_account(&self, user_id: i64, now: i64) -> StoreResult<()> {
+        dispatch!(self, s => s.delete_account(user_id, now))
     }
     /// Unlocks achievements; returns the codes that were new.
     pub async fn add_achievements(
@@ -353,8 +506,8 @@ impl Store {
     pub async fn history(&self, user_id: i64, limit: u32) -> StoreResult<Vec<HistoryRow>> {
         dispatch!(self, s => s.history(user_id, limit))
     }
-    pub async fn leaderboard(&self, limit: u32) -> StoreResult<Vec<LeaderboardEntry>> {
-        dispatch!(self, s => s.leaderboard(limit))
+    pub async fn leaderboard(&self, limit: u32, now: i64) -> StoreResult<Vec<LeaderboardEntry>> {
+        dispatch!(self, s => s.leaderboard(limit, now))
     }
     pub async fn rank_of(&self, user_id: i64) -> StoreResult<Option<u32>> {
         dispatch!(self, s => s.rank_of(user_id))
@@ -519,6 +672,33 @@ impl Store {
     pub async fn payments_of(&self, user_id: i64, limit: u32) -> StoreResult<Vec<Payment>> {
         dispatch!(self, s => s.payments_of(user_id, limit))
     }
+    /// The daily bonus: `coins` once per `day`; false if already claimed.
+    pub async fn claim_daily(&self, user_id: i64, day: i64, coins: i64) -> StoreResult<bool> {
+        dispatch!(self, s => s.claim_daily(user_id, day, coins))
+    }
+    /// Coins for playing, up to `cap` a day; returns what was given.
+    pub async fn earn(
+        &self,
+        user_id: i64,
+        day: i64,
+        amount: i64,
+        cap: i64,
+        reason: &str,
+        at: i64,
+    ) -> StoreResult<i64> {
+        dispatch!(self, s => s.earn(user_id, day, amount, cap, reason, at))
+    }
+    /// `from` pays `price` and `to` gets the item, atomically.
+    pub async fn gift_item(
+        &self,
+        from: i64,
+        to: i64,
+        code: &str,
+        price: i64,
+        at: i64,
+    ) -> StoreResult<BuyOutcome> {
+        dispatch!(self, s => s.gift_item(from, to, code, price, at))
+    }
 }
 
 /// Updates a player's numbers after a match (the same rules as the
@@ -544,4 +724,17 @@ pub fn apply_match_numbers(u: &mut User, m: &MatchRecord, seat: usize) {
         u.runouts += m.runout as u32;
         u.shutouts += m.shutout as u32;
     }
+    if m.abandoned == Some(seat) {
+        u.abandons += 1;
+    }
+}
+
+/// The username a deleted account is left with.
+pub fn deleted_name(id: i64) -> String {
+    format!("deleted-{id}")
+}
+
+/// Unix day number.
+pub fn day_of(t: i64) -> i64 {
+    t.div_euclid(86_400)
 }
