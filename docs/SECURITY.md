@@ -16,7 +16,7 @@ without consequence, take over accounts, or take the server down cheaply.
 |---|---|---|---|
 | 1 | Session tokens stored in plain text: a leaked database would sign anyone in. | High | Tokens are 256-bit random values stored as SHA-256 hashes; sessions renew after a day of use and expire after 30 days; staff sessions are separate and last 8 hours. |
 | 2 | Password guessing limited only per connection (reconnect to reset). | High | Failures are counted per account (8 / 15 min) and per address (20 / 15 min) across connections; unknown usernames still run Argon2 (no timing difference). |
-| 3 | Unlimited account creation. | Medium | 5 new accounts per address per hour; reserved names (`admin`, `snook`, `moderator`…). |
+| 3 | Unlimited account creation. | Medium | 5 new accounts per address per hour; reserved names (`admin`, `snookered`, `moderator`…). |
 | 4 | Outgoing queues unbounded: a client that stops reading made the server buffer every broadcast forever (memory exhaustion). | High | Bounded queues (512 messages); a client that can't keep up is disconnected. |
 | 5 | No message rate limit per connection. | Medium | 40 messages/s sustained, bursts of 120; 16 KiB per message; 12 connections per address. |
 | 6 | Shot simulation ran inside the lounge lock: every shot froze the whole server for its duration (×10 on a small shared CPU). | High | Simulation runs on a blocking worker; the lounge only validates and commits. Password hashing is limited to two at a time. |
@@ -26,7 +26,7 @@ without consequence, take over accounts, or take the server down cheaply.
 | 10 | "Signed in elsewhere" was recognised by matching an English error string. | Low | A typed `kicked` message; the game doesn't reconnect after it. |
 | 11 | The settings file (with the session token) was world-readable and written in place. | Low | Written to a temporary file and renamed; `0600` on Unix. |
 | 12 | Minimum password length 6. | Low | 8–72 characters, not only digits, not one repeated character. |
-| 13 | The client trusted the address of the proxy as the player's address. | Medium (on hosts behind a proxy) | `SNOOK_CLIENT_IP_HEADER` with a list of headers; the staff panel warns when every player shares one address. |
+| 13 | The client trusted the address of the proxy as the player's address. | Medium (on hosts behind a proxy) | `SNOOKERED_CLIENT_IP_HEADER` with a list of headers; the staff panel warns when every player shares one address. |
 | 14 | Lounge actions that are announced to everyone (opening and closing tables, tournaments, the queue) had no limit of their own: one connection could make the server send thousands of messages a second to the whole lounge. | Medium | Their own limit per player (12 at once, then one a second); leaving a tournament one is not in says nothing to anyone. |
 | 15 | Requests answered from the database (profiles, friends, blocks, reports, watching) were limited only by the general message limit, also before signing in. | Medium | Their own limit per connection (30 at once, then two a second). |
 | 16 | Only text frames counted towards the flood limit (pings and binary frames were free). | Low | Every frame counts. |

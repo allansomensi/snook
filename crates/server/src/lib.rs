@@ -1,12 +1,12 @@
-//! # snook_server
+//! # snookered_server
 //!
-//! The Snook game server: accounts, the lounge (who's online, chat,
+//! The Snookered game server: accounts, the lounge (who's online, chat,
 //! invitations, open tables), authoritative eight-ball matches with a shot
 //! clock and reconnection, tournaments, friends, achievements, Elo ratings,
 //! the global leaderboard and a web panel for the staff.
 //!
 //! Endpoints:
-//! - `GET /ws`: the game (WebSocket, JSON messages from [`snook_proto`]);
+//! - `GET /ws`: the game (WebSocket, JSON messages from [`snookered_proto`]);
 //! - `GET /health`: `ok`, for monitoring;
 //! - `GET /api/status`, `GET /api/leaderboard`: public JSON;
 //! - `/admin`: the staff panel (see [`admin`]).
@@ -41,9 +41,9 @@ use axum::routing::get;
 use futures_util::{SinkExt, StreamExt};
 use rand::RngCore;
 use sha2::{Digest, Sha256};
-use snook_core::GameOverReason;
-use snook_core::rating::EloConfig;
-use snook_proto::{
+use snookered_core::GameOverReason;
+use snookered_core::rating::EloConfig;
+use snookered_proto::{
     ACHIEVEMENTS, ClientMsg, FriendInfo, HistoryEntry, LeaderboardEntry, PROTOCOL_VERSION,
     PlayerStatus, Profile, Relation, Role, ServerMsg, clean_text, parse_client, valid_country,
     valid_password, valid_username,
@@ -148,8 +148,17 @@ const OUTGOING_QUEUE: usize = 512;
 /// Game sessions last this long; they are renewed when used after a day.
 pub(crate) const SESSION_LIFETIME: i64 = 60 * 60 * 24 * 30;
 const SESSION_RENEW_AFTER: i64 = 60 * 60 * 24;
-const RESERVED_NAMES: &[&str] =
-    &["admin", "administrator", "snook", "moderator", "mod", "system", "staff", "support", "guest"];
+const RESERVED_NAMES: &[&str] = &[
+    "admin",
+    "administrator",
+    "snookered",
+    "moderator",
+    "mod",
+    "system",
+    "staff",
+    "support",
+    "guest",
+];
 
 impl Server {
     pub async fn new(config: Config) -> Result<Arc<Self>, Box<dyn std::error::Error>> {
@@ -275,7 +284,7 @@ impl Server {
         let mut stats = user.stats(now());
         stats.friends = friends;
         if rated_win {
-            stats.today = snook_proto::month_day(now());
+            stats.today = snookered_proto::month_day(now());
         }
         let earned: Vec<&str> = stats.earned().collect();
         match self.store.add_achievements(user.id, &earned, now()).await {
@@ -1200,7 +1209,11 @@ fn history_entry(h: crate::store::HistoryRow) -> HistoryEntry {
 
 /// A stored game's replay, for a player of that game (within their replay
 /// allowance) or staff.
-async fn replay_for(server: &Server, me: &User, match_id: i64) -> Option<snook_proto::ReplayInfo> {
+async fn replay_for(
+    server: &Server,
+    me: &User,
+    match_id: i64,
+) -> Option<snookered_proto::ReplayInfo> {
     let r = server.store.replay(match_id).await.ok().flatten()?;
     if !me.role.is_staff() {
         let mine = r.players.iter().any(|p| p.eq_ignore_ascii_case(&me.username));
@@ -1215,7 +1228,7 @@ async fn replay_for(server: &Server, me: &User, match_id: i64) -> Option<snook_p
             }
         }
     }
-    Some(snook_proto::ReplayInfo {
+    Some(snookered_proto::ReplayInfo {
         match_id: r.id,
         players: r.players,
         countries: r.countries,
@@ -1312,7 +1325,7 @@ async fn report(
     server: &Server,
     me: &User,
     name: &str,
-    reason: snook_proto::ReportReason,
+    reason: snookered_proto::ReportReason,
     details: &str,
     send: &impl Fn(ServerMsg),
 ) {

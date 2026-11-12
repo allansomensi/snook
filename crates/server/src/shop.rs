@@ -11,8 +11,8 @@ use axum::extract::State;
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::{Html, IntoResponse, Response};
 use serde_json::Value;
-use snook_proto::shop::{self, COIN_PACKS, Category, Price, VIP_MONTHLY_COINS, VIP_PLAN};
-use snook_proto::{ClientMsg, PackOffer, ServerMsg};
+use snookered_proto::shop::{self, COIN_PACKS, Category, Price, VIP_MONTHLY_COINS, VIP_PLAN};
+use snookered_proto::{ClientMsg, PackOffer, ServerMsg};
 
 use crate::lounge::Look;
 use crate::store::{BuyOutcome, Payment, User, Wallet};

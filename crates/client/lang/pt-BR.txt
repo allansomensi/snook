@@ -592,7 +592,7 @@ Lost contact with the server.	Perdeu o contato com o servidor.
 The server closed the connection.	O servidor encerrou a conexão.
 The server took too long to answer.	O servidor demorou demais para responder.
 The server is not answering (connection refused).	O servidor não está respondendo (conexão recusada).
-The server address is not valid (example: wss://snook.example.com/ws).	O endereço do servidor não é válido (exemplo: wss://snook.exemplo.com/ws).
+The server address is not valid (example: wss://snookered.example.com/ws).	O endereço do servidor não é válido (exemplo: wss://snookered.exemplo.com/ws).
 The server address has no host name.	O endereço do servidor não tem nome de host.
 Welcome to Snookered! Be kind, play fair.	Bem-vindo ao Snookered! Seja gentil, jogue limpo.
 Ball in hand: drag the cue ball{zone} to move it	Bola na mão: arraste a branca{zone} para movê-la

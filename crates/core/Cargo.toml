@@ -1,6 +1,6 @@
 [package]
-name = "snook_core"
-description = "Engine-agnostic physics, 8-ball rules, AI and rating for Snook"
+name = "snookered_core"
+description = "Engine-agnostic physics, 8-ball rules, AI and rating for Snookered"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

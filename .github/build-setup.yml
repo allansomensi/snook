@@ -19,13 +19,13 @@
     exit 1
 
 # The game server baked into the release: the repository variable
-# SNOOK_SERVER (Settings → Secrets and variables → Actions → Variables), or
+# SNOOKERED_SERVER (Settings → Secrets and variables → Actions → Variables), or
 # the public server when it isn't set.
 - name: Game server for this release
   shell: bash
   env:
-    SERVER: ${{ vars.SNOOK_SERVER }}
+    SERVER: ${{ vars.SNOOKERED_SERVER }}
   run: |
     if [ -n "$SERVER" ]; then
-      echo "SNOOK_SERVER=$SERVER" >> "$GITHUB_ENV"
+      echo "SNOOKERED_SERVER=$SERVER" >> "$GITHUB_ENV"
     fi

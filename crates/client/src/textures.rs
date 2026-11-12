@@ -5,7 +5,7 @@
 //! "grain" that fine noise produces when the camera moves.
 
 use macroquad::math::Vec3;
-use snook_core::{BallId, BallKind};
+use snookered_core::{BallId, BallKind};
 
 /// RGBA8 image data.
 pub struct Pixels {
@@ -21,7 +21,7 @@ pub fn uv_to_dir(u: f32, v: f32) -> Vec3 {
     Vec3::new(theta.sin() * phi.cos(), theta.cos(), theta.sin() * phi.sin())
 }
 
-/// The colours of a ball set (see `snook_proto::shop`).
+/// The colours of a ball set (see `snookered_proto::shop`).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Palette {
     pub colors: [[u8; 3]; 7],
@@ -32,10 +32,10 @@ pub struct Palette {
 impl Palette {
     /// The palette of a shop ball set (the classic one if unknown).
     pub fn of(code: &str) -> Palette {
-        let item =
-            snook_proto::shop::item(code).or_else(|| snook_proto::shop::item("balls_classic"));
+        let item = snookered_proto::shop::item(code)
+            .or_else(|| snookered_proto::shop::item("balls_classic"));
         match item.map(|i| i.look) {
-            Some(snook_proto::shop::Look::Balls { colors, eight, ivory, .. }) => {
+            Some(snookered_proto::shop::Look::Balls { colors, eight, ivory, .. }) => {
                 Palette { colors, eight, ivory }
             }
             _ => Palette { colors: [[255, 204, 10]; 7], eight: [22, 22, 24], ivory: IVORY },

@@ -13,7 +13,7 @@
 #     (Partner Center → Product management → Product identity),
 #   MSSTORE_DISPLAY_NAME (the name reserved in the Store),
 #   MSSTORE_PRODUCT_ID (the Store ID, 9xxxxxxxxxxx), MSSTORE_AUTO_SUBMIT,
-#   SNOOK_SERVER (the game server, as for the other releases).
+#   SNOOKERED_SERVER (the game server, as for the other releases).
 # Secrets: MSSTORE_TENANT_ID, MSSTORE_SELLER_ID, MSSTORE_CLIENT_ID,
 #   MSSTORE_CLIENT_SECRET.
 name: Microsoft Store
@@ -85,10 +85,10 @@ jobs:
       - name: Build the Store version of the game
         shell: pwsh
         env:
-          SNOOK_SERVER: ${{ vars.SNOOK_SERVER }}
+          SNOOKERED_SERVER: ${{ vars.SNOOKERED_SERVER }}
           # The C runtime inside the executable: nothing else to install.
           RUSTFLAGS: -C target-feature=+crt-static
-        run: cargo build --release --locked -p snook --features store
+        run: cargo build --release --locked -p snookered --features store
       - name: Pack the MSIX
         id: pack
         shell: pwsh

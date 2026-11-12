@@ -2,14 +2,6 @@
 
 ## Unreleased
 
-### The game's name
-- The game is now called **Snookered** everywhere players see it: window,
-  menu, lounge, notifications, the installer and its shortcuts, the
-  server's messages and web pages, and the Microsoft Store package. The
-  name lives in one constant (`snook_proto::GAME_NAME`). Internal names
-  (the `snook` executable and crates, the settings folder, the LAN beacon)
-  are unchanged, so updating keeps settings and sign-ins.
-
 ### Distribution
 - The Microsoft Store version: an MSIX package built by the *Microsoft Store*
   workflow from release tags and sent to Partner Center as a draft
@@ -19,8 +11,8 @@
 
 ### Server
 - The privacy policy, in Portuguese (`/privacidade`) and English
-  (`/privacy`); `SNOOK_GAME_NAME`, `SNOOK_PRIVACY_CONTROLLER` and
-  `SNOOK_PRIVACY_CONTACT` fill in its names.
+  (`/privacy`); `SNOOKERED_GAME_NAME`, `SNOOKERED_PRIVACY_CONTROLLER` and
+  `SNOOKERED_PRIVACY_CONTACT` fill in its names.
 
 ## 0.1.1 (protocol 11)
 
@@ -65,12 +57,12 @@ Everything in the 0.1.1 betas, and:
 ### Server
 - Accounts: change password, recovery e-mail (offered from checkout),
   deletion by anonymising (LGPD); matches no longer cascade on delete.
-- Graceful drain on SIGTERM (`SNOOK_DRAIN_SECS`, `maxShutdownDelaySeconds`);
+- Graceful drain on SIGTERM (`SNOOKERED_DRAIN_SECS`, `maxShutdownDelaySeconds`);
   games are saved after every stroke and continue on the next server.
 - Replays (seed + strokes), per-match statistics, rating history.
 - Coins for rated games (daily cap), daily bonus, anti-farm for repeated
   pairs; tournament fees and prizes (70/20, 10% house); weekly cup
-  (`SNOOK_CUP`); VIP 16-player brackets and waiting-list priority.
+  (`SNOOKERED_CUP`); VIP 16-player brackets and waiting-list priority.
 - Staff panel: metrics (DAU, games, retention, funnel, revenue, queue
   wait), aim-assistance review queue, replays attached to reports.
 
@@ -95,7 +87,7 @@ Everything in the 0.1.1 betas, and:
   (High and Ultra).
 - The leather around the pockets was lit from below (its faces pointed
   down) and looked dark; the pocket walls were lit from the outside.
-- A development view (`SNOOK_DEBUG_NORMALS=1`, debug builds) paints red any
+- A development view (`SNOOKERED_DEBUG_NORMALS=1`, debug builds) paints red any
   face lit from behind; tests check the shapes the table is made of.
 
 ### Fixes
@@ -108,9 +100,9 @@ Everything in the 0.1.1 betas, and:
   vence!" used to overflow the game-over panel).
 - Installing a newer beta over an older one with the .msi kept the old
   game: Windows Installer ignores the fourth part of a version (the beta
-  number), so it saw the same version and left the old snook.exe, whose
+  number), so it saw the same version and left the old snookered.exe, whose
   file version was also the same. Newer builds now replace older ones of the
-  same version, and snook.exe carries the beta number in its version.
+  same version, and snookered.exe carries the beta number in its version.
 - The bottom and right cushions were darker than the others: their faces
   were wound the other way, so the light hit them from behind.
 - The side pockets showed a black trapezoid between the jaws: the cloth
@@ -120,7 +112,7 @@ Everything in the 0.1.1 betas, and:
   drawn after everything else, so panels, buttons, chat and toasts drawn
   later no longer cover them ("Find an opponent…" used to hide under the
   rated/casual switch, achievement cards under the match history).
-- A release built with an empty `SNOOK_SERVER` (the CI variable not set) no
+- A release built with an empty `SNOOKERED_SERVER` (the CI variable not set) no
   longer ships without a game server: it keeps the public one.
 
 ## 0.1.0

@@ -7,8 +7,8 @@
 //! open a payment page, and shows what it answers.
 
 use macroquad::prelude::*;
-use snook_proto::ClientMsg;
-use snook_proto::shop::{Category, ITEMS, Item, Look, Price};
+use snookered_proto::ClientMsg;
+use snookered_proto::shop::{Category, ITEMS, Item, Look, Price};
 
 #[allow(unused_imports)]
 use crate::paint::{draw_circle, draw_circle_lines, draw_line, draw_rectangle};
@@ -114,7 +114,7 @@ fn draw_styled_name_preview(ui: &Ui, label: &str, c: Vec2, style: Option<([u8; 3
             ui.styled_text(label, c.x - w / 2.0, c.y - 11.0, 22.0, rgb(a), rgb(b), true)
         }
         None => {
-            let color = crate::ui::tier_color(snook_proto::Tier::Expert);
+            let color = crate::ui::tier_color(snookered_proto::Tier::Expert);
             ui.text(label, c.x - w / 2.0, c.y - 11.0, 22.0, color, true)
         }
     }
@@ -251,7 +251,7 @@ impl ShopScreen {
 
     /// Opens on the tab of an item (back from the 3D preview).
     pub fn show_item(&mut self, code: &str) {
-        if let Some(item) = snook_proto::shop::item(code) {
+        if let Some(item) = snookered_proto::shop::item(code) {
             self.tab = Tab::Items(item.category);
             self.first = 0;
         }
@@ -293,7 +293,7 @@ impl ShopScreen {
         }
         // The server confirmed a purchase: show it.
         if let Some((code, gift)) = online.bought.take()
-            && let Some(item) = snook_proto::shop::item(&code)
+            && let Some(item) = snookered_proto::shop::item(&code)
         {
             self.confirm = None;
             self.done = Some((item.code, gift));
@@ -527,14 +527,14 @@ impl ShopScreen {
                         }
                     }
                     Price::Achievement(a) => {
-                        let how = snook_proto::ACHIEVEMENTS
+                        let how = snookered_proto::ACHIEVEMENTS
                             .iter()
                             .find(|x| x.code == a)
                             .map(|x| t(x.title))
                             .unwrap_or(a);
                         ui.button(b, &tw("Achievement: {a}", &[("a", &how)]), false);
                         if ui.hovering(b) {
-                            let desc = snook_proto::ACHIEVEMENTS
+                            let desc = snookered_proto::ACHIEVEMENTS
                                 .iter()
                                 .find(|x| x.code == a)
                                 .map(|x| t(x.description).to_string())
@@ -555,7 +555,7 @@ impl ShopScreen {
     /// "Buy this?": the item, what it costs, the coins before and after.
     fn confirm_dialog(&mut self, ui: &mut Ui, online: &mut Online) -> Option<ShopAction> {
         let confirm = self.confirm.clone()?;
-        let item = snook_proto::shop::item(confirm.code)?;
+        let item = snookered_proto::shop::item(confirm.code)?;
         let price = item.coins().unwrap_or(0) as i64;
         let coins = online.wallet.as_ref().map(|w| w.coins).unwrap_or(0);
         let sw = crate::ui::vw();
@@ -661,7 +661,7 @@ impl ShopScreen {
         online: &mut Online,
         code: &'static str,
     ) -> PreviewAction {
-        let Some(item) = snook_proto::shop::item(code) else { return PreviewAction::Close };
+        let Some(item) = snookered_proto::shop::item(code) else { return PreviewAction::Close };
         let sw = crate::ui::vw();
         let sh = crate::ui::vh();
         let w = 620.0f32.min(sw - 30.0);
@@ -700,7 +700,7 @@ impl ShopScreen {
     /// The purchase went through.
     fn done_dialog(&mut self, ui: &mut Ui) {
         let Some((code, gift)) = self.done.clone() else { return };
-        let Some(item) = snook_proto::shop::item(code) else {
+        let Some(item) = snookered_proto::shop::item(code) else {
             self.done = None;
             return;
         };
@@ -757,7 +757,7 @@ impl ShopScreen {
         ui.panel(r);
         crate::icons::draw(Icon::Gift, vec2(r.x + 30.0, r.y + 30.0), 22.0, GOLD);
         ui.text(t("Give to a friend"), r.x + 50.0, r.y + 18.0, 20.0, GOLD, true);
-        if let Some(item) = snook_proto::shop::item(code) {
+        if let Some(item) = snookered_proto::shop::item(code) {
             ui.text(t(item.name), r.x + 50.0, r.y + 44.0, 14.0, MUTED, false);
         }
         let friends = online.friends.friends.clone();
@@ -875,7 +875,7 @@ impl ShopScreen {
         let wallet = online.wallet.clone().unwrap_or_default();
         crate::icons::draw(Icon::Crown, vec2(area.x + 22.0, area.y + 18.0), 30.0, GOLD);
         ui.text(
-            &format!("{} VIP", snook_proto::GAME_NAME),
+            &format!("{} VIP", snookered_proto::GAME_NAME),
             area.x + 48.0,
             area.y + 4.0,
             24.0,

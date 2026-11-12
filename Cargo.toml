@@ -30,11 +30,11 @@ strip = true
 inherits = "release"
 lto = "thin"
 
-[profile.dev.package.snook_core]
+[profile.dev.package.snookered_core]
 opt-level = 3
 
 
 # miniquad with one fix for Intel graphics on Windows (see vendor/miniquad/
-# src/graphics/gl.rs, "Snook patch"): stream buffers are orphaned on update.
+# src/graphics/gl.rs, "Snookered patch"): stream buffers are orphaned on update.
 [patch.crates-io]
 miniquad = { path = "vendor/miniquad" }

@@ -1,6 +1,6 @@
 # cargo audit reads Cargo.lock, which lists optional dependencies of every
 # crate whether or not they are built. These two come from sqlx's MySQL and
-# SQLite drivers, which Snook does not enable (`cargo tree -i rsa` and
+# SQLite drivers, which Snookered does not enable (`cargo tree -i rsa` and
 # `cargo tree -i libsqlite3-sys` print nothing): they are never compiled.
 [advisories]
 ignore = [

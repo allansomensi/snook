@@ -76,10 +76,10 @@ impl AimGuide {
     }
 }
 
-/// The default game server; change it in Settings or with `SNOOK_SERVER`
-/// when building (an empty `SNOOK_SERVER`, as CI passes when the variable
+/// The default game server; change it in Settings or with `SNOOKERED_SERVER`
+/// when building (an empty `SNOOKERED_SERVER`, as CI passes when the variable
 /// isn't set, keeps the public server).
-pub const DEFAULT_SERVER: &str = match option_env!("SNOOK_SERVER") {
+pub const DEFAULT_SERVER: &str = match option_env!("SNOOKERED_SERVER") {
     Some(s) if !s.is_empty() => s,
     _ => "wss://snook-server.onrender.com/ws",
 };
@@ -180,14 +180,15 @@ impl Default for Config {
 
 fn config_dir() -> Option<PathBuf> {
     if cfg!(windows) {
-        std::env::var_os("APPDATA").map(|p| PathBuf::from(p).join("Snook"))
+        std::env::var_os("APPDATA").map(|p| PathBuf::from(p).join("Snookered"))
     } else if cfg!(target_os = "macos") {
-        std::env::var_os("HOME").map(|h| PathBuf::from(h).join("Library/Application Support/Snook"))
+        std::env::var_os("HOME")
+            .map(|h| PathBuf::from(h).join("Library/Application Support/Snookered"))
     } else {
         std::env::var_os("XDG_CONFIG_HOME")
             .map(PathBuf::from)
             .or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".config")))
-            .map(|p| p.join("snook"))
+            .map(|p| p.join("snookered"))
     }
 }
 
@@ -251,7 +252,8 @@ impl Config {
                 "lan_name" => c.lan_name = v.chars().take(16).collect(),
                 // Only real items of the right kind (a typo means the default).
                 "cloth" | "cue" | "chalk" | "balls" | "effect" => {
-                    let fits = snook_proto::shop::item(v).is_some_and(|i| i.category.code() == k);
+                    let fits =
+                        snookered_proto::shop::item(v).is_some_and(|i| i.category.code() == k);
                     if fits {
                         match k {
                             "cloth" => c.cloth = v.to_string(),

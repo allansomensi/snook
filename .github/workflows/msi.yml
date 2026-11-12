@@ -37,10 +37,10 @@ jobs:
           # The cargo-wix that dist 0.33 builds installers with.
           tool: cargo-wix@0.3.9
       - name: Build the game
-        run: cargo build --release --locked -p snook
+        run: cargo build --release --locked -p snookered
       - name: Build the installer (with WiX's output)
-        run: cargo wix --package snook --no-build --nocapture --target-bin-dir target/release --output target/wix/snook-x86_64-pc-windows-msvc.msi
+        run: cargo wix --package snookered --no-build --nocapture --target-bin-dir target/release --output target/wix/snookered-x86_64-pc-windows-msvc.msi
       - uses: actions/upload-artifact@v4
         with:
-          name: snook-msi
+          name: snookered-msi
           path: target/wix/*.msi

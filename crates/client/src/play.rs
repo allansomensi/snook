@@ -12,7 +12,7 @@
 
 use ::glam::DVec2;
 use macroquad::prelude::*;
-use snook_core::{BallId, BallInHand, PocketId};
+use snookered_core::{BallId, BallInHand, PocketId};
 
 use crate::camera::{CameraMode, CameraRig};
 use crate::config::AimGuide;

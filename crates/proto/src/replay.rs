@@ -4,7 +4,7 @@
 
 use glam::DVec2;
 use serde::{Deserialize, Serialize};
-use snook_core::{BallId, EightBallGame, PocketId, Shot, ShotReport};
+use snookered_core::{BallId, EightBallGame, PocketId, Shot, ShotReport};
 
 /// One thing that changed the game.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]

@@ -15,8 +15,8 @@ const PRIVACY_EN: &str = include_str!("../pages/privacy.en.html");
 /// The date shown at the top of the policy: change it with the text.
 const PRIVACY_UPDATED: &str = "2026-11-12";
 
-/// Who the policy names (from `SNOOK_GAME_NAME`, `SNOOK_PRIVACY_CONTROLLER`
-/// and `SNOOK_PRIVACY_CONTACT`).
+/// Who the policy names (from `SNOOKERED_GAME_NAME`, `SNOOKERED_PRIVACY_CONTROLLER`
+/// and `SNOOKERED_PRIVACY_CONTACT`).
 #[derive(Debug, Clone)]
 pub struct PrivacyInfo {
     /// The game's name in the store.
@@ -30,7 +30,7 @@ pub struct PrivacyInfo {
 impl Default for PrivacyInfo {
     fn default() -> Self {
         PrivacyInfo {
-            game: snook_proto::GAME_NAME.into(),
+            game: snookered_proto::GAME_NAME.into(),
             controller: "Allan Somensi".into(),
             contact: format!("{}/issues", env!("CARGO_PKG_REPOSITORY")),
         }

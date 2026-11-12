@@ -19,7 +19,7 @@ API, CORS and a second set of credentials for no gain at this size.
 | Resolve reports, announcements in the lounge | | ✓ | ✓ |
 | Change roles, reset a password, change the welcome message | | | ✓ |
 
-The first administrators come from `SNOOK_ADMINS`; they can then promote
+The first administrators come from `SNOOKERED_ADMINS`; they can then promote
 others from the panel. Nobody can act on their own account (except signing
 out everywhere).
 

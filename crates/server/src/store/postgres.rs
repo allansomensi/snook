@@ -1,11 +1,11 @@
 //! PostgreSQL storage (production; works with Neon, Supabase, RDS…).
 
-use snook_proto::{LeaderboardEntry, Role};
+use snookered_proto::{LeaderboardEntry, Role};
 use sqlx::postgres::{PgPool, PgPoolOptions, PgRow};
 use sqlx::{Row, query};
 
-use snook_proto::CareerNumbers;
-use snook_proto::replay::Replay;
+use snookered_proto::CareerNumbers;
+use snookered_proto::replay::Replay;
 
 use super::{
     AimRow, AuditRow, BuyOutcome, FriendOutcome, FriendState, HistoryRow, LedgerRow, LiveMatch,

@@ -1,4 +1,4 @@
-# Render Blueprint for the Snook server (free plan). See docs/DEPLOY.pt-BR.md.
+# Render Blueprint for the Snookered server (free plan). See docs/DEPLOY.pt-BR.md.
 services:
   - type: web
     name: snook-server
@@ -11,26 +11,26 @@ services:
     autoDeploy: true
     # A deploy no longer cuts games short: on SIGTERM the server stops
     # starting games, tells the lounge, and lets the games in progress go on
-    # (SNOOK_DRAIN_SECS); what is left is saved and continues on the new server.
+    # (SNOOKERED_DRAIN_SECS); what is left is saved and continues on the new server.
     maxShutdownDelaySeconds: 300
     envVars:
       # Neon connection string (the direct one, not "-pooler"). Set it in the dashboard.
       - key: DATABASE_URL
         sync: false
       # Your username: you become an administrator the next time you sign in.
-      - key: SNOOK_ADMINS
+      - key: SNOOKERED_ADMINS
         sync: false
       # Render sits behind Cloudflare: take the player's real address from these.
-      - key: SNOOK_CLIENT_IP_HEADER
+      - key: SNOOKERED_CLIENT_IP_HEADER
         value: cf-connecting-ip,true-client-ip,x-forwarded-for
-      - key: SNOOK_DB_POOL
+      - key: SNOOKERED_DB_POOL
         value: "5"
-      - key: SNOOK_SHOT_CLOCK
+      - key: SNOOKERED_SHOT_CLOCK
         value: "30"
-      - key: SNOOK_DRAIN_SECS
+      - key: SNOOKERED_DRAIN_SECS
         value: "270"
       # The weekly cup (an arena organised by the server).
-      - key: SNOOK_CUP
+      - key: SNOOKERED_CUP
         value: "sat 20:00 60m"
       - key: RUST_LOG
         value: info

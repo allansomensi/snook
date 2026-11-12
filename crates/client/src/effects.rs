@@ -3,7 +3,7 @@
 //! the age of the effect (no state per particle).
 
 use macroquad::prelude::*;
-use snook_proto::shop::{EffectKind, Look};
+use snookered_proto::shop::{EffectKind, Look};
 
 /// How long an effect plays, in seconds.
 pub const LENGTH: f32 = 2.6;
@@ -218,7 +218,7 @@ pub struct WinEffect {
 impl WinEffect {
     /// The effect of a shop item (`None` for no effect).
     pub fn of(code: &str, at: Vec3) -> Option<WinEffect> {
-        match snook_proto::shop::item(code)?.look {
+        match snookered_proto::shop::item(code)?.look {
             Look::Effect { kind, color } if kind != EffectKind::None => {
                 Some(WinEffect { kind, color, at, age: 0.0 })
             }

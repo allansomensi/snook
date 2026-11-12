@@ -144,11 +144,11 @@ jobs:
       - name: "Game server for this release"
         run: |
           if [ -n "$SERVER" ]; then
-            echo "SNOOK_SERVER=$SERVER" >> "$GITHUB_ENV"
+            echo "SNOOKERED_SERVER=$SERVER" >> "$GITHUB_ENV"
           fi
         shell: "bash"
         env:
-          "SERVER": "${{ vars.SNOOK_SERVER }}"
+          "SERVER": "${{ vars.SNOOKERED_SERVER }}"
       - name: Install dist
         run: ${{ matrix.install_dist.run }}
       # Get the dist-manifest

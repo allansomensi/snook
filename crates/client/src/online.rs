@@ -9,7 +9,7 @@ use std::collections::VecDeque;
 use macroquad::prelude::*;
 
 use crate::i18n::{t, tw};
-use snook_proto::{
+use snookered_proto::{
     ClientMsg, FriendInfo, LeaderboardEntry, MAX_CHAT_LEN, PlayerInfo, PlayerStatus, Profile,
     ServerMsg, TableInfo, TournamentInfo, TournamentState, valid_password, valid_username,
 };
@@ -67,7 +67,7 @@ struct TournamentForm {
     password: String,
     /// Coins to enter (0: free).
     entry_fee: u32,
-    format: snook_proto::TournamentFormat,
+    format: snookered_proto::TournamentFormat,
 }
 
 #[derive(Default)]
@@ -97,7 +97,7 @@ impl WalletView {
 #[derive(Debug, Clone, Default)]
 pub struct ShopOffers {
     pub payments: bool,
-    pub packs: Vec<snook_proto::PackOffer>,
+    pub packs: Vec<snookered_proto::PackOffer>,
     pub vip_price: String,
     pub vip_coins: u32,
 }
@@ -173,11 +173,11 @@ pub struct Online {
     /// The e-mail of a payment, offered as the recovery e-mail.
     pub email_offer: Option<String>,
     /// Games that can be watched again, and how many are kept (0: all).
-    pub replays: Option<(Vec<snook_proto::HistoryEntry>, u32)>,
+    pub replays: Option<(Vec<snookered_proto::HistoryEntry>, u32)>,
     /// A replay to watch (opened by the replays screen).
-    pub replay: Option<Box<snook_proto::ReplayInfo>>,
+    pub replay: Option<Box<snookered_proto::ReplayInfo>>,
     /// The game on the lounge's TV.
-    pub featured: Option<snook_proto::FeaturedMatch>,
+    pub featured: Option<snookered_proto::FeaturedMatch>,
     /// A code friends can use to sit at this player's table.
     pub invite_code: Option<String>,
     /// The server restarts at this time (no new games until then).
@@ -445,16 +445,16 @@ impl Online {
                     save = true;
                     self.send(ClientMsg::Friends);
                     self.send(ClientMsg::Leaderboard);
-                    // Development aid: SNOOK_AUTOINVITE=<name> invites that player.
-                    if let Some(to) = crate::dev::var("SNOOK_AUTOINVITE") {
+                    // Development aid: SNOOKERED_AUTOINVITE=<name> invites that player.
+                    if let Some(to) = crate::dev::var("SNOOKERED_AUTOINVITE") {
                         self.send(ClientMsg::Invite { to, rated: true });
                     }
-                    // SNOOK_AUTOQUEUE=1 joins "Play now".
-                    if crate::dev::flag("SNOOK_AUTOQUEUE") {
+                    // SNOOKERED_AUTOQUEUE=1 joins "Play now".
+                    if crate::dev::flag("SNOOKERED_AUTOQUEUE") {
                         self.send(ClientMsg::QueueJoin { rated: true });
                     }
-                    // SNOOK_AUTOWATCH=<name> watches that friend's game.
-                    if let Some(username) = crate::dev::var("SNOOK_AUTOWATCH") {
+                    // SNOOKERED_AUTOWATCH=<name> watches that friend's game.
+                    if let Some(username) = crate::dev::var("SNOOKERED_AUTOWATCH") {
                         self.send(ClientMsg::Spectate { username });
                     }
                 }
@@ -540,7 +540,7 @@ impl Online {
                 }
             }
             ServerMsg::Invited { from, rated } => {
-                if crate::dev::flag("SNOOK_AUTOPLAY") && current.is_none() {
+                if crate::dev::flag("SNOOKERED_AUTOPLAY") && current.is_none() {
                     // Development aid: accept at once.
                     self.send(ClientMsg::AnswerInvite { from, accept: true });
                     return save;
@@ -594,7 +594,7 @@ impl Online {
                 self.toast(tw("{name} wants to be your friend.", &[("name", &from)]), true);
             }
             ServerMsg::AchievementUnlocked { code } => {
-                let title = snook_proto::ACHIEVEMENTS
+                let title = snookered_proto::ACHIEVEMENTS
                     .iter()
                     .find(|a| a.code == code)
                     .map(|a| t(a.title).to_string())
@@ -625,12 +625,12 @@ impl Online {
                 if !spectating {
                     self.incoming.clear();
                 }
-                // Development aid: SNOOK_AUTOCHAT="text" says it at the start of a match.
-                if let Some(text) = crate::dev::var("SNOOK_AUTOCHAT").filter(|_| !spectating) {
+                // Development aid: SNOOKERED_AUTOCHAT="text" says it at the start of a match.
+                if let Some(text) = crate::dev::var("SNOOKERED_AUTOCHAT").filter(|_| !spectating) {
                     self.send(ClientMsg::MatchChat { text });
                 }
-                // SNOOK_AUTOREACT="code" sends that reaction.
-                if let Some(code) = crate::dev::var("SNOOK_AUTOREACT") {
+                // SNOOKERED_AUTOREACT="code" sends that reaction.
+                if let Some(code) = crate::dev::var("SNOOKERED_AUTOREACT") {
                     self.send(ClientMsg::React { code });
                 }
                 let next = Match::online(
@@ -674,7 +674,7 @@ impl Online {
                 self.bought = Some((code, gift_to));
             }
             ServerMsg::GiftReceived { from, code } => {
-                let name = snook_proto::shop::item(&code).map(|i| t(i.name)).unwrap_or(&code);
+                let name = snookered_proto::shop::item(&code).map(|i| t(i.name)).unwrap_or(&code);
                 self.toast(
                     tw("{from} gave you {item}!", &[("from", &from), ("item", &name)]),
                     true,
@@ -722,16 +722,17 @@ impl Online {
             ServerMsg::Wallet { coins, vip_until, owned, equipped } => {
                 let wallet = WalletView { coins, vip_until, owned, equipped };
                 // The items in use, as the server allows them now.
-                for c in snook_proto::shop::Category::ALL {
+                for c in snookered_proto::shop::Category::ALL {
                     let code = self.effective(&wallet, c).to_string();
                     let slot = match c {
-                        snook_proto::shop::Category::Cloth => &mut config.cloth,
-                        snook_proto::shop::Category::Cue => &mut config.cue,
-                        snook_proto::shop::Category::Chalk => &mut config.chalk,
-                        snook_proto::shop::Category::Balls => &mut config.balls,
-                        snook_proto::shop::Category::Effect => &mut config.effect,
+                        snookered_proto::shop::Category::Cloth => &mut config.cloth,
+                        snookered_proto::shop::Category::Cue => &mut config.cue,
+                        snookered_proto::shop::Category::Chalk => &mut config.chalk,
+                        snookered_proto::shop::Category::Balls => &mut config.balls,
+                        snookered_proto::shop::Category::Effect => &mut config.effect,
                         // Only seen online.
-                        snook_proto::shop::Category::Frame | snook_proto::shop::Category::Name => {
+                        snookered_proto::shop::Category::Frame
+                        | snookered_proto::shop::Category::Name => {
                             continue;
                         }
                     };
@@ -787,8 +788,12 @@ impl Online {
 
     /// Called when the player leaves the table to go back to the lounge.
     /// The item used in `category` (what is equipped, if still allowed).
-    pub fn effective(&self, w: &WalletView, category: snook_proto::shop::Category) -> &'static str {
-        use snook_proto::shop;
+    pub fn effective(
+        &self,
+        w: &WalletView,
+        category: snookered_proto::shop::Category,
+    ) -> &'static str {
+        use snookered_proto::shop;
         w.equipped
             .iter()
             .find(|(c, _)| c == category.code())
@@ -801,9 +806,9 @@ impl Online {
     }
 
     /// Whether this player may use `item` now.
-    pub fn can_use(&self, item: &snook_proto::shop::Item) -> bool {
+    pub fn can_use(&self, item: &snookered_proto::shop::Item) -> bool {
         let w = self.wallet.clone().unwrap_or_default();
-        snook_proto::shop::can_use(item, &w.owned, &self.achievements, w.is_vip())
+        snookered_proto::shop::can_use(item, &w.owned, &self.achievements, w.is_vip())
     }
 
     /// Starts watching a friend's game.
@@ -1145,7 +1150,7 @@ impl Online {
             action = OnlineAction::Leave;
         }
         crate::icon::draw(header.x + 52.0, header.y + 8.0, 36.0);
-        let name = snook_proto::GAME_NAME.to_uppercase();
+        let name = snookered_proto::GAME_NAME.to_uppercase();
         ui.text(&name, header.x + 96.0, header.y + 12.0, 24.0, GOLD, true);
         let title_w = ui.text_size(&name, 24.0, true).x;
         let title = if self.lan { t("LAN game") } else { t("lounge") };
@@ -1395,7 +1400,7 @@ impl Online {
         let send_r = Rect::new(input.x + input.w + 8.0, input.y, 40.0, input_h);
         let can_send = !self.chat_input.trim().is_empty();
         if (ui.icon_button(send_r, Icon::Play, t("Send"), can_send) || sent) && can_send {
-            let text = snook_proto::clean_chat(&self.chat_input);
+            let text = snookered_proto::clean_chat(&self.chat_input);
             self.send(ClientMsg::Chat { text });
             self.chat_input.clear();
             self.chat_scroll = 0;
@@ -1655,7 +1660,7 @@ impl Online {
             let r = Rect::new(area.x, y, area.w, 48.0);
             rrect(r, 8.0, Color::new(0.91, 0.75, 0.38, 0.12));
             ui.text(&code, r.x + 14.0, r.y + 10.0, 24.0, GOLD, true);
-            let link = format!("snook://join/{code}");
+            let link = format!("snookered://join/{code}");
             let cw = ui.text_size(&code, 24.0, true).x;
             ui.text(&link, r.x + 30.0 + cw, r.y + 17.0, 12.0, MUTED, false);
             if ui.button(Rect::new(r.x + r.w - 92.0, r.y + 9.0, 82.0, 30.0), t("Copy"), true) {
@@ -1755,19 +1760,19 @@ impl Online {
                 33,
                 Rect::new(area.x + 90.0, y, area.w - 90.0, 32.0),
                 &mut form.name,
-                snook_proto::MAX_NAME_LEN,
+                snookered_proto::MAX_NAME_LEN,
             );
             y += 44.0;
             ui.text(t("Format"), area.x, y + 8.0, 13.0, MUTED, true);
             let formats = [t("Knockout"), t("Arena")];
-            let arena = form.format == snook_proto::TournamentFormat::Arena;
+            let arena = form.format == snookered_proto::TournamentFormat::Arena;
             if let Some(i) =
                 ui.segmented(Rect::new(area.x + 90.0, y, 220.0, 30.0), &formats, arena as usize)
             {
                 form.format = if i == 1 {
-                    snook_proto::TournamentFormat::Arena
+                    snookered_proto::TournamentFormat::Arena
                 } else {
-                    snook_proto::TournamentFormat::Knockout
+                    snookered_proto::TournamentFormat::Knockout
                 };
             }
             y += 42.0;
@@ -1880,7 +1885,7 @@ impl Online {
             return;
         }
         // Development aid (screenshots): open the first running tournament.
-        if self.selected_tournament.is_none() && crate::dev::flag("SNOOK_OPEN_TOURNAMENT") {
+        if self.selected_tournament.is_none() && crate::dev::flag("SNOOKERED_OPEN_TOURNAMENT") {
             self.selected_tournament =
                 self.tournaments.iter().find(|t| t.state == TournamentState::Running).map(|t| t.id);
         }
@@ -1965,7 +1970,7 @@ impl Online {
         ui.pill(label, area.x + area.w - pw, area.y + 7.0, color);
         let mut y = area.y + 38.0;
         let kind = if tour.rated { t("rated games") } else { t("casual games") };
-        let arena = tour.format == snook_proto::TournamentFormat::Arena;
+        let arena = tour.format == snookered_proto::TournamentFormat::Arena;
         let line = if arena {
             tw(
                 "Arena · host {host} · {n} players · {kind}",

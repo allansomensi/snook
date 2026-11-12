@@ -10,7 +10,7 @@ use std::collections::HashMap;
 use std::sync::OnceLock;
 use std::sync::atomic::{AtomicU8, Ordering};
 
-use snook_core::{BallId, Difficulty, Foul, GameOverReason, Group, PocketId, ShotError};
+use snookered_core::{BallId, Difficulty, Foul, GameOverReason, Group, PocketId, ShotError};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Lang {

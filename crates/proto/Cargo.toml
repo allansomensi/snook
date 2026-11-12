@@ -1,13 +1,13 @@
 [package]
-name = "snook_proto"
-description = "Client/server protocol for Snook"
+name = "snookered_proto"
+description = "Client/server protocol for Snookered"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 
 [dependencies]
-snook_core = { path = "../core" }
+snookered_core = { path = "../core" }
 glam.workspace = true
 serde.workspace = true
 serde_json = { version = "1", features = ["float_roundtrip"] }

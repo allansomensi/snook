@@ -184,7 +184,7 @@ impl CameraRig {
             }
             Some(m) => {
                 let moving = matches!(m.phase, Phase::Simulating(_) | Phase::Pause(_));
-                let cue = to_world(m.game.ball(snook_core::BallId::CUE).position);
+                let cue = to_world(m.game.ball(snookered_core::BallId::CUE).position);
                 let aim = -(m.aim.yaw as f32);
                 let (focus, base) = if moving || self.hold {
                     *self.frozen.get_or_insert((cue, aim))

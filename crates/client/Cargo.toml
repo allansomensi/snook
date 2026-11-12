@@ -1,5 +1,5 @@
 [package]
-name = "snook"
+name = "snookered"
 description = "Snookered: a lightweight 3D eight-ball pool game with an online lounge"
 authors = ["Allan Somensi"]
 version.workspace = true
@@ -27,13 +27,13 @@ store = []
 embed-resource = "3"
 
 [dependencies]
-snook_core = { path = "../core" }
-# Same glam version as snook_core (macroquad bundles an older one).
+snookered_core = { path = "../core" }
+# Same glam version as snookered_core (macroquad bundles an older one).
 glam.workspace = true
 macroquad = { version = "0.4.16", default-features = false, features = ["audio"] }
-snook_proto = { path = "../proto" }
+snookered_proto = { path = "../proto" }
 # Hosting LAN games (in memory, no database).
-snook_server = { path = "../server", default-features = false }
+snookered_server = { path = "../server", default-features = false }
 # Online play: an event-driven WebSocket client on a background thread
 # (ws:// and wss://): it wakes the moment a message comes in or goes out.
 tungstenite = { version = "0.30", default-features = false, features = ["handshake", "rustls-tls-webpki-roots"] }

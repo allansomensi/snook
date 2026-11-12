@@ -1,13 +1,13 @@
 //! The storage back ends behave the same. The in-memory store is always
-//! tested; PostgreSQL when `SNOOK_TEST_DATABASE_URL` points at an empty
+//! tested; PostgreSQL when `SNOOKERED_TEST_DATABASE_URL` points at an empty
 //! database (it is wiped first), e.g.
-//! `SNOOK_TEST_DATABASE_URL=postgres://snook:snook@localhost/snook_test`.
+//! `SNOOKERED_TEST_DATABASE_URL=postgres://snookered:snookered@localhost/snookered_test`.
 
-use snook_core::stats::ShotStats;
-use snook_core::{GameOverReason, Shot};
-use snook_proto::Role;
-use snook_proto::replay::{Replay, Stroke};
-use snook_server::store::{
+use snookered_core::stats::ShotStats;
+use snookered_core::{GameOverReason, Shot};
+use snookered_proto::Role;
+use snookered_proto::replay::{Replay, Stroke};
+use snookered_server::store::{
     BuyOutcome, FriendOutcome, FriendState, LiveMatch, MatchRecord, NewReport, NewUser, Payment,
     SessionKind, Store, TournamentRecord, day_of,
 };
@@ -285,7 +285,7 @@ async fn exercise(store: Store) {
     // ended long ago).
     assert!(
         store
-            .leaderboard(10, snook_server::now())
+            .leaderboard(10, snookered_server::now())
             .await
             .unwrap()
             .iter()
@@ -294,7 +294,7 @@ async fn exercise(store: Store) {
     store.set_ban(a.id, Some(i64::MAX), Some("cheating")).await.unwrap();
     assert!(
         !store
-            .leaderboard(10, snook_server::now())
+            .leaderboard(10, snookered_server::now())
             .await
             .unwrap()
             .iter()
@@ -361,8 +361,8 @@ async fn memory_store() {
 
 #[tokio::test]
 async fn postgres_store() {
-    let Ok(url) = std::env::var("SNOOK_TEST_DATABASE_URL") else {
-        eprintln!("SNOOK_TEST_DATABASE_URL not set: skipping");
+    let Ok(url) = std::env::var("SNOOKERED_TEST_DATABASE_URL") else {
+        eprintln!("SNOOKERED_TEST_DATABASE_URL not set: skipping");
         return;
     };
     // Start from an empty database.

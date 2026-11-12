@@ -2,8 +2,8 @@
 //! one found on the network, or by address.
 
 use macroquad::prelude::*;
-use snook_proto::valid_username;
-use snook_server::lan::{Discovery, LanHost};
+use snookered_proto::valid_username;
+use snookered_server::lan::{Discovery, LanHost};
 
 #[allow(unused_imports)]
 use crate::paint::{draw_circle, draw_rectangle};
@@ -223,7 +223,7 @@ fn address_url(address: &str) -> String {
     if a.contains(':') {
         format!("ws://{a}/ws")
     } else {
-        format!("ws://{a}:{}/ws", snook_proto::LAN_GAME_PORT)
+        format!("ws://{a}:{}/ws", snookered_proto::LAN_GAME_PORT)
     }
 }
 

@@ -370,14 +370,14 @@ impl Materials {
         let load = |vertex: &'static str, pipeline_params: PipelineParams| -> Material {
             let params =
                 || MaterialParams { pipeline_params, uniforms: uniforms.clone(), textures: vec![] };
-            // SNOOK_SAFE_GRAPHICS=1 forces the basic shader (for troubleshooting).
+            // SNOOKERED_SAFE_GRAPHICS=1 forces the basic shader (for troubleshooting).
             static DEBUG: std::sync::OnceLock<String> = std::sync::OnceLock::new();
             let debug: &'static str = DEBUG.get_or_init(|| {
                 FRAGMENT.replacen("#version 100\n", "#version 100\n#define DEBUG_NORMALS\n", 1)
             });
-            let first = if crate::dev::flag("SNOOK_SAFE_GRAPHICS") {
+            let first = if crate::dev::flag("SNOOKERED_SAFE_GRAPHICS") {
                 simple
-            } else if crate::dev::flag("SNOOK_DEBUG_NORMALS") {
+            } else if crate::dev::flag("SNOOKERED_DEBUG_NORMALS") {
                 debug
             } else {
                 FRAGMENT

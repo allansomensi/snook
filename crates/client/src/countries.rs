@@ -3,7 +3,7 @@
 use std::cell::RefCell;
 
 use macroquad::prelude::*;
-use snook_proto::COUNTRIES;
+use snookered_proto::COUNTRIES;
 
 use crate::i18n::t;
 use crate::ui::{BORDER, CREAM, GOLD, MUTED, Ui, rrect, rrect_lines};

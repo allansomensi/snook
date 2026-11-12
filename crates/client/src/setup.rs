@@ -2,7 +2,7 @@
 //! guide and the shot clock.
 
 use macroquad::prelude::*;
-use snook_core::Difficulty;
+use snookered_core::Difficulty;
 
 use crate::config::{AimGuide, Config};
 use crate::i18n::t;

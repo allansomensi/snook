@@ -14,9 +14,9 @@ pub use postgres::PgStore;
 
 use std::collections::BTreeMap;
 
-use snook_core::stats::ShotStats;
-use snook_proto::replay::Replay;
-use snook_proto::{CareerNumbers, LeaderboardEntry, Role, Stats};
+use snookered_core::stats::ShotStats;
+use snookered_proto::replay::Replay;
+use snookered_proto::{CareerNumbers, LeaderboardEntry, Role, Stats};
 
 #[derive(Debug, Clone)]
 pub struct StoreError(pub String);
@@ -67,8 +67,8 @@ pub struct User {
 }
 
 impl User {
-    pub fn rating(&self) -> snook_core::rating::Rating {
-        snook_core::rating::Rating { rating: self.rating, games: self.games }
+    pub fn rating(&self) -> snookered_core::rating::Rating {
+        snookered_core::rating::Rating { rating: self.rating, games: self.games }
     }
 
     pub fn is_banned(&self, now: i64) -> bool {
@@ -120,7 +120,7 @@ pub enum SessionKind {
 pub struct MatchRecord {
     pub players: [i64; 2],
     pub winner: usize,
-    pub reason: snook_core::GameOverReason,
+    pub reason: snookered_core::GameOverReason,
     pub rated: bool,
     pub delta: [i32; 2],
     pub ratings_after: [i32; 2],

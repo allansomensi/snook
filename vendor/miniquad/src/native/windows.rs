@@ -118,7 +118,7 @@ pub(crate) struct WindowsDisplay {
     event_handler: Option<Box<dyn EventHandler>>,
     modal_resizing_timer: usize,
     update_requested: bool,
-    /// Snook patch: the window's place before going full screen.
+    /// Snookered patch: the window's place before going full screen.
     restore_rect: Option<RECT>,
 }
 
@@ -278,7 +278,7 @@ impl WindowsDisplay {
             #[cfg(target_arch = "x86")]
             SetWindowLong(self.wnd, GWL_STYLE, win_style as _);
 
-            // Snook patch: full screen on the monitor the window is on (not
+            // Snookered patch: full screen on the monitor the window is on (not
             // always the primary one), and back to the same place after.
             if self.fullscreen {
                 let mut current: RECT = std::mem::zeroed();

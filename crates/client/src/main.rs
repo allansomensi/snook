@@ -1,7 +1,7 @@
 // No console window behind the game on Windows (release builds).
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-//! Snook desktop client.
+//! Snookered desktop client.
 //!
 //! Rendering uses macroquad (OpenGL 2.1 / GLES 2), so the game is small and
 //! runs on practically any PC, including old integrated graphics.
@@ -41,7 +41,7 @@ mod ui;
 mod util;
 
 use macroquad::prelude::*;
-use snook_core::{Difficulty, Table};
+use snookered_core::{Difficulty, Table};
 
 use crate::camera::{CameraMode, CameraRig};
 use crate::config::Config;
@@ -159,11 +159,11 @@ fn window_conf() -> macroquad::conf::Conf {
         .and_then(|(w, h)| Some((w.parse().ok()?, h.parse().ok()?)))
         .unwrap_or((1280, 760));
     let window = Conf {
-        window_title: snook_proto::GAME_NAME.into(),
+        window_title: snookered_proto::GAME_NAME.into(),
         window_width: size.0,
         window_height: size.1,
         // Safe graphics mode (troubleshooting) also turns multisampling off.
-        sample_count: if std::env::var_os("SNOOK_SAFE_GRAPHICS").is_some() {
+        sample_count: if std::env::var_os("SNOOKERED_SAFE_GRAPHICS").is_some() {
             1
         } else {
             config.msaa
@@ -206,7 +206,7 @@ enum Screen {
 
 /// A LAN game: the server this computer hosts (if any) and the connection.
 struct LanSession {
-    host: Option<snook_server::lan::LanHost>,
+    host: Option<snookered_server::lan::LanHost>,
     net: Online,
 }
 
@@ -220,7 +220,7 @@ async fn main() {
         let size = (screen_height() * 0.22).clamp(96.0, 220.0);
         icon::draw((screen_width() - size) / 2.0, screen_height() / 2.0 - size * 0.75, size);
         ui.text_centered(
-            &snook_proto::GAME_NAME.to_uppercase(),
+            &snookered_proto::GAME_NAME.to_uppercase(),
             screen_width() / 2.0,
             screen_height() / 2.0 + size * 0.35,
             32.0,
@@ -275,8 +275,8 @@ async fn main() {
         if options.on_eight {
             m.debug_on_eight();
         }
-        // Development aid: SNOOK_RESIGN=1 resigns at once (the game-over panel).
-        if crate::dev::flag("SNOOK_RESIGN") {
+        // Development aid: SNOOKERED_RESIGN=1 resigns at once (the game-over panel).
+        if crate::dev::flag("SNOOKERED_RESIGN") {
             m.resign();
         }
         current = Some(m);
@@ -316,7 +316,7 @@ async fn main() {
         }
         _ => {}
     }
-    let menu_rack = snook_core::rules::rack(&scene.table, 2024);
+    let menu_rack = snookered_core::rules::rack(&scene.table, 2024);
     let vignette = vignette_texture();
 
     // First run: measure the frame rate on the menu and pick graphics that
@@ -328,9 +328,9 @@ async fn main() {
     let mut was_in_match = current.is_some();
     let mut hud_opacity = 1.0f32;
     let mut frame = 0u32;
-    // Development aid: SNOOK_PROFILE prints the CPU time of a frame (without
+    // Development aid: SNOOKERED_PROFILE prints the CPU time of a frame (without
     // waiting for the GPU) every 300 frames.
-    let profiling = crate::dev::flag("SNOOK_PROFILE");
+    let profiling = crate::dev::flag("SNOOKERED_PROFILE");
     let mut cpu = (0.0f64, 0.0f64, 0u32);
     loop {
         let frame_start = std::time::Instant::now();
@@ -469,8 +469,8 @@ async fn main() {
             };
             cam.up = Vec3::Y;
         }
-        // Development aid: SNOOK_CAM="eye x,y,z,target x,y,z" fixes the camera.
-        if let Some(v) = crate::dev::var("SNOOK_CAM")
+        // Development aid: SNOOKERED_CAM="eye x,y,z,target x,y,z" fixes the camera.
+        if let Some(v) = crate::dev::var("SNOOKERED_CAM")
             .map(|v| v.split(',').filter_map(|x| x.trim().parse::<f32>().ok()).collect::<Vec<_>>())
             && v.len() == 6
         {
@@ -510,8 +510,10 @@ async fn main() {
                     let cue = if code.starts_with("cue") { code } else { config.cue.as_str() };
                     let chalk =
                         if code.starts_with("chalk") { code } else { config.chalk.as_str() };
-                    if let Some(ball) = menu_rack.iter().find(|b| b.id == snook_core::BallId::CUE) {
-                        let params = snook_core::PhysicsParams::default();
+                    if let Some(ball) =
+                        menu_rack.iter().find(|b| b.id == snookered_core::BallId::CUE)
+                    {
+                        let params = snookered_core::PhysicsParams::default();
                         let pose = scene.cue_pose(
                             &params,
                             ball.position,
@@ -902,8 +904,8 @@ async fn main() {
         if options.show_fps && frame.is_multiple_of(120) {
             println!("fps {}", get_fps());
         }
-        // Development aid: SNOOK_SHOTS="300,900" also saves `<name>-300.png`… on the way.
-        if let (Some(path), Some(list)) = (&options.screenshot, crate::dev::var("SNOOK_SHOTS"))
+        // Development aid: SNOOKERED_SHOTS="300,900" also saves `<name>-300.png`… on the way.
+        if let (Some(path), Some(list)) = (&options.screenshot, crate::dev::var("SNOOKERED_SHOTS"))
             && list.split(',').filter_map(|n| n.trim().parse::<u32>().ok()).any(|n| n == frame)
         {
             let mut image = get_screen_data();

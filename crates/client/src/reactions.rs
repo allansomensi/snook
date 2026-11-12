@@ -3,7 +3,7 @@
 use std::cell::OnceCell;
 
 use macroquad::prelude::*;
-use snook_proto::REACTIONS;
+use snookered_proto::REACTIONS;
 
 const SIZE: f32 = 72.0;
 const COLUMNS: usize = 8;

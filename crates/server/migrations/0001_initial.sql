@@ -1,4 +1,4 @@
--- Snook schema, version 1.
+-- Snookered schema, version 1.
 
 CREATE TABLE users (
     id                 BIGSERIAL PRIMARY KEY,

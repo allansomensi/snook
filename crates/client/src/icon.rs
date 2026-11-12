@@ -1,4 +1,4 @@
-//! The Snook emblem, drawn procedurally: a pool table seen from above
+//! The Snookered emblem, drawn procedurally: a pool table seen from above
 //! (walnut rails, brass pocket castings, green cloth) with a black ball
 //! whose number circle carries an "S".
 //!
@@ -262,7 +262,7 @@ mod tests {
 
     /// Writes the emblem as PNG files and a Windows .ico into
     /// `crates/client/assets/icon/`:
-    /// `cargo test --release -p snook export_icons -- --ignored`.
+    /// `cargo test --release -p snookered export_icons -- --ignored`.
     #[test]
     #[ignore]
     fn export_icons() {
@@ -281,7 +281,7 @@ mod tests {
             bytes
         };
         for size in [64, 128, 256, 512] {
-            std::fs::write(dir.join(format!("snook-{size}.png")), png(size)).unwrap();
+            std::fs::write(dir.join(format!("snookered-{size}.png")), png(size)).unwrap();
         }
         // A .ico with PNG entries (Windows Vista and later).
         let sizes = [16usize, 20, 24, 32, 40, 48, 64, 128, 256];
@@ -302,7 +302,7 @@ mod tests {
         for img in &images {
             ico.extend_from_slice(img);
         }
-        std::fs::write(dir.join("snook.ico"), ico).unwrap();
+        std::fs::write(dir.join("snookered.ico"), ico).unwrap();
 
         // The Windows installer's pictures (WiX: 493x58 banner, 493x312 welcome page).
         let banner = picture(493, 58, |_, _| [1.0, 1.0, 1.0], &[(46, 493 - 52, 6)]);
@@ -329,7 +329,7 @@ mod tests {
     /// Writes the Microsoft Store package's pictures into
     /// `crates/client/msix/Assets/` (at twice their nominal size, which the
     /// Store recommends; Windows scales them down):
-    /// `cargo test --release -p snook export_msix_assets -- --ignored`.
+    /// `cargo test --release -p snookered export_msix_assets -- --ignored`.
     #[test]
     #[ignore]
     fn export_msix_assets() {

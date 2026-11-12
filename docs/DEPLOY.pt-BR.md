@@ -49,12 +49,12 @@ Não precisa criar tabelas: o servidor aplica as migrations sozinho ao iniciar
 ## 2. Servidor no Render
 
 1. Crie uma conta em <https://render.com> e conecte seu GitHub.
-2. **New → Blueprint**, escolha o repositório `snook`. O Render lê o
-   `render.yaml` da raiz e propõe o serviço `snook-server` (Docker, plano Free,
+2. **New → Blueprint**, escolha o repositório `snookered`. O Render lê o
+   `render.yaml` da raiz e propõe o serviço `snookered-server` (Docker, plano Free,
    região Virginia, health check em `/health`).
 3. Ele vai pedir as variáveis marcadas como secretas:
    - `DATABASE_URL`: a string do Neon do passo 1.
-   - `SNOOK_ADMINS`: seu nome de usuário no jogo (ex.: `allan`). Vários: `allan,maria`.
+   - `SNOOKERED_ADMINS`: seu nome de usuário no jogo (ex.: `allan`). Vários: `allan,maria`.
 4. **Apply**. O primeiro build (Rust em release) leva ~10–15 min no plano
    grátis; os seguintes usam cache.
 5. Quando ficar "Live", teste:
@@ -69,20 +69,20 @@ As outras variáveis já vêm no `render.yaml`:
 
 | Variável | Valor | Para quê |
 |---|---|---|
-| `SNOOK_CLIENT_IP_HEADER` | `cf-connecting-ip,true-client-ip,x-forwarded-for` | O Render fica atrás da Cloudflare: o servidor lê o IP real do jogador desses cabeçalhos. Sem isso todos parecem vir do mesmo IP e os limites anti-abuso (contas por IP, conexões por IP) bloqueariam gente inocente. O painel avisa se isso acontecer. |
-| `SNOOK_DB_POOL` | `5` | Conexões com o banco (o Neon grátis aceita bem). |
-| `SNOOK_SHOT_CLOCK` | `30` | Segundos por tacada nas partidas online. |
-| `SNOOK_MOTD` | (opcional) | Mensagem de boas-vindas do salão. |
+| `SNOOKERED_CLIENT_IP_HEADER` | `cf-connecting-ip,true-client-ip,x-forwarded-for` | O Render fica atrás da Cloudflare: o servidor lê o IP real do jogador desses cabeçalhos. Sem isso todos parecem vir do mesmo IP e os limites anti-abuso (contas por IP, conexões por IP) bloqueariam gente inocente. O painel avisa se isso acontecer. |
+| `SNOOKERED_DB_POOL` | `5` | Conexões com o banco (o Neon grátis aceita bem). |
+| `SNOOKERED_SHOT_CLOCK` | `30` | Segundos por tacada nas partidas online. |
+| `SNOOKERED_MOTD` | (opcional) | Mensagem de boas-vindas do salão. |
 | `RUST_LOG` | `info` | Nível dos logs (veja em **Logs** no Render). |
 
 > Alternativa sem Blueprint: **New → Web Service → Existing image**, usando a
-> imagem `ghcr.io/allansomensi/snook-server:latest` publicada pelo workflow de
+> imagem `ghcr.io/allansomensi/snookered-server:latest` publicada pelo workflow de
 > release (passo 6). O deploy fica instantâneo porque não compila nada no Render.
 
 ## 3. Virar administrador
 
 1. Abra o jogo, **Jogar online → Nova conta**, crie a conta com o nome que pôs
-   em `SNOOK_ADMINS` (ou entre, se ela já existe). Ao entrar, ela vira admin.
+   em `SNOOKERED_ADMINS` (ou entre, se ela já existe). Ao entrar, ela vira admin.
 2. Abra `https://snook-server.onrender.com/admin` e entre com o mesmo usuário e
    senha.
 
@@ -107,13 +107,13 @@ wss://snook-server.onrender.com/ws
   configurar nada:
 
   ```bash
-  SNOOK_SERVER=wss://snook-server.onrender.com/ws cargo build --release -p snook
+  SNOOKERED_SERVER=wss://snook-server.onrender.com/ws cargo build --release -p snookered
   ```
 
   No Windows (PowerShell):
 
   ```powershell
-  $env:SNOOK_SERVER="wss://snook-server.onrender.com/ws"; cargo build --release -p snook
+  $env:SNOOKERED_SERVER="wss://snook-server.onrender.com/ws"; cargo build --release -p snookered
   ```
 
 ## 5. Rede local (LAN)
@@ -128,7 +128,7 @@ salão, chat, mesas, torneios e partidas como no online.
 ## 6. Publicar versões (GitHub Actions)
 
 1. No GitHub: **Settings → Secrets and variables → Actions → Variables → New
-   variable**: `SNOOK_SERVER` = `wss://snook-server.onrender.com/ws`.
+   variable**: `SNOOKERED_SERVER` = `wss://snook-server.onrender.com/ws`.
 2. Crie uma tag:
 
    ```bash
@@ -144,12 +144,12 @@ salão, chat, mesas, torneios e partidas como no online.
    ARM64) com o servidor embutido e publica na página de Releases o
    instalador `.msi`, os pacotes `.zip`/`.tar.xz` e os instaladores de uma
    linha (shell e PowerShell). O workflow **Server image** publica a imagem
-   do servidor em `ghcr.io/<você>/snook-server`. Detalhes em
+   do servidor em `ghcr.io/<você>/snookered-server`. Detalhes em
    [RELEASING.md](RELEASING.md).
 
 ## 7. (Opcional) Manter o servidor acordado
 
-Defina a variável de repositório `SNOOK_HEALTH_URL` =
+Defina a variável de repositório `SNOOKERED_HEALTH_URL` =
 `https://snook-server.onrender.com/health`. O workflow **Keep the server
 awake** chama o servidor a cada 10 minutos. O GitHub às vezes atrasa execuções
 agendadas, então ainda pode haver um "acordar" ocasional; no plano pago isso
@@ -161,7 +161,7 @@ O Neon grátis mantém histórico de 24 h (restauração a um ponto no tempo pel
 painel). Para uma cópia sua:
 
 ```bash
-pg_dump "postgresql://usuario:senha@ep-xxxx.us-east-1.aws.neon.tech/neondb?sslmode=require" -Fc -f snook-$(date +%F).dump
+pg_dump "postgresql://usuario:senha@ep-xxxx.us-east-1.aws.neon.tech/neondb?sslmode=require" -Fc -f snookered-$(date +%F).dump
 ```
 
 ## 9. Loja: moedas e VIP com dinheiro real (Stripe)
@@ -190,14 +190,14 @@ segura da Stripe (cartão, Pix, boleto): o jogo nunca vê dados de cartão.
      `customer.subscription.deleted`, `charge.refunded`,
      `charge.dispute.created`.
    Copie o **Signing secret** (`whsec_…`).
-7. No **Render → snook-server → Environment**, adicione:
+7. No **Render → snookered-server → Environment**, adicione:
 
    | Variável | Valor |
    |---|---|
-   | `SNOOK_STRIPE_SECRET` | a chave secreta (`sk_test_…` ou `sk_live_…`) |
-   | `SNOOK_STRIPE_WEBHOOK_SECRET` | o `whsec_…` do passo 6 |
-   | `SNOOK_PUBLIC_URL` | `https://snook-server.onrender.com` |
-   | `SNOOK_STRIPE_PRICES` | `coins_500=price_A\|R$ 4,90;coins_1200=price_B\|R$ 9,90;coins_2800=price_C\|R$ 19,90;coins_7000=price_D\|R$ 44,90;vip_monthly=price_V\|R$ 14,90/mês` |
+   | `SNOOKERED_STRIPE_SECRET` | a chave secreta (`sk_test_…` ou `sk_live_…`) |
+   | `SNOOKERED_STRIPE_WEBHOOK_SECRET` | o `whsec_…` do passo 6 |
+   | `SNOOKERED_PUBLIC_URL` | `https://snook-server.onrender.com` |
+   | `SNOOKERED_STRIPE_PRICES` | `coins_500=price_A\|R$ 4,90;coins_1200=price_B\|R$ 9,90;coins_2800=price_C\|R$ 19,90;coins_7000=price_D\|R$ 44,90;vip_monthly=price_V\|R$ 14,90/mês` |
 
    O texto depois de `|` é o preço mostrado no jogo: mantenha igual ao da
    Stripe. Salve: o servidor reinicia e o log mostra `payments on (5 prices)`.
@@ -228,6 +228,6 @@ GitHub, a Stripe é permitida.
 | Jogo fica em "Conectando ao servidor…" ~1 min e entra | Instância grátis acordando. Normal. |
 | `could not start: … password authentication failed` nos logs | `DATABASE_URL` errada. Copie de novo do Neon. |
 | `… prepared statement … already exists` | Usou a string com `-pooler`. Use a conexão direta. |
-| Jogadores recebem "Muitas contas novas desta rede" sem motivo | `SNOOK_CLIENT_IP_HEADER` ausente. O painel mostra o aviso "Every player comes from the same address". |
+| Jogadores recebem "Muitas contas novas desta rede" sem motivo | `SNOOKERED_CLIENT_IP_HEADER` ausente. O painel mostra o aviso "Every player comes from the same address". |
 | "Esta versão do Snookered está desatualizada" | Jogo e servidor com protocolos diferentes. Atualize os dois juntos. |
 | Partida em andamento sumiu | Deploy ou o Render reiniciou a instância (o salão e as partidas ficam na memória; contas e resultados ficam no banco). |

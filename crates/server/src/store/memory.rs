@@ -3,9 +3,9 @@
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::sync::Mutex;
 
-use snook_proto::{LeaderboardEntry, Role};
+use snookered_proto::{LeaderboardEntry, Role};
 
-use snook_proto::CareerNumbers;
+use snookered_proto::CareerNumbers;
 
 use super::{
     AimRow, AuditRow, BuyOutcome, FriendOutcome, FriendState, HistoryRow, LedgerRow, LiveMatch,

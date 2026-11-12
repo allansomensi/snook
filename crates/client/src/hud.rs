@@ -6,7 +6,7 @@ use macroquad::prelude::*;
 use crate::paint::{draw_circle, draw_circle_lines, draw_line, draw_rectangle, draw_triangle};
 
 use crate::i18n::{t, tw};
-use snook_core::{BallId, BallInHand, Group};
+use snookered_core::{BallId, BallInHand, Group};
 
 use crate::game::{Controller, Match, Phase};
 use crate::icons::Icon;
@@ -69,10 +69,10 @@ impl Default for Hud {
             paused: false,
             show_help: false,
             chat_input: String::new(),
-            // Development aid: SNOOK_CHAT_CLOSED starts with the chat folded.
+            // Development aid: SNOOKERED_CHAT_CLOSED starts with the chat folded.
             // Folded at the start (a dot and a preview announce new messages).
-            // Development aid: SNOOK_CHAT_OPEN opens it.
-            chat_open: crate::dev::flag("SNOOK_CHAT_OPEN"),
+            // Development aid: SNOOKERED_CHAT_OPEN opens it.
+            chat_open: crate::dev::flag("SNOOKERED_CHAT_OPEN"),
             chat_scroll: 0,
             confirm_leave: false,
             banner_key: None,
@@ -87,8 +87,8 @@ impl Default for Hud {
             panel_key: None,
             zoom: 0.5,
             zoom_drag: false,
-            // Development aid: SNOOK_OPEN_REACTIONS opens the picker.
-            reactions_open: crate::dev::flag("SNOOK_OPEN_REACTIONS"),
+            // Development aid: SNOOKERED_OPEN_REACTIONS opens the picker.
+            reactions_open: crate::dev::flag("SNOOKERED_OPEN_REACTIONS"),
             camera_default: true,
             history_open: false,
         }
@@ -162,7 +162,7 @@ fn player_card(ui: &mut Ui, m: &Match, seat: usize, x: f32, y: f32, w: f32) {
     let reserve = if m.online.is_some() || m.clock.is_some() { 96.0 } else { 40.0 };
     match &m.online {
         Some(o) => {
-            let color = crate::ui::tier_color(snook_proto::Tier::of(o.ratings[seat]));
+            let color = crate::ui::tier_color(snookered_proto::Tier::of(o.ratings[seat]));
             ui.name_with_flag(
                 &m.names[seat],
                 &o.countries[seat],
@@ -847,7 +847,7 @@ impl Hud {
         self.chat_scroll = ui.chat_log(log, &o.feed, Some(&me), self.chat_scroll);
         let input = Rect::new(r.x + 6.0, r.y + r.h - 36.0, r.w - 12.0, 30.0);
         let sent =
-            ui.text_input(CHAT_FIELD, input, &mut self.chat_input, snook_proto::MAX_CHAT_LEN);
+            ui.text_input(CHAT_FIELD, input, &mut self.chat_input, snookered_proto::MAX_CHAT_LEN);
         if self.chat_input.is_empty() && ui.focus != Some(CHAT_FIELD) {
             ui.text(
                 t("Click to chat, Enter to send"),
@@ -940,13 +940,13 @@ impl Hud {
         }
         const COLS: usize = 7;
         const CELL: f32 = 40.0;
-        let n = snook_proto::REACTIONS.len();
+        let n = snookered_proto::REACTIONS.len();
         let rows = n.div_ceil(COLS);
         let w = COLS as f32 * CELL + 16.0;
         let h = rows as f32 * CELL + 40.0;
         let p = Rect::new(b.x.min(crate::ui::vw() - w - 8.0), b.y - h - 8.0, w, h);
         ui.panel(p);
-        let open = snook_proto::REACTIONS.iter().filter(|r| r.unlocked(&o.unlocked)).count();
+        let open = snookered_proto::REACTIONS.iter().filter(|r| r.unlocked(&o.unlocked)).count();
         ui.text(
             &tw("Reactions {n}/{total}", &[("n", &open), ("total", &n)]),
             p.x + 10.0,
@@ -957,7 +957,7 @@ impl Hud {
         );
         let mut chosen = None;
         let mut tip: Option<(String, Rect)> = None;
-        for (k, r) in snook_proto::REACTIONS.iter().enumerate() {
+        for (k, r) in snookered_proto::REACTIONS.iter().enumerate() {
             let c = Rect::new(
                 p.x + 8.0 + (k % COLS) as f32 * CELL,
                 p.y + 32.0 + (k / COLS) as f32 * CELL,
@@ -991,7 +991,7 @@ impl Hud {
                 if hover {
                     let how = r
                         .unlock
-                        .and_then(|a| snook_proto::ACHIEVEMENTS.iter().find(|x| x.code == a))
+                        .and_then(|a| snookered_proto::ACHIEVEMENTS.iter().find(|x| x.code == a))
                         .map(|a| {
                             tw(
                                 "{title}: {how}",

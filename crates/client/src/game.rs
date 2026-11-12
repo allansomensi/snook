@@ -4,13 +4,13 @@
 use std::sync::{Arc, Mutex};
 
 use ::glam::DVec2;
-use snook_core::ai::{self, AiDecision};
-use snook_core::{
+use snookered_core::ai::{self, AiDecision};
+use snookered_core::{
     BallId, Difficulty, EightBallGame, Event, GameOverReason, PendingShot, PocketId, Shot,
     ShotError, ShotReport, Simulation,
 };
 
-use snook_proto::{
+use snookered_proto::{
     AimState, ChatKind, ChatLine, ClientMsg, MatchResult, PlayerInfo, SPECTATOR_SEAT, ServerMsg,
 };
 
@@ -96,7 +96,7 @@ pub struct Notice {
     pub ttl: f32,
 }
 
-pub use snook_core::stats::ShotStats;
+pub use snookered_core::stats::ShotStats;
 
 pub struct Match {
     /// Each player's cue and chalk (shop codes).
@@ -104,7 +104,7 @@ pub struct Match {
     /// Each player's winning effect (shop codes).
     pub effects: [String; 2],
     /// A game just won on the 8: (winner, the pocket), for the effect.
-    pub win_effect: Option<(usize, snook_core::PocketId)>,
+    pub win_effect: Option<(usize, snookered_core::PocketId)>,
     /// Each player's numbers this game.
     pub stats: [ShotStats; 2],
     /// The shot being shown was taken with the cue ball in hand.
@@ -134,7 +134,7 @@ pub struct Match {
     pub escape_used: bool,
     seed: u64,
     /// A stored game being watched again: the strokes still to play.
-    pub script: Option<std::collections::VecDeque<snook_proto::replay::Stroke>>,
+    pub script: Option<std::collections::VecDeque<snookered_proto::replay::Stroke>>,
     /// The exact shot the computer (or a replay) plays, not rebuilt from
     /// the power bar (which would round it).
     forced_shot: Option<Shot>,
@@ -263,7 +263,7 @@ impl Match {
     }
 
     /// Watches a stored game again, stroke by stroke.
-    pub fn replay_of(info: &snook_proto::ReplayInfo, guide: AimGuide) -> Match {
+    pub fn replay_of(info: &snookered_proto::ReplayInfo, guide: AimGuide) -> Match {
         let settings = MatchSettings {
             mode: MatchMode::Demo,
             names: info.players.clone(),
@@ -298,11 +298,11 @@ impl Match {
         spectating: bool,
     ) -> Self {
         let mut controllers = [Controller::Remote; 2];
-        // Development aid: SNOOK_AUTOPLAY=1 lets the computer play this seat
+        // Development aid: SNOOKERED_AUTOPLAY=1 lets the computer play this seat
         // (two such games can play a whole online match by themselves).
         // A spectator only watches: both seats are played from the server.
         if !spectating {
-            controllers[seat] = if crate::dev::flag("SNOOK_AUTOPLAY") {
+            controllers[seat] = if crate::dev::flag("SNOOKERED_AUTOPLAY") {
                 Controller::Computer(Difficulty::Hard)
             } else {
                 Controller::Human
@@ -454,7 +454,7 @@ impl Match {
     }
 
     /// Balls as currently displayed (a replay, mid-shot or at rest).
-    pub fn balls(&self) -> &[snook_core::Ball] {
+    pub fn balls(&self) -> &[snookered_core::Ball] {
         if let Some(r) = &self.replay {
             return &r.simulation.balls;
         }
@@ -506,7 +506,7 @@ impl Match {
         // A replay: the next stroke decides the turn.
         let mut scripted = None;
         while let Some(script) = self.script.as_mut() {
-            use snook_proto::replay::Stroke;
+            use snookered_proto::replay::Stroke;
             match script.pop_front() {
                 Some(Stroke::Shot { shot, called, cue_ball, .. }) => {
                     scripted = Some(AiDecision { shot, called_pocket: called, cue_ball });
@@ -708,8 +708,8 @@ impl Match {
             let next = self.names[self.game.current_player()].clone();
             if let Some(bih) = self.game.ball_in_hand() {
                 let where_ = match bih {
-                    snook_core::BallInHand::Kitchen => t(" behind the head string"),
-                    snook_core::BallInHand::Anywhere => "",
+                    snookered_core::BallInHand::Kitchen => t(" behind the head string"),
+                    snookered_core::BallInHand::Anywhere => "",
                 };
                 self.notify(
                     tw("{next} has ball in hand{where}.", &[("next", &next), ("where", &where_)]),
@@ -917,7 +917,7 @@ impl Match {
         let report = match self.online.as_mut() {
             Some(o) => match o.pending_end.take() {
                 Some((end, report)) => {
-                    if crate::dev::flag("SNOOK_NET_DEBUG") {
+                    if crate::dev::flag("SNOOKERED_NET_DEBUG") {
                         let mut local = self.game.clone();
                         local.finish_shot((*pending).clone());
                         let same = local == end;
@@ -954,9 +954,9 @@ impl Match {
 
     fn after_shot(&mut self, report: &ShotReport) {
         if let Some(over) = report.game_over
-            && over.reason == snook_core::GameOverReason::PocketedEight
+            && over.reason == snookered_core::GameOverReason::PocketedEight
             && let Some((_, pocket)) =
-                report.pocketed.iter().find(|(b, _)| *b == snook_core::BallId::EIGHT)
+                report.pocketed.iter().find(|(b, _)| *b == snookered_core::BallId::EIGHT)
         {
             self.win_effect = Some((over.winner, *pocket));
         }
@@ -1354,7 +1354,7 @@ impl Match {
                 o.push_feed(feed);
             }
             ServerMsg::Reaction { seat, code } => {
-                if let Some(r) = snook_proto::reaction(&code) {
+                if let Some(r) = snookered_proto::reaction(&code) {
                     if seat < 2 {
                         // One at a time per player: a new one replaces the last.
                         o.reactions.retain(|(s, ..)| *s != seat);
@@ -1392,7 +1392,7 @@ impl Match {
 
     /// Sends a chat line to the opponent.
     pub fn send_chat(&mut self, text: &str) {
-        let text = snook_proto::clean_chat(text);
+        let text = snookered_proto::clean_chat(text);
         if let Some(o) = self.online.as_mut()
             && !o.spectator
             && !text.is_empty()
@@ -1434,7 +1434,7 @@ mod tests {
 
     #[test]
     fn match_stats_count_runs_fouls_and_ball_in_hand() {
-        use snook_core::{Foul, PocketId};
+        use snookered_core::{Foul, PocketId};
         let report = |made: &[u8], foul: bool, continues: bool| ShotReport {
             shooter: 0,
             was_break: false,
@@ -1460,7 +1460,7 @@ mod tests {
 
     #[test]
     fn a_replay_plays_the_stored_game_exactly() {
-        use snook_proto::replay::{Replay, Stroke};
+        use snookered_proto::replay::{Replay, Stroke};
         // A game played by the computer, recorded stroke by stroke.
         let mut replay = Replay::new(77, 0);
         let mut game = replay.start();
@@ -1475,10 +1475,10 @@ mod tests {
                 cue_ball: d.cue_ball,
                 timeout: false,
             };
-            snook_proto::replay::apply(&mut game, &stroke).unwrap();
+            snookered_proto::replay::apply(&mut game, &stroke).unwrap();
             replay.strokes.push(stroke);
         }
-        let info = snook_proto::ReplayInfo {
+        let info = snookered_proto::ReplayInfo {
             match_id: 1,
             players: ["a".into(), "b".into()],
             countries: Default::default(),
@@ -1506,9 +1506,9 @@ mod tests {
             rating: 1200,
             games: 0,
             wins: 0,
-            status: snook_proto::PlayerStatus::Playing,
+            status: snookered_proto::PlayerStatus::Playing,
             country: String::new(),
-            role: snook_proto::Role::Player,
+            role: snookered_proto::Role::Player,
             guest: false,
             vip: false,
             cue: String::new(),

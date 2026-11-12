@@ -12,11 +12,11 @@ use std::time::{Duration, Instant};
 
 use glam::DVec2;
 use rand::Rng;
-use snook_core::rating::{self, EloConfig, Rating};
-use snook_core::stats::ShotStats;
-use snook_core::{BallId, EightBallGame, GameOverReason, PocketId, Shot, ShotReport};
-use snook_proto::replay::{Replay, Stroke, shot_difficulty};
-use snook_proto::{
+use snookered_core::rating::{self, EloConfig, Rating};
+use snookered_core::stats::ShotStats;
+use snookered_core::{BallId, EightBallGame, GameOverReason, PocketId, Shot, ShotReport};
+use snookered_proto::replay::{Replay, Stroke, shot_difficulty};
+use snookered_proto::{
     AimState, ChatKind, ChatLine, ClientMsg, FeaturedMatch, MAX_ROOM_PASSWORD, MatchResult,
     PlayerInfo, PlayerStatus, SPECTATOR_SEAT, ServerMsg, TableInfo, TournamentInfo,
     TournamentState, clean_chat, clean_text,
@@ -63,7 +63,7 @@ impl Default for Rules {
             shot_clock: Duration::from_secs(30),
             reconnect_grace: Duration::from_secs(60),
             chat_history: 60,
-            motd: format!("Welcome to {}! Be kind, play fair.", snook_proto::GAME_NAME),
+            motd: format!("Welcome to {}! Be kind, play fair.", snookered_proto::GAME_NAME),
             lan: false,
             max_connections_per_ip: 12,
             tournament_no_show: Duration::from_secs(120),
@@ -627,7 +627,7 @@ impl Lounge {
             return;
         }
         let line = ChatLine {
-            from: snook_proto::GAME_NAME.into(),
+            from: snookered_proto::GAME_NAME.into(),
             text,
             at: now(),
             kind: ChatKind::Announcement,
@@ -913,7 +913,7 @@ impl Lounge {
     /// A reaction to everyone at the table (it must be unlocked; a few a
     /// second at most; muted players and blocked senders are not shown).
     fn react(&mut self, k: &str, code: &str) {
-        let Some(r) = snook_proto::reaction(code) else { return };
+        let Some(r) = snookered_proto::reaction(code) else { return };
         let Some(s) = self.sessions.get_mut(k) else { return };
         if !r.unlocked(&s.achievements) || !s.reaction_bucket.take() {
             return;
@@ -2213,7 +2213,7 @@ impl Lounge {
     fn join_by_code(&mut self, k: &str, code: &str) {
         let code: String = code
             .trim()
-            .trim_start_matches("snook://join/")
+            .trim_start_matches("snookered://join/")
             .chars()
             .filter(|c| c.is_ascii_alphanumeric())
             .collect::<String>()
@@ -2245,7 +2245,7 @@ impl Rebuilt {
             let before = game.clone();
             let shooter = game.current_player();
             let in_hand = game.ball_in_hand().is_some();
-            let report = snook_proto::replay::apply(&mut game, stroke)?;
+            let report = snookered_proto::replay::apply(&mut game, stroke)?;
             if let (Some(report), Stroke::Shot { shot, .. }) = (report, stroke) {
                 stats[shooter].add(&report, in_hand);
                 if let Some(b) = shot_difficulty(&before, shot, &report) {

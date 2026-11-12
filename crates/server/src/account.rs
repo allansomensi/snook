@@ -3,7 +3,7 @@
 
 use std::sync::Arc;
 
-use snook_proto::{ClientMsg, ServerMsg, valid_password};
+use snookered_proto::{ClientMsg, ServerMsg, valid_password};
 
 use crate::store::{User, day_of};
 use crate::{Server, now, token_hash};

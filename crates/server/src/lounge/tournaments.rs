@@ -4,7 +4,7 @@
 use std::collections::{HashMap, HashSet};
 use std::time::{Duration, Instant};
 
-use snook_proto::{
+use snookered_proto::{
     ArenaStanding, MAX_NAME_LEN, PlayerInfo, PlayerStatus, ServerMsg, TournamentFormat,
     TournamentInfo, TournamentState, clean_text,
 };
@@ -42,7 +42,7 @@ pub struct Cup {
 }
 
 impl Cup {
-    /// From `SNOOK_CUP`-style text: `sat 20:00` (optionally `60m`, `fee=100`,
+    /// From `SNOOKERED_CUP`-style text: `sat 20:00` (optionally `60m`, `fee=100`,
     /// `utc-3`).
     pub fn parse(text: &str) -> Option<Cup> {
         let mut cup = Cup {
@@ -204,7 +204,11 @@ impl Lounge {
         TournamentInfo {
             id: t.id,
             name: t.name.clone(),
-            host: if t.host.is_empty() { snook_proto::GAME_NAME.into() } else { display(&t.host) },
+            host: if t.host.is_empty() {
+                snookered_proto::GAME_NAME.into()
+            } else {
+                display(&t.host)
+            },
             size: t.size,
             rated: t.rated,
             private: t.password.is_some(),

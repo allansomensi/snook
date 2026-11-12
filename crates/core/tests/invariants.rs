@@ -1,8 +1,8 @@
 //! Random shots must never leave the table in an impossible state.
 
 use glam::DVec2;
-use snook_core::rng::Rng;
-use snook_core::{EightBallGame, PocketId, Shot};
+use snookered_core::rng::Rng;
+use snookered_core::{EightBallGame, PocketId, Shot};
 
 #[test]
 fn random_shots_keep_the_table_physical() {

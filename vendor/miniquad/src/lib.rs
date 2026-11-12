@@ -1,4 +1,4 @@
-#![allow(dead_code, static_mut_refs)] // Snook: vendored copy, upstream lints.
+#![allow(dead_code, static_mut_refs)] // Snookered: vendored copy, upstream lints.
 #![doc = include_str!("../README.md")]
 #![allow(
     clippy::collapsible_if,

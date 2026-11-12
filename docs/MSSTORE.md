@@ -23,7 +23,7 @@ O build da Store usa a feature `store` do jogo (`crates/client/src/channel.rs`):
 | Arquivo | O que é |
 |---|---|
 | `crates/client/msix/AppxManifest.xml` | o manifesto do pacote (identidade, ícones, firewall) |
-| `crates/client/msix/Assets/` | os ícones do pacote (`cargo test --release -p snook export_msix_assets -- --ignored` os refaz a partir do emblema) |
+| `crates/client/msix/Assets/` | os ícones do pacote (`cargo test --release -p snookered export_msix_assets -- --ignored` os refaz a partir do emblema) |
 | `tools/msix/make-msix.ps1` | preenche o manifesto e monta o `.msix` |
 | `.github/workflows/msstore.yml` | gera o MSIX e o envia à Store |
 | `crates/server/pages/` | a política de privacidade (`/privacidade` e `/privacy`) |
@@ -57,9 +57,9 @@ Na Render (**Environment**), defina:
 
 | Variável | Exemplo |
 |---|---|
-| `SNOOK_GAME_NAME` | o nome do jogo na Store |
-| `SNOOK_PRIVACY_CONTROLLER` | seu nome ou o da sua empresa |
-| `SNOOK_PRIVACY_CONTACT` | um e-mail para pedidos de privacidade (sem ele, a página aponta para as *issues* do GitHub) |
+| `SNOOKERED_GAME_NAME` | o nome do jogo na Store |
+| `SNOOKERED_PRIVACY_CONTROLLER` | seu nome ou o da sua empresa |
+| `SNOOKERED_PRIVACY_CONTACT` | um e-mail para pedidos de privacidade (sem ele, a página aponta para as *issues* do GitHub) |
 
 No Partner Center, use `https://<seu-servidor>/privacy` como **Privacy policy
 URL**.
@@ -67,7 +67,7 @@ URL**.
 ### 3. Servidor sempre acordado
 
 No plano gratuito da Render o servidor dorme e o primeiro jogador espera
-cerca de um minuto. Defina a variável do repositório `SNOOK_HEALTH_URL` como
+cerca de um minuto. Defina a variável do repositório `SNOOKERED_HEALTH_URL` como
 `https://<seu-servidor>/health` (o workflow *Keep the server awake* passa a
 acordá-lo a cada 10 minutos) ou use um plano pago.
 
@@ -125,7 +125,7 @@ desenvolvedores), no PowerShell, na pasta do projeto:
 
 ```powershell
 $env:RUSTFLAGS = "-C target-feature=+crt-static"
-cargo build --release --locked -p snook --features store
+cargo build --release --locked -p snookered --features store
 ./tools/msix/make-msix.ps1 -IdentityName Snookered.Teste -Publisher "CN=Teste" `
   -PublisherDisplayName "Teste" -DisplayName "Snookered (teste)" -Register
 ```
@@ -135,15 +135,7 @@ O jogo aparece no menu Iniciar como "Snookered (teste)". Para remover:
 
 ## O nome
 
-O jogo se chama **Snookered**. O nome que o jogador vê vem de uma constante só,
-`snook_proto::GAME_NAME` (janela, menu, salão, notificações, mensagens do
-servidor, páginas web); o instalador `.msi` (`crates/client/wix/main.wxs`),
-os metadados do `.exe` (`crates/client/build.rs`) e os textos traduzidos
-(`crates/client/lang/`) repetem o nome e mudam junto. Os nomes internos
-continuam `snook` (crates, `snook.exe`, a pasta de configurações, o
-identificador da rede local), para que atualizações e logins existentes
-continuem funcionando.
-
-Na Store, o nome vem das variáveis `MSSTORE_DISPLAY_NAME` (GitHub) e
-`SNOOK_GAME_NAME` (Render, para a política de privacidade); use **Snookered**
-nas duas.
+O nome que o jogador vê vem de `snookered_proto::GAME_NAME` (janela, menu,
+salão, notificações, mensagens do servidor, páginas web). Na Store, ele vem
+das variáveis `MSSTORE_DISPLAY_NAME` (GitHub) e `SNOOKERED_GAME_NAME` (Render,
+para a política de privacidade): use **Snookered** nas duas.

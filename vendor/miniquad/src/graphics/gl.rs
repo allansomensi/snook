@@ -1407,7 +1407,7 @@ impl RenderingBackend for GlContext {
         self.cache.store_buffer_binding(gl_target);
         self.cache
             .bind_buffer(gl_target, buffer.gl_buf, buffer.index_type);
-        // Snook patch: orphan the old storage before writing. macroquad updates
+        // Snookered patch: orphan the old storage before writing. macroquad updates
         // the same stream buffers several times per frame; some drivers (Intel
         // on Windows) then draw earlier calls with the newer data, which makes
         // the 2D interface flicker or vanish. Re-specifying the store gives

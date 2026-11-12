@@ -1,6 +1,6 @@
 [package]
-name = "snook_server"
-description = "Snook game server: accounts, lounge, tables, tournaments, rated matches, leaderboard, admin panel"
+name = "snookered_server"
+description = "Snookered game server: accounts, lounge, tables, tournaments, rated matches, leaderboard, admin panel"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -13,7 +13,7 @@ repository.workspace = true
 dist = false
 
 [[bin]]
-name = "snook-server"
+name = "snookered-server"
 path = "src/main.rs"
 required-features = ["postgres", "payments"]
 
@@ -26,8 +26,8 @@ postgres = ["dep:sqlx"]
 payments = ["dep:reqwest", "dep:rustls"]
 
 [dependencies]
-snook_core = { path = "../core" }
-snook_proto = { path = "../proto" }
+snookered_core = { path = "../core" }
+snookered_proto = { path = "../proto" }
 glam.workspace = true
 serde.workspace = true
 serde_json = "1"

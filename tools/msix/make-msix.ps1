@@ -3,9 +3,9 @@
   Packs the game as an MSIX for the Microsoft Store (see docs/MSSTORE.md).
 
 .DESCRIPTION
-  Takes a snook.exe built for the Store
+  Takes a snookered.exe built for the Store
       $env:RUSTFLAGS = "-C target-feature=+crt-static"
-      cargo build --release --locked -p snook --features store
+      cargo build --release --locked -p snookered --features store
   fills in crates/client/msix/AppxManifest.xml and packs it with the
   Assets folder using makeappx (Windows SDK). The package is not signed:
   the Store signs it. To try it on this computer without packing, use
@@ -27,7 +27,7 @@ param(
     [string] $Description = "3D eight-ball pool: play online, with friends or against the computer.",
     # Defaults to the workspace version (0.1.1 becomes 0.1.1.0).
     [string] $Version,
-    [string] $Exe = "target/release/snook.exe",
+    [string] $Exe = "target/release/snookered.exe",
     [string] $Out = "target/msix",
     # Register the unpacked package on this computer instead of packing it.
     [switch] $Register
@@ -51,7 +51,7 @@ if (-not (Test-Path $Exe)) { throw "No game at ${Exe}: build it first (see the d
 $stage = Join-Path $Out "package"
 if (Test-Path $stage) { Remove-Item -Recurse -Force $stage }
 New-Item -ItemType Directory -Force -Path $stage | Out-Null
-Copy-Item $Exe (Join-Path $stage "snook.exe")
+Copy-Item $Exe (Join-Path $stage "snookered.exe")
 Copy-Item -Recurse "crates/client/msix/Assets" (Join-Path $stage "Assets")
 
 function Escape([string] $s) { [System.Security.SecurityElement]::Escape($s) }
@@ -80,7 +80,7 @@ if ($Register) {
 $makeappx = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\makeappx.exe" -ErrorAction SilentlyContinue |
     Sort-Object FullName | Select-Object -Last 1
 if (-not $makeappx) { throw "makeappx.exe not found: install the Windows SDK." }
-$package = Join-Path $Out "snook-$msixVersion-x64.msix"
+$package = Join-Path $Out "snookered-$msixVersion-x64.msix"
 & $makeappx.FullName pack /o /h SHA256 /d $stage /p $package
 if ($LASTEXITCODE -ne 0) { throw "makeappx failed ($LASTEXITCODE)." }
 Write-Host "Packed $package"

@@ -38,8 +38,8 @@ pub enum FeedKind {
 }
 
 /// The colour of a rating tier (used for player names everywhere).
-pub fn tier_color(tier: snook_proto::Tier) -> Color {
-    use snook_proto::Tier;
+pub fn tier_color(tier: snookered_proto::Tier) -> Color {
+    use snookered_proto::Tier;
     match tier {
         Tier::Rookie => Color::new(0.72, 0.72, 0.74, 1.0),
         Tier::Amateur => Color::new(0.93, 0.89, 0.80, 1.0),
@@ -52,17 +52,17 @@ pub fn tier_color(tier: snook_proto::Tier) -> Color {
 }
 
 /// The colour of a player's name.
-pub fn name_color(p: &snook_proto::PlayerInfo) -> Color {
+pub fn name_color(p: &snookered_proto::PlayerInfo) -> Color {
     tier_color(p.tier())
 }
 
 /// A VIP name style (two colours), if the player has one.
-pub fn name_style(p: &snook_proto::PlayerInfo) -> Option<(Color, Color)> {
+pub fn name_style(p: &snookered_proto::PlayerInfo) -> Option<(Color, Color)> {
     if !p.vip {
         return None;
     }
-    match snook_proto::shop::item(&p.name_style)?.look {
-        snook_proto::shop::Look::Name(Some((a, b))) => {
+    match snookered_proto::shop::item(&p.name_style)?.look {
+        snookered_proto::shop::Look::Name(Some((a, b))) => {
             Some((Color::from_rgba(a[0], a[1], a[2], 255), Color::from_rgba(b[0], b[1], b[2], 255)))
         }
         _ => None,
@@ -70,7 +70,7 @@ pub fn name_style(p: &snook_proto::PlayerInfo) -> Option<(Color, Color)> {
 }
 
 /// A player's name in their colour (their VIP style, else their tier's).
-pub fn draw_name(ui: &Ui, p: &snook_proto::PlayerInfo, x: f32, y: f32, size: f32) {
+pub fn draw_name(ui: &Ui, p: &snookered_proto::PlayerInfo, x: f32, y: f32, size: f32) {
     match name_style(p) {
         Some((a, b)) => ui.styled_text(&p.username, x, y, size, a, b, true),
         None => ui.text(&p.username, x, y, size, name_color(p), true),
@@ -852,7 +852,7 @@ impl Ui {
                 (Some((name, rating)), FeedKind::Player) => {
                     let mine = me.is_some_and(|m| m.eq_ignore_ascii_case(name));
                     let c = if *rating > 0 {
-                        tier_color(snook_proto::Tier::of(*rating))
+                        tier_color(snookered_proto::Tier::of(*rating))
                     } else {
                         Color::new(0.55, 0.78, 0.95, 1.0)
                     };
@@ -1034,7 +1034,7 @@ impl Ui {
     /// A flag (if any) and a player name in their tier colour. Returns the width used.
     pub fn player_name(
         &self,
-        p: &snook_proto::PlayerInfo,
+        p: &snookered_proto::PlayerInfo,
         x: f32,
         y: f32,
         size: f32,
@@ -1063,8 +1063,8 @@ impl Ui {
             ),
         };
         // The shop frame: a thin line of its colours under the name.
-        if let Some(snook_proto::shop::Look::Frame { a, b, .. }) =
-            snook_proto::shop::item(&p.frame).map(|i| i.look)
+        if let Some(snookered_proto::shop::Look::Frame { a, b, .. }) =
+            snookered_proto::shop::item(&p.frame).map(|i| i.look)
             && p.frame != "frame_none"
         {
             let ca = Color::from_rgba(a[0], a[1], a[2], 220);

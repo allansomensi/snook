@@ -37,7 +37,7 @@
 
   <Applications>
     <!-- A regular desktop program (full trust), as installed by the .msi. -->
-    <Application Id="Game" Executable="snook.exe" EntryPoint="Windows.FullTrustApplication">
+    <Application Id="Game" Executable="snookered.exe" EntryPoint="Windows.FullTrustApplication">
       <uap:VisualElements
         DisplayName="{{DISPLAY_NAME}}"
         Description="{{DESCRIPTION}}"
@@ -59,9 +59,9 @@
   <Extensions>
     <!-- Local network games: let the host's game and its discovery beacon
          through the firewall on home and work networks, without a prompt
-         (ports from snook_proto: LAN_GAME_PORT, LAN_DISCOVERY_PORT). -->
+         (ports from snookered_proto: LAN_GAME_PORT, LAN_DISCOVERY_PORT). -->
     <desktop2:Extension Category="windows.firewallRules">
-      <desktop2:FirewallRules Executable="snook.exe">
+      <desktop2:FirewallRules Executable="snookered.exe">
         <desktop2:Rule Direction="in" IPProtocol="TCP" LocalPortMin="47879" LocalPortMax="47879" Profile="domainAndPrivate" />
         <desktop2:Rule Direction="in" IPProtocol="UDP" LocalPortMin="47878" LocalPortMax="47878" Profile="domainAndPrivate" />
       </desktop2:FirewallRules>

@@ -13,7 +13,7 @@
     `export_icons` test in src\icon.rs).
 
   Variables set by cargo-wix: Version, CargoTargetBinDir (the folder with
-  snook.exe), CargoProfile, TargetTriple...
+  snookered.exe), CargoProfile, TargetTriple...
 -->
 
 <?if $(sys.BUILDARCH) = x64 or $(sys.BUILDARCH) = arm64 ?>
@@ -49,7 +49,7 @@
         <!-- Windows Installer compares only the first three parts of a
              version, and the betas differ only in the fourth (0.1.1-beta.2
              is 0.1.1.2): without AllowSameVersionUpgrades a new beta would
-             be installed next to the old one and keep its snook.exe. The old
+             be installed next to the old one and keep its snookered.exe. The old
              version is removed before the new one is installed. -->
         <MajorUpgrade
             AllowSameVersionUpgrades='yes'
@@ -59,8 +59,8 @@
         <Media Id='1' Cabinet='media1.cab' EmbedCab='yes' DiskPrompt='CD-ROM #1'/>
         <Property Id='DiskPrompt' Value='Snookered Installation'/>
 
-        <Icon Id='SnookIcon' SourceFile='$(var.Assets)\snook.ico'/>
-        <Property Id='ARPPRODUCTICON' Value='SnookIcon'/>
+        <Icon Id='SnookeredIcon' SourceFile='$(var.Assets)\snookered.ico'/>
+        <Property Id='ARPPRODUCTICON' Value='SnookeredIcon'/>
         <Property Id='ARPHELPLINK' Value='https://github.com/allansomensi/snook'/>
         <Property Id='ARPURLINFOABOUT' Value='https://github.com/allansomensi/snook'/>
 
@@ -70,9 +70,9 @@
                     <Component Id='binary0' Guid='*'>
                         <File
                             Id='exe0'
-                            Name='snook.exe'
+                            Name='snookered.exe'
                             DiskId='1'
-                            Source='$(var.CargoTargetBinDir)\snook.exe'
+                            Source='$(var.CargoTargetBinDir)\snookered.exe'
                             KeyPath='yes'/>
                     </Component>
                 </Directory>
@@ -88,12 +88,12 @@
                         Id='StartMenuShortcut'
                         Name='Snookered'
                         Description='3D eight-ball pool'
-                        Target='[APPLICATIONFOLDER]snook.exe'
+                        Target='[APPLICATIONFOLDER]snookered.exe'
                         WorkingDirectory='APPLICATIONFOLDER'
-                        Icon='SnookIcon'/>
+                        Icon='SnookeredIcon'/>
                     <RegistryValue
                         Root='HKCU'
-                        Key='Software\Snook\Installer'
+                        Key='Software\Snookered\Installer'
                         Name='StartMenuShortcut'
                         Type='integer'
                         Value='1'
@@ -106,12 +106,12 @@
                         Id='DesktopShortcut'
                         Name='Snookered'
                         Description='3D eight-ball pool'
-                        Target='[APPLICATIONFOLDER]snook.exe'
+                        Target='[APPLICATIONFOLDER]snookered.exe'
                         WorkingDirectory='APPLICATIONFOLDER'
-                        Icon='SnookIcon'/>
+                        Icon='SnookeredIcon'/>
                     <RegistryValue
                         Root='HKCU'
-                        Key='Software\Snook\Installer'
+                        Key='Software\Snookered\Installer'
                         Name='DesktopShortcut'
                         Type='integer'
                         Value='1'

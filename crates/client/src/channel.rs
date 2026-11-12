@@ -16,7 +16,7 @@ pub const fn real_money_purchases() -> bool {
 
 #[cfg(test)]
 mod tests {
-    use snook_proto::{LAN_DISCOVERY_PORT, LAN_GAME_PORT};
+    use snookered_proto::{LAN_DISCOVERY_PORT, LAN_GAME_PORT};
 
     /// The Store package's manifest stays in step with the game: the
     /// executable's name, the local network ports it opens in the firewall,

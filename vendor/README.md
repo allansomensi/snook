@@ -1,6 +1,6 @@
 # Vendored crates
 
-`miniquad/` is miniquad 0.4.11 with two small fixes, marked "Snook patch" in the
+`miniquad/` is miniquad 0.4.11 with two small fixes, marked "Snookered patch" in the
 source (used through `[patch.crates-io]` in the workspace `Cargo.toml`):
 
 - `src/graphics/gl.rs`: stream buffers are re-specified ("orphaned") on every

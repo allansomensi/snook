@@ -1,11 +1,11 @@
 //! The shop's payment events (as Stripe sends them) and purchases.
 
 use serde_json::json;
-use snook_proto::Role;
-use snook_proto::shop::VIP_MONTHLY_COINS;
-use snook_server::shop::apply_event;
-use snook_server::store::NewUser;
-use snook_server::{Config, Server, now};
+use snookered_proto::Role;
+use snookered_proto::shop::VIP_MONTHLY_COINS;
+use snookered_server::shop::apply_event;
+use snookered_server::store::NewUser;
+use snookered_server::{Config, Server, now};
 
 async fn setup() -> (std::sync::Arc<Server>, i64) {
     let server = Server::new(Config::default()).await.unwrap();

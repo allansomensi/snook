@@ -1,6 +1,6 @@
-//! # snook_proto
+//! # snookered_proto
 //!
-//! Messages exchanged between the Snook client and server over a
+//! Messages exchanged between the Snookered client and server over a
 //! WebSocket, encoded as JSON (one message per text frame), plus the data
 //! both sides must agree on: name rules, countries, rating tiers and the
 //! achievement catalogue.
@@ -20,7 +20,7 @@ pub use reactions::{REACTIONS, Reaction, reaction};
 
 use glam::DVec2;
 use serde::{Deserialize, Serialize};
-use snook_core::{EightBallGame, GameOverReason, PocketId, Shot, ShotReport};
+use snookered_core::{EightBallGame, GameOverReason, PocketId, Shot, ShotReport};
 
 /// A coin pack on sale, with its price as shown to players.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -34,9 +34,8 @@ pub struct PackOffer {
 /// The `seat` of a reaction sent by a spectator.
 pub const SPECTATOR_SEAT: usize = 2;
 
-/// The game's name, as players see it (window, menus, store, web pages).
-/// Internal names (the `snook` crates and executable, the settings folder,
-/// the LAN beacon) stay as they are, so updates keep working.
+/// The game's name, as players see it (window, menus, notifications, the
+/// server's messages and web pages).
 pub const GAME_NAME: &str = "Snookered";
 
 /// Bumped whenever messages change incompatibly.
@@ -1066,7 +1065,7 @@ pub const LAN_GAME_PORT: u16 = 47879;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct LanBeacon {
-    /// Always "snook".
+    /// Always "snookered".
     pub game: String,
     pub version: u32,
     /// Name of the host.

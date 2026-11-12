@@ -42,7 +42,7 @@ jobs:
       - name: Clippy
         run: cargo clippy --workspace --all-targets -- -D warnings
       - name: Clippy (Microsoft Store build)
-        run: cargo clippy -p snook --all-targets --features store -- -D warnings
+        run: cargo clippy -p snookered --all-targets --features store -- -D warnings
       - name: Test
         run: cargo test --workspace --release
 
@@ -53,9 +53,9 @@ jobs:
       postgres:
         image: postgres:16
         env:
-          POSTGRES_USER: snook
-          POSTGRES_PASSWORD: snook
-          POSTGRES_DB: snook_test
+          POSTGRES_USER: snookered
+          POSTGRES_PASSWORD: snookered
+          POSTGRES_DB: snookered_test
         ports: ["5432:5432"]
         options: --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
     steps:
@@ -64,15 +64,15 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: Store tests against PostgreSQL
         env:
-          SNOOK_TEST_DATABASE_URL: postgres://snook:snook@localhost:5432/snook_test
-        run: cargo test --release -p snook_server --test store
+          SNOOKERED_TEST_DATABASE_URL: postgres://snookered:snookered@localhost:5432/snookered_test
+        run: cargo test --release -p snookered_server --test store
 
   docker:
     name: Server image
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - run: docker build -t snook-server .
+      - run: docker build -t snookered-server .
 
   audit:
     name: Dependency advisories

@@ -3,12 +3,12 @@
 use std::time::Duration;
 
 use futures_util::{SinkExt, StreamExt};
-use snook_core::{Difficulty, EightBallGame, ai};
-use snook_proto::{
+use snookered_core::{Difficulty, EightBallGame, ai};
+use snookered_proto::{
     ClientMsg, PROTOCOL_VERSION, ReportReason, ServerMsg, TournamentState, parse_server,
 };
-use snook_server::lounge::Rules;
-use snook_server::{Config, Server, serve};
+use snookered_server::lounge::Rules;
+use snookered_server::{Config, Server, serve};
 use tokio::net::{TcpListener, TcpStream};
 use tokio_tungstenite::tungstenite::Message;
 use tokio_tungstenite::{MaybeTlsStream, WebSocketStream, connect_async};
@@ -116,7 +116,7 @@ async fn play_out(
     b: &mut Client,
     mut game: EightBallGame,
     sa: usize,
-) -> snook_proto::MatchResult {
+) -> snookered_proto::MatchResult {
     let mut shots = 0;
     loop {
         assert!(shots < 400, "game did not finish");
@@ -356,7 +356,7 @@ async fn friends_can_watch_and_react() {
     carol.send(ClientMsg::React { code: "clap".into() }).await;
     bob.expect(
         "crowd",
-        |m| matches!(m, ServerMsg::Reaction { seat, .. } if *seat == snook_proto::SPECTATOR_SEAT),
+        |m| matches!(m, ServerMsg::Reaction { seat, .. } if *seat == snookered_proto::SPECTATOR_SEAT),
     )
     .await;
     // Players' chat stays between them.
@@ -489,7 +489,7 @@ async fn disconnect_reconnect_and_abandon() {
     else {
         unreachable!()
     };
-    assert_eq!(result.reason, snook_core::GameOverReason::Abandoned);
+    assert_eq!(result.reason, snookered_core::GameOverReason::Abandoned);
 }
 
 #[tokio::test]
@@ -853,7 +853,7 @@ async fn lounge_actions_are_rate_limited() {
 }
 
 /// A server on its own port over `store`; returns its address and handle.
-async fn start_on(store: snook_server::store::Store) -> (String, std::sync::Arc<Server>) {
+async fn start_on(store: snookered_server::store::Store) -> (String, std::sync::Arc<Server>) {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let addr = listener.local_addr().unwrap();
     let rules = Rules { max_connections_per_ip: 100, ..Rules::default() };
@@ -923,7 +923,7 @@ async fn play_shots(
 
 #[tokio::test]
 async fn a_restart_hands_the_game_to_the_next_server() {
-    let store = snook_server::store::Store::memory();
+    let store = snookered_server::store::Store::memory();
     let (url_a, server_a) = start_on(store.share().unwrap()).await;
     let (mut alice, _) = Client::register(&url_a, "alice").await;
     let (mut bob, _) = Client::register(&url_a, "bob").await;
@@ -933,7 +933,7 @@ async fn a_restart_hands_the_game_to_the_next_server() {
 
     // The first server is told to stop: no new games, a notice, and after
     // the drain time the game is handed over (the connections close).
-    let drain = tokio::spawn(snook_server::drain(server_a.clone(), 1));
+    let drain = tokio::spawn(snookered_server::drain(server_a.clone(), 1));
     alice.expect("draining", |m| matches!(m, ServerMsg::Draining { .. })).await;
     alice.closed().await;
     bob.closed().await;
@@ -995,7 +995,7 @@ async fn replays_coins_featured_table_and_codes() {
     let (mut bob, _) = Client::register(&url, "bob").await;
     let (mut eve, _) = Client::register(&url, "eve").await;
 
-    // An invitation code: "snook://join/abc123" works as well as "ABC123".
+    // An invitation code: "snookered://join/abc123" works as well as "ABC123".
     alice.send(ClientMsg::CreateInviteCode { rated: true }).await;
     let ServerMsg::InviteCode { code } =
         alice.expect("code", |m| matches!(m, ServerMsg::InviteCode { .. })).await
@@ -1003,7 +1003,8 @@ async fn replays_coins_featured_table_and_codes() {
         unreachable!()
     };
     assert_eq!(code.len(), 6);
-    bob.send(ClientMsg::JoinByCode { code: format!("snook://join/{}", code.to_lowercase()) }).await;
+    bob.send(ClientMsg::JoinByCode { code: format!("snookered://join/{}", code.to_lowercase()) })
+        .await;
     let ServerMsg::MatchStarted { game, seat: sa, match_id, table_look, .. } =
         alice.expect("match", |m| matches!(m, ServerMsg::MatchStarted { .. })).await
     else {
@@ -1085,7 +1086,7 @@ async fn arenas_with_an_entry_fee() {
             rated: false,
             password: None,
             entry_fee: 1000,
-            format: snook_proto::TournamentFormat::Arena,
+            format: snookered_proto::TournamentFormat::Arena,
         })
         .await;
     alice.expect("too dear", |m| matches!(m, ServerMsg::Error { .. })).await;
@@ -1096,7 +1097,7 @@ async fn arenas_with_an_entry_fee() {
             rated: false,
             password: None,
             entry_fee: 10,
-            format: snook_proto::TournamentFormat::Arena,
+            format: snookered_proto::TournamentFormat::Arena,
         })
         .await;
     let ServerMsg::TournamentUpdated { tournament } =

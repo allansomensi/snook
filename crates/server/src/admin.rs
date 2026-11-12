@@ -2,7 +2,7 @@
 //! and the JSON API it uses under `/admin/api`.
 //!
 //! Staff are ordinary accounts with the moderator or administrator role
-//! (the first administrators come from `SNOOK_ADMINS`). They sign in with
+//! (the first administrators come from `SNOOKERED_ADMINS`). They sign in with
 //! their game password and get a separate, short-lived admin session sent
 //! as a bearer token (never a cookie, so there is no CSRF surface). Every
 //! action is written to the audit log.
@@ -19,7 +19,7 @@ use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use serde::Deserialize;
 use serde_json::{Value, json};
-use snook_proto::{Role, Tier, clean_text, valid_password};
+use snookered_proto::{Role, Tier, clean_text, valid_password};
 
 use crate::store::{SessionKind, User};
 use crate::{Server, new_token, now, token_hash};
@@ -184,8 +184,9 @@ async fn metrics(State(server): State<Arc<Server>>, headers: HeaderMap) -> ApiRe
 /// Nobody is banned by this: it is a list to look at, with the replays.
 async fn aim_review(State(server): State<Arc<Server>>, headers: HeaderMap) -> ApiResult {
     staff(&server, &headers).await?;
-    let hard: Vec<usize> =
-        (0..snook_proto::replay::BANDS).filter(|b| snook_proto::replay::is_hard_band(*b)).collect();
+    let hard: Vec<usize> = (0..snookered_proto::replay::BANDS)
+        .filter(|b| snookered_proto::replay::is_hard_band(*b))
+        .collect();
     let rows = server.store.aim_rows(&hard, AIM_MIN_ATTEMPTS).await?;
     Ok(Json(json!({
         "min_attempts": AIM_MIN_ATTEMPTS,
@@ -490,7 +491,7 @@ async fn user_action(
             server.with(|l| {
                 l.notify(
                     &target.username,
-                    snook_proto::ServerMsg::Notice {
+                    snookered_proto::ServerMsg::Notice {
                         text: format!("You were muted for {minutes} minutes: {reason}"),
                     },
                 )
@@ -556,7 +557,7 @@ async fn user_action(
         }
         "item" => {
             require_admin(&s)?;
-            if snook_proto::shop::item(&body.item).is_none() {
+            if snookered_proto::shop::item(&body.item).is_none() {
                 return Err(err(StatusCode::BAD_REQUEST, "No such item."));
             }
             server.store.grant_item(target.id, &body.item, "staff", t).await?;
@@ -652,7 +653,7 @@ async fn announce(
     Json(body): Json<TextBody>,
 ) -> ApiResult {
     let s = staff(&server, &headers).await?;
-    let text = clean_text(&body.text, snook_proto::MAX_CHAT_LEN);
+    let text = clean_text(&body.text, snookered_proto::MAX_CHAT_LEN);
     if text.is_empty() {
         return Err(err(StatusCode::BAD_REQUEST, "Write a message."));
     }

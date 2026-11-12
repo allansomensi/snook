@@ -4,7 +4,7 @@ use std::collections::HashMap;
 
 use ::glam::{DVec2, DVec3};
 use macroquad::prelude::*;
-use snook_core::{Ball, BallId, BallStatus, PhysicsParams, PocketId, Table};
+use snookered_core::{Ball, BallId, BallStatus, PhysicsParams, PocketId, Table};
 
 use crate::config::Quality;
 use crate::coords::{TABLE_HEIGHT, ball_rotation, dir_to_world, surface, to_world};
@@ -749,7 +749,8 @@ impl Scene {
         });
         self.materials.set_shadows(self.soft_shadows, self.soft_shadows, &casters, cue);
         self.materials.set_pockets(&self.holes, &self.throats);
-        let skip: Option<usize> = crate::dev::var("SNOOK_SKIP_PART").and_then(|v| v.parse().ok());
+        let skip: Option<usize> =
+            crate::dev::var("SNOOKERED_SKIP_PART").and_then(|v| v.parse().ok());
         for (k, part) in self.parts.iter().enumerate() {
             if skip == Some(k) {
                 continue;
@@ -1004,8 +1005,8 @@ pub struct Looks {
 impl Looks {
     /// From the codes of the equipped cloth and ball set.
     pub fn of(cloth: &str, balls: &str) -> Looks {
-        let cloth = match snook_proto::shop::item(cloth).map(|i| i.look) {
-            Some(snook_proto::shop::Look::Cloth(c)) => c,
+        let cloth = match snookered_proto::shop::item(cloth).map(|i| i.look) {
+            Some(snookered_proto::shop::Look::Cloth(c)) => c,
             _ => [24, 96, 48],
         };
         Looks { cloth, balls: textures::Palette::of(balls) }
@@ -1020,7 +1021,7 @@ impl Default for Looks {
 
 /// A cue of the given design, chalked with `chalk` (shop codes).
 pub fn cue_mesh(cue: &str, chalk: &str, white: &Texture2D) -> gfx::Model {
-    use snook_proto::shop::{Look, item};
+    use snookered_proto::shop::{Look, item};
     let (butt, accent, ring) = match item(cue).map(|i| i.look) {
         Some(Look::Cue { butt, accent, ring, .. }) => (butt, accent, ring),
         _ => ([35, 20, 12], [20, 20, 24], [240, 238, 228]),

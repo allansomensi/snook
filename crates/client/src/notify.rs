@@ -60,9 +60,9 @@ fn send(text: &str) {
     {
         let _ = std::process::Command::new("notify-send")
             .args([
-                &format!("--app-name={}", snook_proto::GAME_NAME),
+                &format!("--app-name={}", snookered_proto::GAME_NAME),
                 "--urgency=normal",
-                snook_proto::GAME_NAME,
+                snookered_proto::GAME_NAME,
                 text,
             ])
             .spawn();
@@ -72,7 +72,7 @@ fn send(text: &str) {
         let quoted = text.replace('\\', "\\\\").replace('"', "\\\"");
         let script = format!(
             "display notification \"{quoted}\" with title \"{}\" sound name \"Glass\"",
-            snook_proto::GAME_NAME
+            snookered_proto::GAME_NAME
         );
         let _ = std::process::Command::new("osascript").args(["-e", &script]).spawn();
     }
@@ -106,7 +106,7 @@ mod windows {
 
     /// Flashes the game's taskbar button until it is brought to the front.
     pub fn flash() {
-        let title: Vec<u16> = snook_proto::GAME_NAME.encode_utf16().chain(Some(0)).collect();
+        let title: Vec<u16> = snookered_proto::GAME_NAME.encode_utf16().chain(Some(0)).collect();
         // SAFETY: a null-terminated UTF-16 title and a null class are valid
         // arguments; the window handle is only passed back to the system.
         unsafe {
@@ -137,7 +137,7 @@ mod windows {
              $n.Item(0).AppendChild($t.CreateTextNode('{name}')) > $null; \
              $n.Item(1).AppendChild($t.CreateTextNode('{quoted}')) > $null; \
              [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('{name}').Show([Windows.UI.Notifications.ToastNotification]::new($t))",
-            name = snook_proto::GAME_NAME
+            name = snookered_proto::GAME_NAME
         );
         const CREATE_NO_WINDOW: u32 = 0x0800_0000;
         let _ = std::process::Command::new("powershell")

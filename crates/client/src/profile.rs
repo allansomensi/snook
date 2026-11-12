@@ -2,7 +2,7 @@
 //! the friend, block and report actions.
 
 use macroquad::prelude::*;
-use snook_proto::{ACHIEVEMENTS, ClientMsg, Profile, Relation, ReportReason};
+use snookered_proto::{ACHIEVEMENTS, ClientMsg, Profile, Relation, ReportReason};
 
 #[allow(unused_imports)]
 use crate::paint::{draw_circle, draw_line, draw_rectangle};
@@ -176,8 +176,8 @@ impl ProfileScreen {
         }
         let name_w = ui.text_size(&player.username, 30.0, true).x;
         // The frame from the shop, around the flag and the name.
-        if let Some(snook_proto::shop::Look::Frame { a, b, shine }) =
-            snook_proto::shop::item(&player.frame).map(|i| i.look)
+        if let Some(snookered_proto::shop::Look::Frame { a, b, shine }) =
+            snookered_proto::shop::item(&player.frame).map(|i| i.look)
             && player.frame != "frame_none"
         {
             let fr = Rect::new(x - 12.0, r.y + 10.0, nx - x + name_w + 24.0, 48.0);
@@ -256,13 +256,16 @@ impl ProfileScreen {
 
         // Progress towards the next tier.
         if !player.guest {
-            let next = snook_proto::Tier::ALL.into_iter().find(|t| t.min_rating() > player.rating);
+            let next =
+                snookered_proto::Tier::ALL.into_iter().find(|t| t.min_rating() > player.rating);
             let bx = r.x + 20.0;
             let bw = (r.w * 0.36).min(320.0);
             match next {
                 Some(next) => {
-                    let from = if tier == snook_proto::Tier::Rookie {
-                        snook_core::rating::EloConfig::default().initial_rating.min(player.rating)
+                    let from = if tier == snookered_proto::Tier::Rookie {
+                        snookered_core::rating::EloConfig::default()
+                            .initial_rating
+                            .min(player.rating)
                     } else {
                         tier.min_rating()
                     };
@@ -379,11 +382,11 @@ impl ProfileScreen {
         let ry = area.y + 28.0 + rows as f32 * (cell + 6.0) + 14.0;
         if ry + 60.0 < area.y + area.h {
             let codes: Vec<&str> = p.achievements.iter().map(|(c, _)| c.as_str()).collect();
-            let open = snook_proto::REACTIONS.iter().filter(|r| r.unlocked(&codes)).count();
+            let open = snookered_proto::REACTIONS.iter().filter(|r| r.unlocked(&codes)).count();
             ui.text(
                 &tw(
                     "Reactions {n}/{total}",
-                    &[("n", &open), ("total", &snook_proto::REACTIONS.len())],
+                    &[("n", &open), ("total", &snookered_proto::REACTIONS.len())],
                 ),
                 area.x,
                 ry,
@@ -393,7 +396,7 @@ impl ProfileScreen {
             );
             let size = 26.0;
             let per_row = ((area.w + 4.0) / (size + 4.0)).floor().max(1.0) as usize;
-            for (k, r) in snook_proto::REACTIONS.iter().enumerate() {
+            for (k, r) in snookered_proto::REACTIONS.iter().enumerate() {
                 let c = vec2(
                     area.x + size / 2.0 + (k % per_row) as f32 * (size + 4.0),
                     ry + 26.0 + size / 2.0 + (k / per_row) as f32 * (size + 4.0),
@@ -498,7 +501,7 @@ impl ProfileScreen {
                 Color::new(color.r, color.g, color.b, 0.18),
             );
             ui.text_centered(mark, r.x + 18.0, r.y + 11.0, 14.0, color, true);
-            let opp_color = tier_color(snook_proto::Tier::of(h.opponent_rating));
+            let opp_color = tier_color(snookered_proto::Tier::of(h.opponent_rating));
             ui.name_with_flag(
                 &h.opponent,
                 &h.opponent_country,
@@ -604,7 +607,8 @@ impl ProfileScreen {
             72,
         );
         y += 38.0;
-        let ok = snook_proto::valid_password(&form.new_password) && !form.old_password.is_empty();
+        let ok =
+            snookered_proto::valid_password(&form.new_password) && !form.old_password.is_empty();
         if ui.button(Rect::new(x + fw - 160.0, y, 160.0, 32.0), t("Change password"), ok) {
             online.send(ClientMsg::ChangePassword {
                 old: std::mem::take(&mut form.old_password),
@@ -735,7 +739,7 @@ fn rating_chart(ui: &mut Ui, p: &Profile, area: Rect) {
     };
     rrect(chart, 6.0, Color::new(1.0, 1.0, 1.0, 0.03));
     // Tier lines that fall inside the chart.
-    for tier in snook_proto::Tier::ALL {
+    for tier in snookered_proto::Tier::ALL {
         let m = tier.min_rating();
         if m > lo && m < hi {
             let y = chart.y + chart.h * (1.0 - (m - lo) as f32 / span);

@@ -3,7 +3,7 @@
 use std::cell::OnceCell;
 
 use macroquad::prelude::*;
-use snook_proto::{COUNTRIES, FLAG_COLUMNS, FLAG_H, FLAG_W, country_index};
+use snookered_proto::{COUNTRIES, FLAG_COLUMNS, FLAG_H, FLAG_W, country_index};
 
 thread_local! {
     static ATLAS: OnceCell<Option<Texture2D>> = const { OnceCell::new() };

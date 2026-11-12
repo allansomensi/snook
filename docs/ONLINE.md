@@ -2,10 +2,10 @@
 
 ## Pieces
 
-- **`snook_proto`**: every message between the game and the server (JSON
+- **`snookered_proto`**: every message between the game and the server (JSON
   objects with a `type` field, one per WebSocket text frame), plus what both
   sides must agree on: name rules, countries, rating tiers, achievements.
-- **`snook_server`**: the lounge, open tables, match rooms and tournaments
+- **`snookered_server`**: the lounge, open tables, match rooms and tournaments
   live in memory behind one mutex (short, synchronous methods); everything
   slow runs outside it: the database (PostgreSQL, or memory for LAN games and
   tests) and shot simulation (a blocking task per shot).
@@ -96,4 +96,4 @@ themselves when both players are free; a player who is offline for two
 minutes when their match is ready loses it. Players still in a running
 tournament can't start other games.
 
-Rated games use Elo (`snook_core::rating`). See `docs/DEPLOY.md` for limits.
+Rated games use Elo (`snookered_core::rating`). See `docs/DEPLOY.md` for limits.

@@ -1,6 +1,6 @@
-//! # snook_core
+//! # snookered_core
 //!
-//! Engine-agnostic core of **Snook**: ball physics, table geometry, the
+//! Engine-agnostic core of **Snookered**: ball physics, table geometry, the
 //! eight-ball rules, the computer opponent and the rating system.
 //!
 //! This crate has no rendering or networking dependencies so that the desktop
