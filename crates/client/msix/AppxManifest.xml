@@ -46,17 +46,6 @@
         Square44x44Logo="Assets\Square44x44Logo.png">
         <uap:DefaultTile Wide310x150Logo="Assets\Wide310x150Logo.png" />
       </uap:VisualElements>
-      <Extensions>
-        <!-- Local network games: let the host's game and its discovery
-             beacon through the firewall on home and work networks, without
-             a prompt (ports from snook_proto: LAN_GAME_PORT, LAN_DISCOVERY_PORT). -->
-        <desktop2:Extension Category="windows.firewallRules">
-          <desktop2:FirewallRules Executable="snook.exe">
-            <desktop2:Rule Direction="in" IPProtocol="TCP" LocalPortMin="47879" LocalPortMax="47879" Profile="domainAndPrivate" />
-            <desktop2:Rule Direction="in" IPProtocol="UDP" LocalPortMin="47878" LocalPortMax="47878" Profile="domainAndPrivate" />
-          </desktop2:FirewallRules>
-        </desktop2:Extension>
-      </Extensions>
     </Application>
   </Applications>
 
@@ -65,4 +54,17 @@
     <Capability Name="privateNetworkClientServer" />
     <rescap:Capability Name="runFullTrust" />
   </Capabilities>
+
+  <!-- Package-wide extensions (they must follow the capabilities). -->
+  <Extensions>
+    <!-- Local network games: let the host's game and its discovery beacon
+         through the firewall on home and work networks, without a prompt
+         (ports from snook_proto: LAN_GAME_PORT, LAN_DISCOVERY_PORT). -->
+    <desktop2:Extension Category="windows.firewallRules">
+      <desktop2:FirewallRules Executable="snook.exe">
+        <desktop2:Rule Direction="in" IPProtocol="TCP" LocalPortMin="47879" LocalPortMax="47879" Profile="domainAndPrivate" />
+        <desktop2:Rule Direction="in" IPProtocol="UDP" LocalPortMin="47878" LocalPortMax="47878" Profile="domainAndPrivate" />
+      </desktop2:FirewallRules>
+    </desktop2:Extension>
+  </Extensions>
 </Package>
