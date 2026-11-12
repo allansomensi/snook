@@ -40,7 +40,7 @@ jobs:
         run: cargo build --release --locked -p snookered
       - name: Build the installer (with WiX's output)
         run: cargo wix --package snookered --no-build --nocapture --target-bin-dir target/release --output target/wix/snookered-x86_64-pc-windows-msvc.msi
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: snookered-msi
           path: target/wix/*.msi

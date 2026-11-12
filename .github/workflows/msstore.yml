@@ -41,7 +41,7 @@ jobs:
   changes:
     # Branch pushes only build when the packaging changed.
     name: What changed
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     outputs:
       run: ${{ steps.check.outputs.run }}
     steps:
@@ -100,7 +100,7 @@ jobs:
           $pubName = if ("${{ vars.MSSTORE_PUBLISHER_DISPLAY_NAME }}") { "${{ vars.MSSTORE_PUBLISHER_DISPLAY_NAME }}" } else { "Snookered" }
           $name = if ("${{ vars.MSSTORE_DISPLAY_NAME }}") { "${{ vars.MSSTORE_DISPLAY_NAME }}" } else { "Snookered" }
           ./tools/msix/make-msix.ps1 -IdentityName $id -Publisher $pub -PublisherDisplayName $pubName -DisplayName $name
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: msix
           path: target/msix/*.msix
