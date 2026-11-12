@@ -1351,10 +1351,13 @@ impl Online {
             rrect_lines(r, 8.0, 1.0, BORDER);
             let live = 0.5 + 0.5 * (get_time() as f32 * 2.5).sin();
             draw_circle(r.x + 14.0, r.y + 14.0, 4.0, Color::new(1.0, 0.3, 0.25, 0.5 + 0.5 * live));
-            ui.text(t("ON TV"), r.x + 24.0, r.y + 7.0, 11.0, ALERT, true);
+            let on_tv = t("ON TV");
+            ui.text(on_tv, r.x + 24.0, r.y + 7.0, 11.0, ALERT, true);
             let avg = (f.players[0].rating + f.players[1].rating) / 2;
             let sub = tw("{n} watching · avg {r}", &[("n", &f.spectators), ("r", &avg)]);
-            ui.text(&sub, r.x + 74.0, r.y + 7.0, 11.0, MUTED, false);
+            // After the label, however long it is in this language ("EN LA TELE").
+            let sub_x = r.x + 24.0 + ui.text_size(on_tv, 11.0, true).x + 12.0;
+            ui.text(&sub, sub_x, r.y + 7.0, 11.0, MUTED, false);
             let half = (r.w - 110.0) / 2.0;
             ui.player_name(&f.players[0], r.x + 12.0, r.y + 26.0, 14.0, half - 14.0);
             ui.text(t("vs"), r.x + 12.0 + half - 8.0, r.y + 27.0, 12.0, MUTED, false);
