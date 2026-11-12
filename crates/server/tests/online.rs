@@ -1131,3 +1131,57 @@ async fn arenas_with_an_entry_fee() {
     assert_eq!((tournament.standings[0].points, tournament.standings[0].streak), (2, 1));
     assert!(tournament.ends_at.is_some());
 }
+
+#[tokio::test]
+async fn withdrawing_while_waiting_for_an_opponent_frees_the_player() {
+    let url = start(Rules::default()).await;
+    let (mut ana, _) = Client::register(&url, "ana").await;
+    let (mut ben, _) = Client::register(&url, "ben").await;
+    let (mut cid, _) = Client::register(&url, "cid").await;
+    ana.send(ClientMsg::CreateTournament {
+        name: "Three".into(),
+        size: 4,
+        rated: false,
+        password: None,
+        entry_fee: 0,
+        format: Default::default(),
+    })
+    .await;
+    let ServerMsg::TournamentUpdated { tournament } =
+        ben.expect("created", |m| matches!(m, ServerMsg::TournamentUpdated { .. })).await
+    else {
+        unreachable!()
+    };
+    let id = tournament.id;
+    for c in [&mut ben, &mut cid] {
+        c.send(ClientMsg::JoinTournament { id, password: None }).await;
+    }
+    cid.expect("joined", |m| {
+        matches!(m, ServerMsg::TournamentUpdated { tournament } if tournament.players.len() == 3)
+    })
+    .await;
+    // Three players: the top seed (ana, first by name) waits in the final.
+    ana.send(ClientMsg::StartTournament { id }).await;
+    ben.expect("semi-final", |m| matches!(m, ServerMsg::MatchStarted { .. })).await;
+    cid.expect("semi-final", |m| matches!(m, ServerMsg::MatchStarted { .. })).await;
+    // Ana withdraws before her opponent is known: she may play elsewhere.
+    ana.send(ClientMsg::LeaveTournament { id }).await;
+    ana.send(ClientMsg::OpenTable { rated: false, password: None }).await;
+    ana.expect("table", |m| {
+        assert!(!matches!(m, ServerMsg::Error { .. }), "still held by the tournament: {m:?}");
+        matches!(m, ServerMsg::TableOpened { .. })
+    })
+    .await;
+    // The semi-final's winner takes the final by walkover.
+    ben.send(ClientMsg::Resign).await;
+    let ServerMsg::TournamentUpdated { tournament } = cid
+        .expect("finished", |m| {
+            matches!(m, ServerMsg::TournamentUpdated { tournament }
+                if tournament.state == TournamentState::Finished)
+        })
+        .await
+    else {
+        unreachable!()
+    };
+    assert_eq!(tournament.champion.as_deref(), Some("cid"));
+}

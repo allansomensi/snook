@@ -317,18 +317,34 @@ impl Config {
         // half-written settings file; private to the user (it holds the
         // session token).
         let tmp = path.with_extension("ini.tmp");
-        let result = std::fs::write(&tmp, self.to_text()).and_then(|()| {
-            #[cfg(unix)]
-            {
-                use std::os::unix::fs::PermissionsExt;
-                let _ = std::fs::set_permissions(&tmp, std::fs::Permissions::from_mode(0o600));
-            }
-            std::fs::rename(&tmp, &path)
-        });
+        let result = write_private(&tmp, self.to_text().as_bytes())
+            .and_then(|()| std::fs::rename(&tmp, &path));
         if let Err(e) = result {
             eprintln!("could not save settings to {}: {e}", path.display());
         }
     }
+}
+
+/// Writes `data` to a file only the user can read, from the start (the
+/// token is never readable by others, not even for a moment).
+fn write_private(path: &std::path::Path, data: &[u8]) -> std::io::Result<()> {
+    use std::io::Write;
+    let mut options = std::fs::OpenOptions::new();
+    options.write(true).create(true).truncate(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
+        options.mode(0o600);
+        // A leftover file keeps its old mode: tighten it before writing.
+        if let Ok(meta) = std::fs::metadata(path)
+            && meta.permissions().mode() & 0o077 != 0
+        {
+            std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600))?;
+        }
+    }
+    let mut file = options.open(path)?;
+    file.write_all(data)?;
+    file.sync_all()
 }
 
 #[cfg(test)]

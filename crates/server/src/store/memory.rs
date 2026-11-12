@@ -441,10 +441,11 @@ impl MemoryStore {
 
     pub fn leaderboard(&self, limit: u32, now: i64) -> StoreResult<Vec<LeaderboardEntry>> {
         let s = self.lock();
+        // Banned players are left out while the ban lasts.
         let mut users: Vec<&User> = s
             .users
             .values()
-            .filter(|u| u.games > 0 && u.banned_until.is_none() && u.deleted_at.is_none())
+            .filter(|u| u.games > 0 && !u.is_banned(now) && u.deleted_at.is_none())
             .collect();
         users.sort_by(|a, b| {
             b.rating.cmp(&a.rating).then(b.wins.cmp(&a.wins)).then(a.username.cmp(&b.username))
@@ -468,14 +469,12 @@ impl MemoryStore {
     pub fn rank_of(&self, user_id: i64) -> StoreResult<Option<u32>> {
         let s = self.lock();
         let Some(me) = s.users.get(&user_id).filter(|u| u.games > 0) else { return Ok(None) };
+        let now = crate::now();
         let above = s
             .users
             .values()
             .filter(|u| {
-                u.games > 0
-                    && u.banned_until.is_none()
-                    && u.deleted_at.is_none()
-                    && u.rating > me.rating
+                u.games > 0 && !u.is_banned(now) && u.deleted_at.is_none() && u.rating > me.rating
             })
             .count();
         Ok(Some(above as u32 + 1))

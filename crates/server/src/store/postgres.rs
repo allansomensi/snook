@@ -832,7 +832,8 @@ impl PgStore {
             "SELECT u.username, u.rating, u.games, u.wins, u.country,
                     COALESCE(w.vip_until, 0) > $2 AS vip
              FROM users u LEFT JOIN wallets w ON w.user_id = u.id
-             WHERE u.games > 0 AND u.banned_until IS NULL AND u.deleted_at IS NULL
+             WHERE u.games > 0 AND (u.banned_until IS NULL OR u.banned_until <= $2)
+               AND u.deleted_at IS NULL
              ORDER BY u.rating DESC, u.wins DESC, u.username ASC LIMIT $1",
         )
         .bind(limit as i64)
@@ -856,10 +857,11 @@ impl PgStore {
 
     pub async fn rank_of(&self, user_id: i64) -> StoreResult<Option<u32>> {
         let row = query(
-            "SELECT (SELECT COUNT(*) FROM users o WHERE o.games > 0 AND o.banned_until IS NULL AND o.deleted_at IS NULL AND o.rating > u.rating) AS above
+            "SELECT (SELECT COUNT(*) FROM users o WHERE o.games > 0 AND (o.banned_until IS NULL OR o.banned_until <= $2) AND o.deleted_at IS NULL AND o.rating > u.rating) AS above
              FROM users u WHERE u.id = $1 AND u.games > 0",
         )
         .bind(user_id)
+        .bind(crate::now())
         .fetch_optional(&self.pool)
         .await?;
         Ok(row.map(|r| r.get::<i64, _>("above") as u32 + 1))

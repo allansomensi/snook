@@ -176,11 +176,8 @@ impl Tournament {
         if !self.players.iter().any(|p| p == k) {
             return false;
         }
-        if self.is_arena() {
-            !self.withdrawn.contains(k)
-        } else {
-            self.bracket.as_ref().is_some_and(|b| b.alive(k))
-        }
+        !self.withdrawn.contains(k)
+            && (self.is_arena() || self.bracket.as_ref().is_some_and(|b| b.alive(k)))
     }
 }
 
@@ -504,7 +501,12 @@ impl Lounge {
                 self.broadcast_tournament(id);
             }
             TournamentState::Running => {
-                // Withdrawing: lose the current match.
+                // Withdrawing: lose the current match (or the next one, when
+                // the opponent isn't known yet).
+                if !t.alive(k) {
+                    return;
+                }
+                t.withdrawn.insert(k.to_string());
                 let Some(b) = t.bracket.as_mut() else { return };
                 let mut room = None;
                 for (r, round) in b.rounds.clone().iter().enumerate() {
@@ -653,6 +655,18 @@ impl Lounge {
                 slot.players[0].clone().expect("playable"),
                 slot.players[1].clone().expect("playable"),
             ];
+            // A player who withdrew loses at once.
+            match [t.withdrawn.contains(&players[0]), t.withdrawn.contains(&players[1])] {
+                [true, false] => {
+                    walkovers.push((r, i, 1));
+                    continue;
+                }
+                [false, true] | [true, true] => {
+                    walkovers.push((r, i, 0));
+                    continue;
+                }
+                [false, false] => {}
+            }
             let online =
                 [self.sessions.contains_key(&players[0]), self.sessions.contains_key(&players[1])];
             if online[0] && online[1] {

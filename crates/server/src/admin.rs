@@ -274,27 +274,32 @@ async fn login(
     Json(body): Json<LoginBody>,
 ) -> ApiResult {
     let ip = server.client_ip(peer, &headers).to_string();
-    if !server.auth().may_try(&ip, &body.username) {
+    // The name as it is looked up: " admin" and "admin" share one limit.
+    let username = body.username.trim();
+    if !server.auth().may_try(&ip, username) {
         return Err(err(StatusCode::TOO_MANY_REQUESTS, "Too many attempts. Wait a few minutes."));
     }
-    let user = server.store.user_by_name(body.username.trim()).await?;
+    let user = server.store.user_by_name(username).await?;
     let ok = match &user {
         Some(u) => server.verify_password(&body.password, &u.password_hash).await,
-        None => false,
+        None => {
+            let _ = server.verify_password(&body.password, crate::DUMMY_HASH).await;
+            false
+        }
     };
     let user = match user {
         Some(u) if ok => u,
         _ => {
-            server.auth().failed(&ip, &body.username);
+            server.auth().failed(&ip, username);
             return Err(err(StatusCode::UNAUTHORIZED, "Wrong username or password."));
         }
     };
     let user = crate::promote_if_admin(&server, user).await;
     if !user.role.is_staff() || user.is_banned(now()) {
-        server.auth().failed(&ip, &body.username);
+        server.auth().failed(&ip, username);
         return Err(err(StatusCode::FORBIDDEN, "This account has no access to the panel."));
     }
-    server.auth().succeeded(&body.username);
+    server.auth().succeeded(username);
     let token = new_token();
     let t = now();
     server

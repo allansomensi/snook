@@ -361,7 +361,8 @@ async fn vip_paid(
             id: invoice.to_string(),
             user_id: user.id,
             kind: "vip".into(),
-            coins: VIP_MONTHLY_COINS as i64,
+            // What a refund takes back: only coins that were given.
+            coins: if amount > 0 { VIP_MONTHLY_COINS as i64 } else { 0 },
             amount,
             currency: currency.to_string(),
             at: now(),

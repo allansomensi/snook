@@ -568,6 +568,11 @@ async fn promote_if_admin(server: &Server, mut user: User) -> User {
     user
 }
 
+/// Checked against when the account doesn't exist, so a wrong name takes as
+/// long as a wrong password (timing tells nothing).
+pub(crate) const DUMMY_HASH: &str =
+    "$argon2id$v=19$m=19456,t=2,p=1$c2FsdHNhbHQ$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+
 async fn authenticate(server: &Arc<Server>, msg: ClientMsg, ip: &str) -> Auth {
     let fail = |s: &str| Auth::Failed(s.to_string());
     match msg {
@@ -639,9 +644,7 @@ async fn authenticate(server: &Arc<Server>, msg: ClientMsg, ip: &str) -> Auth {
             let ok = match &user {
                 Some(u) => server.verify_password(&password, &u.password_hash).await,
                 None => {
-                    let _ = server
-                        .verify_password(&password, "$argon2id$v=19$m=19456,t=2,p=1$c2FsdHNhbHQ$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
-                        .await;
+                    let _ = server.verify_password(&password, DUMMY_HASH).await;
                     false
                 }
             };
@@ -1499,4 +1502,17 @@ async fn restore_live(server: &Arc<Server>, user: &User) {
 /// Lower-case key of a username (re-exported for the admin panel).
 pub fn user_key(name: &str) -> String {
     key(name)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The stand-in hash must be a real one: a hash that doesn't parse is
+    /// rejected at once, and the timing would give unknown names away.
+    #[test]
+    fn dummy_hash_is_a_real_argon2_hash() {
+        let hash = PasswordHash::new(DUMMY_HASH).expect("parses");
+        assert!(Argon2::default().verify_password(b"guess", &hash).is_err());
+    }
 }
