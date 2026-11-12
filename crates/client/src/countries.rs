@@ -86,10 +86,9 @@ pub fn draw_picker(ui: &mut Ui) -> Option<String> {
             ui.text(t("Search…"), input.x + 9.0, input.y + 9.0, 14.0, MUTED, false);
         }
         let q = p.query.to_lowercase();
-        let lang_pt = crate::i18n::lang() == crate::i18n::Lang::Portuguese;
         let mut list: Vec<(&str, &str)> = COUNTRIES
             .iter()
-            .map(|(c, en, pt)| (*c, if lang_pt { *pt } else { *en }))
+            .map(|(c, _, _)| (*c, crate::flags::name(c)))
             .filter(|(c, name)| {
                 q.is_empty() || name.to_lowercase().contains(&q) || c.to_lowercase() == q
             })

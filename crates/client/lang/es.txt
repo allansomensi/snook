@@ -1,0 +1,889 @@
+# Snook: Spanish.
+# One text per line: the English text (as written in the code), a tab, the translation.
+# Placeholders like {name} must stay as they are; \n is a new line.
+{name} is on the 8: called pocket {pocket}	{name} está en la bola 8: tronera cantada {pocket}
+On the 8-ball: {pocket} pocket	En la bola 8: tronera {pocket}
+Show ping (online)	Mostrar ping (en línea)
+Reactions	Reacciones
+Shop	Tienda
+Cloth	Paño
+Cues	Tacos
+Chalk	Tiza
+Balls	Bolas
+Coins	Monedas
+coins	monedas
+Sign in to buy and use items. Here is what there is:	Inicia sesión para comprar y usar objetos. Esto es lo que hay:
+In use	En uso
+Use	Usar
+Buy for {n}?	¿Comprar por {n}?
+{n} coins	{n} monedas
+Not enough coins: get more in the Coins tab.	No tienes monedas suficientes: consigue más en la pestaña Monedas.
+VIP only	Solo VIP
+Achievement: {a}	Logro: {a}
+free	gratis
+yours	tuyo
+for coins	por monedas
+achievement	logro
+Coins can't be bought on this server yet.	Todavía no se pueden comprar monedas en este servidor.
++{n} bonus	+{n} de regalo
+Payment opens in your browser (card, Pix…), on Stripe's secure page.	El pago se abre en tu navegador (tarjeta, Pix…), en la página segura de Stripe.
+Coins arrive in a moment; they are only used for items in the game.	Las monedas llegan en un momento; solo sirven para objetos del juego.
+Exclusive items: {list}	Objetos exclusivos: {list}
+{n} coins every month	{n} monedas cada mes
+A crown by your name, everywhere	Una corona junto a tu nombre, en todas partes
+Cancel whenever you want: VIP lasts until the end of the paid month	Cancela cuando quieras: el VIP dura hasta el final del mes pagado
+You are VIP until {d}.	Eres VIP hasta el {d}.
+Manage subscription	Gestionar suscripción
+Become VIP · {p}	Hazte VIP · {p}
+VIP can't be bought on this server yet.	Todavía no se puede comprar VIP en este servidor.
+The payment page opened in your browser.	La página de pago se abrió en tu navegador.
+Could not open the browser.	No se pudo abrir el navegador.
+Tournament green	Verde de torneo
+Electric blue	Azul eléctrico
+Burgundy	Burdeos
+Charcoal	Carbón
+Teal	Verde azulado
+Royal purple	Púrpura real
+Camel	Camello
+Midnight	Medianoche
+Champion's red	Rojo campeón
+Classic	Clásico
+Rosewood	Palisandro
+Ebony & silver	Ébano y plata
+Carbon	Carbono
+Ivory inlay	Incrustación de marfil
+Crown	Corona
+Jewels	Joyas
+Blue chalk	Tiza azul
+Green chalk	Tiza verde
+Red chalk	Tiza roja
+Purple chalk	Tiza morada
+Gold chalk	Tiza dorada
+Vintage	Vintage
+Pastel	Pastel
+Neon	Neón
+Purchase complete.	Compra completada.
+You already have this item.	Ya tienes este objeto.
+Not enough coins.	No tienes monedas suficientes.
+The purchase failed; no coins were taken.	La compra falló; no se cobraron monedas.
+No such item.	Ese objeto no existe.
+This item can't be bought with coins.	Este objeto no se puede comprar con monedas.
+You don't have this item.	No tienes este objeto.
+Purchases are not available.	Las compras no están disponibles.
+This pack is not on sale.	Este paquete no está a la venta.
+The payment page could not be opened. Try again in a moment.	No se pudo abrir la página de pago. Inténtalo de nuevo en un momento.
+You are already VIP.	Ya eres VIP.
+There is no subscription to manage.	No hay ninguna suscripción que gestionar.
+The page could not be opened. Try again in a moment.	No se pudo abrir la página. Inténtalo de nuevo en un momento.
+Coins added to your wallet.	Monedas añadidas a tu cartera.
+Welcome to VIP!	¡Bienvenido al VIP!
+Slow down a little.	Más despacio.
+VIP	VIP
+Play now	Jugar ahora
+Find an opponent of your level automatically	Encuentra automáticamente un rival de tu nivel
+Looking for an opponent… {t}	Buscando rival… {t}
+any rating	cualquier rating
+rating ±{n} · {mode}	rating ±{n} · {mode}
+Potting success	Acierto
+Balls made	Bolas metidas
+Best run	Mejor tacada
+Fouls	Faltas
+seen just now	visto hace un momento
+seen {n} min ago	visto hace {n} min
+seen {n} h ago	visto hace {n} h
+seen yesterday	visto ayer
+seen {n} days ago	visto hace {n} días
+seen {n} months ago	visto hace {n} meses
+History	Historial
+Game history	Historial de la partida
+Nothing yet.	Nada todavía.
+Fine aim: click the arrows, or drag here	Puntería fina: pulsa las flechas o arrastra aquí
+Watch the game	Ver la partida
+{n} watching	{n} mirando
+Watching {name}	Mirando a {name}
+Your reactions reach the table quietly.	Tus reacciones llegan a la mesa en silencio.
+Stop watching	Dejar de mirar
+If they play again, you keep watching.	Si vuelven a jugar, sigues mirando.
+Your friend left the table.	Tu amigo dejó la mesa.
+Your friend isn't playing right now.	Tu amigo no está jugando ahora.
+You can only watch your friends.	Solo puedes ver a tus amigos.
+You can't watch this game.	No puedes ver esta partida.
+{n} points to {tier}	{n} puntos para {tier}
+Top tier	Categoría máxima
+Reactions {n}/{total}	Reacciones {n}/{total}
+Haunted table	Mesa embrujada
+Win a rated game during Halloween (Oct 24 – Nov 2).	Gana una partida con rating en Halloween (24 oct – 2 nov).
+Winter league	Liga de invierno
+Win a rated game over the holidays (Dec 15 – Jan 6).	Gana una partida con rating en las fiestas (15 dic – 6 ene).
+Fireworks	Fuegos artificiales
+Win a rated game at the turn of the year (Dec 31 – Jan 1).	Gana una partida con rating en el cambio de año (31 dic – 1 ene).
+Shows where the object ball and the cue ball go (not online).	Muestra a dónde van la bola objetivo y la bola blanca (no en línea).
+{n} online · ping {ms} ms	{n} en línea · ping {ms} ms
+Right-drag · Wheel · C	Arrastre derecho · Rueda · C
+Win %	% victorias
+Reset the camera: top view, no zoom (C)	Restablecer la cámara: vista cenital, sin zoom (C)
+Drag the table to turn it · Wheel · C	Arrastra la mesa para girarla · Rueda · C
+Drag the cue · click a ball or a spot	Arrastra el taco · haz clic en una bola o un punto
+{name} sank the 8-ball	{name} metió la bola 8
+{name} sank the 8 too early	{name} metió la 8 antes de tiempo
+{name} sank the 8 in the wrong pocket	{name} metió la 8 en la tronera equivocada
+{name} fouled on the 8	{name} cometió falta en la 8
+{name} knocked the 8 off the table	{name} sacó la 8 de la mesa
+{name} resigned	{name} se rindió
+{name} left the game	{name} abandonó la partida
+{winner} wins! ({how})	¡{winner} gana! ({how})
+#{n} in the world	#{n} del mundo
+3–16 letters, digits or underscores.	3–16 letras, números o guiones bajos.
+Only a short line from the cue ball.	Solo una línea corta desde la bola blanca.
+A solid club player.	Un jugador de club sólido.
+Accept friend	Aceptar amistad
+Achievement unlocked: {title}	Logro desbloqueado: {title}
+Achievements {n}/{total}	Logros {n}/{total}
+Add	Añadir
+Add a friend by username	Añade un amigo por su nombre de usuario
+Add friend	Añadir amigo
+Against the computer	Contra el ordenador
+All tournaments	Todos los torneos
+Amateur	Aficionado
+At least 8 characters. Use a password you don't use elsewhere.	Al menos 8 caracteres. Usa una contraseña que no uses en otro sitio.
+At least two players are needed.	Se necesitan al menos dos jugadores.
+Back	Volver
+Black ball	Bola negra
+Block	Bloquear
+Break and run	Saque y limpia
+Break and run 10 times.	Saca y limpia la mesa 10 veces.
+Can't listen for games here: join by address below.	No se pueden buscar partidas aquí: únete por dirección abajo.
+Cancel request	Cancelar solicitud
+Cancel tournament	Cancelar torneo
+Casual	Amistosa
+Centurion	Centurión
+Champion	Campeón
+Champion: {name}	Campeón: {name}
+Change country	Cambiar país
+Cheating or abuse	Trampas o abuso
+Choose…	Elegir…
+Click again to block	Haz clic otra vez para bloquear
+Close	Cerrar
+Closer	Más cerca
+Competitor	Competidor
+Connecting to the server…	Conectando con el servidor…
+Could not host a game: {e}	No se pudo crear la partida: {e}
+Country	País
+Create	Crear
+Create a tournament	Crear un torneo
+Create your account	Crea tu cuenta
+Don't show a flag	No mostrar bandera
+Drag outside the table · Wheel · C	Arrastra fuera de la mesa · Rueda · C
+Dynasty	Dinastía
+Eight is enough	Con la ocho basta
+Executioner	Verdugo
+Expert	Experto
+Familiar face	Cara conocida
+Final	Final
+Finish your game first.	Termina tu partida primero.
+First blood	Primera sangre
+First break	Primer saque
+Friend request sent.	Solicitud de amistad enviada.
+Friends	Amigos
+Games	Partidas
+Games on your network	Partidas en tu red
+Give the tournament a name (at least 3 characters).	Ponle un nombre al torneo (al menos 3 caracteres).
+Good company	Buena compañía
+Grandmaster	Gran maestro
+Guests can only join LAN games. Create an account.	Los invitados solo pueden unirse a partidas LAN. Crea una cuenta.
+Guests can't play rated tournaments.	Los invitados no pueden jugar torneos con rating.
+Guests don't have this.	Los invitados no tienen esto.
+Harassment	Acoso
+Hat trick	Triplete
+Have 10 friends.	Ten 10 amigos.
+Have an account for 30 days.	Ten una cuenta desde hace 30 días.
+Have an account for a year.	Ten una cuenta desde hace un año.
+Host a game on this computer	Crear una partida en este ordenador
+Host {host} · {n}/{size} players · {kind}	Anfitrión {host} · {n}/{size} jugadores · {kind}
+Hot hand	Racha caliente
+Hustler	Buscavidas
+Invalid shot.	Tacada no válida.
+Join	Unirse
+Joining the LAN game…	Uniéndose a la partida LAN…
+Just for fun	Solo por diversión
+L	D
+LAN game	Partida LAN
+LAN games don't change ratings.	Las partidas LAN no cambian el rating.
+Legend	Leyenda
+Lives at the table	Vive en la mesa
+Loading the profile…	Cargando el perfil…
+Loading…	Cargando…
+Local network	Red local
+Locked	Bloqueado
+Looking for games…	Buscando partidas…
+Make a friend.	Haz un amigo.
+Master	Maestro
+Misses now and then: good for learning.	Falla de vez en cuando: bueno para aprender.
+Name	Nombre
+Names have 3–16 letters, digits or underscores.	Los nombres tienen 3–16 letras, números o guiones bajos.
+New account	Cuenta nueva
+New here? Choose “New account”: it takes ten seconds.	¿Eres nuevo? Elige «Cuenta nueva»: tarda diez segundos.
+New tournament	Torneo nuevo
+No friends yet. Add someone you played with!	Todavía no tienes amigos. ¡Añade a alguien con quien jugaste!
+No games yet.	Todavía no hay partidas.
+No limit	Sin límite
+No open tables. Open one and others can sit down.	No hay mesas abiertas. Abre una y otros podrán sentarse.
+No such player.	Ese jugador no existe.
+No tournaments right now. Create one!	No hay torneos ahora. ¡Crea uno!
+Offensive name	Nombre ofensivo
+Old timer	Veterano
+On a roll	En racha
+On fire	Imparable de verdad
+Only the host can start the tournament.	Solo el anfitrión puede empezar el torneo.
+Open a table	Abrir una mesa
+Open a table and wait, or invite a friend!	¡Abre una mesa y espera, o invita a un amigo!
+Opponent	Rival
+Or join by address	O únete por dirección
+Other	Otro
+Others can join at {ip}:{port}	Otros pueden unirse en {ip}:{port}
+Passwords need at least 8 characters (not only digits).	La contraseña necesita al menos 8 caracteres (no solo números).
+Plans position and plays safeties.	Planifica la posición y juega defensivas.
+Play 1,000 rated games.	Juega 1.000 partidas con rating.
+Play 10 rated games.	Juega 10 partidas con rating.
+Play 100 rated games.	Juega 100 partidas con rating.
+Play 25 casual games.	Juega 25 partidas amistosas.
+Play 500 rated games.	Juega 500 partidas con rating.
+Play in a tournament.	Juega un torneo.
+Play online	Jugar en línea
+Play with friends on the same network	Juega con amigos en la misma red
+Play your first rated game.	Juega tu primera partida con rating.
+Player 1	Jugador 1
+Players	Jugadores
+Players in a tournament can't start other games.	Los jugadores de un torneo no pueden empezar otras partidas.
+Please don't repeat the same message.	Por favor, no repitas el mismo mensaje.
+Pool hall legend	Leyenda del salón
+Popular	Popular
+Private	Privada
+Profile	Perfil
+R: watch the last shot again	R: ver la última tacada otra vez
+REPLAY	REPETICIÓN
+Rated	Con rating
+Rated games, tables, tournaments and friends	Partidas con rating, mesas, torneos y amigos
+Reach a rating of 1300.	Alcanza un rating de 1300.
+Reach a rating of 1500.	Alcanza un rating de 1500.
+Reach a rating of 1700.	Alcanza un rating de 1700.
+Reach a rating of 1900.	Alcanza un rating de 1900.
+Reach a rating of 2100.	Alcanza un rating de 2100.
+Recent games	Partidas recientes
+Refresh	Actualizar
+Regular	Habitual
+Remove friend	Quitar amigo
+Replay	Repetición
+Report	Denunciar
+Report {name}	Denunciar a {name}
+Request sent	Solicitud enviada
+Rookie	Novato
+Round {n}	Ronda {n}
+Search…	Buscar…
+Semi-finals	Semifinales
+Send report	Enviar denuncia
+Shark	Tiburón
+Shows the contact point; judging the cut is up to you.	Muestra el punto de contacto; el corte lo calculas tú.
+Shows where the object ball and the cue ball go.	Muestra a dónde van la bola objetivo y la bola blanca.
+Shutout	Paliza
+Sign in	Iniciar sesión
+Sign in or create an account	Inicia sesión o crea una cuenta
+Sign out	Cerrar sesión
+Sit down	Sentarse
+Skilled	Hábil
+Someone with that name is already here.	Ya hay alguien con ese nombre.
+Spam	Spam
+Start now	Empezar ahora
+Stop the replay (R)	Parar la repetición (R)
+Table runner	Limpiamesas
+Tables	Mesas
+Take turns on this computer	Turnaos en este ordenador
+Thank you. The moderators will look into it.	Gracias. Los moderadores lo revisarán.
+That player is not accepting invitations.	Ese jugador no acepta invitaciones.
+That shot was for an earlier turn.	Esa tacada era de un turno anterior.
+That table is no longer open.	Esa mesa ya no está abierta.
+That tournament has already started.	Ese torneo ya empezó.
+That tournament is full.	Ese torneo está lleno.
+That tournament no longer exists.	Ese torneo ya no existe.
+The first connection of the day can take up to a minute while the server wakes up.	La primera conexión del día puede tardar hasta un minuto mientras el servidor despierta.
+The first time, allow Snook through the firewall when asked.	La primera vez, permite a Snook en el cortafuegos cuando te lo pida.
+The server could not play that shot.	El servidor no pudo jugar esa tacada.
+The server is busy. Try again in a moment.	El servidor está ocupado. Inténtalo de nuevo en un momento.
+The tournament starts when it is full (the host can start it earlier).	El torneo empieza cuando se llena (el anfitrión puede empezarlo antes).
+There are too many tournaments right now. Join one!	Hay demasiados torneos ahora. ¡Únete a uno!
+This is a LAN server: join as a guest.	Este es un servidor LAN: únete como invitado.
+Three levels, from relaxed to ruthless	Tres niveles, de relajado a implacable
+Tier	Categoría
+Time per shot	Tiempo por tacada
+Too many failed attempts. Wait a few minutes and try again.	Demasiados intentos fallidos. Espera unos minutos e inténtalo de nuevo.
+Too many messages.	Demasiados mensajes.
+Too many new accounts from this network. Try again later.	Demasiadas cuentas nuevas desde esta red. Inténtalo más tarde.
+Top 100 · rated games	Top 100 · partidas con rating
+Top view (C)	Vista cenital (C)
+Tournament game: the next round starts from the lounge.	Partida de torneo: la siguiente ronda empieza desde el salón.
+Tournament games have no rematch.	Las partidas de torneo no tienen revancha.
+Tournaments	Torneos
+Tournaments have 4, 8 or 16 players.	Los torneos tienen 4, 8 o 16 jugadores.
+Two players	Dos jugadores
+Unblock	Desbloquear
+Unlocked {date}	Desbloqueado el {date}
+Unstoppable	Imparable
+W	V
+Watch the last shot again (R)	Ver la última tacada otra vez (R)
+What happened? (optional)	¿Qué pasó? (opcional)
+When time runs out, the opponent gets ball in hand.	Cuando se acaba el tiempo, el rival tiene bola en mano.
+Whitewash	Blanqueo
+Win 10 rated games on the 8-ball.	Gana 10 partidas con rating metiendo la 8.
+Win 10 rated games in a row.	Gana 10 partidas con rating seguidas.
+Win 10 rated games.	Gana 10 partidas con rating.
+Win 10 rated shutouts.	Gana 10 palizas con rating.
+Win 100 rated games on the 8-ball.	Gana 100 partidas con rating metiendo la 8.
+Win 100 rated games.	Gana 100 partidas con rating.
+Win 250 rated games on the 8-ball.	Gana 250 partidas con rating metiendo la 8.
+Win 3 rated games in a row.	Gana 3 partidas con rating seguidas.
+Win 5 rated games in a row.	Gana 5 partidas con rating seguidas.
+Win 5 tournaments.	Gana 5 torneos.
+Win 50 rated games on the 8-ball.	Gana 50 partidas con rating metiendo la 8.
+Win 50 rated games.	Gana 50 partidas con rating.
+Win 500 rated games.	Gana 500 partidas con rating.
+Win a rated game.	Gana una partida con rating.
+Win a tournament.	Gana un torneo.
+Win a rated game before your opponent sinks a ball of their group.	Gana una partida con rating antes de que tu rival meta una bola de su grupo.
+Win a rated game from the break without your opponent getting a shot.	Gana una partida con rating desde el saque sin que tu rival tire.
+Withdraw	Retirarse
+World ranking	Ranking mundial
+Wrong table password.	Contraseña de mesa incorrecta.
+Wrong tournament password.	Contraseña de torneo incorrecta.
+You are already in a tournament.	Ya estás en un torneo.
+You are hosting a game	Estás alojando una partida
+You can't join this table.	No puedes unirte a esta mesa.
+You signed in from another place.	Iniciaste sesión desde otro lugar.
+You're sending invitations too quickly.	Estás enviando invitaciones demasiado rápido.
+You're sending messages too quickly.	Estás enviando mensajes demasiado rápido.
+You've sent many reports. Please wait before sending more.	Has enviado muchas denuncias. Espera antes de enviar más.
+Your friend list is full.	Tu lista de amigos está llena.
+Your next match starts by itself when both players are free.	Tu próximo partido empieza solo cuando ambos jugadores estén libres.
+Your profile	Tu perfil
+Your table is open	Tu mesa está abierta
+Zoom in	Acercar
+Zoom out	Alejar
+at a table	en una mesa
+best streak	mejor racha
+by {host} · {n}/{size} players	de {host} · {n}/{size} jugadores
+casual games	partidas amistosas
+casual · private	amistosa · privada
+casual · public	amistosa · pública
+connecting to the server	conectando con el servidor
+eight-ball pool	bola 8
+finished	terminado
+guest	invitado
+invites you to {kind}	te invita a {kind}
+joined today	se unió hoy
+member for {n} days	miembro desde hace {n} días
+member for {n} months	miembro desde hace {n} meses
+member for {n} years	miembro desde hace {n} años
+offline	desconectado
+open	abierto
+optional: only friends with it can join	opcional: solo pueden unirse los amigos que la tengan
+password	contraseña
+peak {n}	máximo {n}
+playing	jugando
+rated games	partidas con rating
+rated · private	con rating · privada
+rated · public	con rating · pública
+request sent	solicitud enviada
+the connection dropped	se cayó la conexión
+to play online	para jugar en línea
+tournament	torneo
+tournaments won	torneos ganados
+waiting for an opponent…	esperando a un rival…
+win rate	% de victorias
+wins	victorias
+won on the 8	ganadas con la 8
+{host}'s game	partida de {host}
+{name} wants to be friends	{name} quiere ser tu amigo
+{name} wants to be your friend.	{name} quiere ser tu amigo.
+{n} online	{n} en línea
+sank the 8-ball	metió la bola 8
+the opponent sank the 8-ball	el rival metió la bola 8
+the opponent sank the 8 too early	el rival metió la 8 antes de tiempo
+sank the 8 too early	metió la 8 antes de tiempo
+the opponent sank the 8 in the wrong pocket	el rival metió la 8 en la tronera equivocada
+sank the 8 in the wrong pocket	metió la 8 en la tronera equivocada
+the opponent fouled on the 8	el rival cometió falta en la 8
+fouled on the 8	cometió falta en la 8
+the opponent knocked the 8 off the table	el rival sacó la 8 de la mesa
+knocked the 8 off the table	sacó la 8 de la mesa
+the opponent resigned	el rival se rindió
+resigned	se rindió
+the opponent left	el rival se fue
+left the game	abandonó la partida
+You are muted for {n} more minutes.	Estás silenciado durante {n} minutos más.
+This account is suspended for {n} more day(s). Reason: {reason}.	Esta cuenta está suspendida durante {n} día(s) más. Motivo: {reason}.
+This account is banned. Reason: {reason}.	Esta cuenta está bloqueada. Motivo: {reason}.
+You were muted: {r}	Te silenciaron: {r}
+Your account was suspended: {r}	Tu cuenta fue suspendida: {r}
+Your account was banned: {r}	Tu cuenta fue bloqueada: {r}
+You were disconnected by a moderator: {r}	Un moderador te desconectó: {r}
+You were disconnected by a moderator.	Un moderador te desconectó.
+Please sign in again.	Vuelve a iniciar sesión.
+Your password was changed. Sign in again.	Tu contraseña cambió. Vuelve a iniciar sesión.
+Accept rematch	Aceptar revancha
+Accept	Aceptar
+Aim	Apuntar
+Aiming guide	Guía de puntería
+Anti-aliasing (smooth edges)	Antialiasing (bordes suaves)
+Back to lounge	Volver al salón
+Back to menu	Volver al menú
+Balanced: smooth on most laptops.	Equilibrado: fluido en la mayoría de portátiles.
+Ball in hand	Bola en mano
+Break the rack	Romper el triángulo
+Camera pulls back to watch each shot	La cámara se aleja para ver cada tacada
+Camera	Cámara
+Cancel	Cancelar
+Casual game: ratings unchanged	Partida amistosa: el rating no cambia
+Center	Centro
+Chat	Chat
+Click a ball or a spot	Haz clic en una bola o un punto
+Click to chat, Enter to send	Haz clic para chatear, Enter para enviar
+Controls (H)	Controles (H)
+Controls	Controles
+Create account	Crear cuenta
+Cue ball contact	Contacto en la bola blanca
+Decline	Rechazar
+Done	Listo
+Drag on the table: cue follows	Arrastra sobre la mesa: el taco sigue
+Drag the cue ball	Arrastra la bola blanca
+Elevation	Elevación
+Enter the lounge	Entrar al salón
+Everything, with the sharpest balls: for gaming PCs.	Todo, con las bolas más nítidas: para PCs gamer.
+Fine aim	Puntería fina
+Finish this match first.	Termina este partido primero.
+For old or very slow computers.	Para ordenadores antiguos o muy lentos.
+Full screen (F11)	Pantalla completa (F11)
+Full	Completa
+Game server	Servidor de juego
+Graphics quality	Calidad gráfica
+High	Alta
+Hold Space, release	Mantén Espacio y suelta
+Invite	Invitar
+Leave to the lounge	Salir al salón
+Leave	Salir
+Leaving now counts as a loss.	Salir ahora cuenta como derrota.
+Log in	Entrar
+Log out	Cerrar sesión
+Lounge chat	Chat del salón
+Low	Baja
+Main menu	Menú principal
+Medium	Media
+Menu / help	Menú / ayuda
+New here? Pick a name and password, then Create account.	¿Eres nuevo? Elige un nombre y una contraseña, y luego Crear cuenta.
+Next game starts in a moment…	La siguiente partida empieza en un momento…
+No rated games yet. Be the first!	Todavía no hay partidas con rating. ¡Sé el primero!
+Nobody else is here right now.	No hay nadie más aquí ahora.
+Off	No
+On the 8-ball: call a pocket	En la bola 8: canta una tronera
+On the 8-ball	En la bola 8
+Online lounge	Salón en línea
+Open table	Mesa abierta
+Password	Contraseña
+Passwords need at least 6 characters.	La contraseña necesita al menos 6 caracteres.
+Paused	En pausa
+Play against the computer	Jugar contra el ordenador
+Play people around the world and climb the ranking.	Juega con gente de todo el mundo y sube en el ranking.
+Play two players	Jugar dos jugadores
+Play	Jugar
+Player 2	Jugador 2
+Player	Jugador
+Players online	Jugadores en línea
+Quick aim	Puntería rápida
+Quit	Salir
+Rated games (affect your rating)	Partidas con rating (afectan tu rating)
+Reconnected.	Reconectado.
+Rematch	Revancha
+Resign this game	Rendirse en esta partida
+Restart the game to apply this change.	Reinicia el juego para aplicar este cambio.
+Resume	Continuar
+Retry	Reintentar
+Right-drag · Wheel · Tab · C	Arrastre derecho · Rueda · Tab · C
+Saving the result…	Guardando el resultado…
+Say hello… (Enter to send)	Saluda… (Enter para enviar)
+Say hi in the chat, or invite a friend!	¡Saluda en el chat o invita a un amigo!
+Send	Enviar
+Settings	Ajustes
+Shift + drag · A / D	Shift + arrastrar · A / D
+Shoot	Tirar
+Shooting…	Tirando…
+Short	Corta
+Show the controls panel	Mostrar el panel de controles
+Signing in…	Iniciando sesión…
+Soft shadows from every lamp, contact shading.	Sombras suaves de cada lámpara y sombreado de contacto.
+Solids (1–7)	Lisas (1–7)
+Spin ball · ↑ ↓ · Q / E	Bola de efecto · ↑ ↓ · Q / E
+Spin	Efecto
+Standard	Estándar
+Stay	Quedarse
+Stripes (9–15)	Rayadas (9–15)
+The game goes on while this is open.	El juego sigue mientras esto está abierto.
+Top players	Mejores jugadores
+Two players on this computer	Dos jugadores en este ordenador
+Use default	Usar predeterminado
+Username	Nombre de usuario
+Usernames have 3–16 letters, digits or underscores.	Los nombres de usuario tienen 3–16 letras, números o guiones bajos.
+W / S (jump & massé)	W / S (salto y massé)
+Watch demo	Ver demostración
+Won	Ganó
+You signed in from another window or computer.	Iniciaste sesión desde otra ventana u ordenador.
+You win!	¡Ganaste!
+Your name	Tu nombre
+Your opponent went back to the lounge.	Tu rival volvió al salón.
+Your turn	Tu turno
+open table: the next ball you make sets your group	mesa abierta: la próxima bola que metas define tu grupo
+draw	retroceso
+follow	seguimiento
+stun	golpe seco
+solids	lisas
+stripes	rayadas
+eight-ball  ·  play, chat, climb the ranking	bola 8  ·  juega, chatea, sube en el ranking
+lounge	salón
+release Space to shoot · Esc cancels	suelta Espacio para tirar · Esc cancela
+ · left english	 · efecto a la izquierda
+ · right english	 · efecto a la derecha
+Language	Idioma
+Graphics	Gráficos
+Game	Juego
+Sound	Sonido
+Reset to defaults	Restablecer valores
+Online	En línea
+Menu	Menú
+Rating	Rating
+Ultra	Ultra
+Esc · H	Esc · H
+Call the pocket for the 8-ball	Canta la tronera de la bola 8
+Click a pocket on the table, or pick one here:	Haz clic en una tronera de la mesa o elige una aquí:
+Called pocket	Tronera cantada
+Change	Cambiar
+Sinking the 8 in any other pocket loses the game.	Meter la 8 en cualquier otra tronera pierde la partida.
+Mouse aim sensitivity	Sensibilidad de puntería del ratón
+Vignette (cinematic edges)	Viñeta (bordes cinematográficos)
+Show FPS	Mostrar FPS
+Call a pocket for the 8-ball first: click a pocket.	Canta primero una tronera para la bola 8: haz clic en una tronera.
+Reconnecting…	Reconectando…
+the game is over	la partida terminó
+the cue ball cannot be placed there	la bola blanca no se puede colocar ahí
+call a pocket for the 8-ball	canta una tronera para la bola 8
+That username is taken.	Ese nombre de usuario ya existe.
+Wrong username or password.	Usuario o contraseña incorrectos.
+Your session expired. Please log in again.	Tu sesión caducó. Vuelve a iniciar sesión.
+This version of Snook is out of date. Please update the game.	Esta versión de Snook está desactualizada. Actualiza el juego.
+It's not your turn.	No es tu turno.
+That player is not online.	Ese jugador no está en línea.
+That player is in a game.	Ese jugador está en una partida.
+You can't invite yourself.	No puedes invitarte a ti mismo.
+That invitation is no longer valid.	Esa invitación ya no es válida.
+That player is no longer available.	Ese jugador ya no está disponible.
+Resign first to leave a game in progress.	Ríndete primero para salir de una partida en curso.
+Malformed message.	Mensaje mal formado.
+Please log in first.	Inicia sesión primero.
+Could not create the account.	No se pudo crear la cuenta.
+The cue ball can't be placed there.	La bola blanca no se puede colocar ahí.
+Disconnected.	Desconectado.
+Lost contact with the server.	Se perdió el contacto con el servidor.
+The server closed the connection.	El servidor cerró la conexión.
+The server took too long to answer.	El servidor tardó demasiado en responder.
+The server is not answering (connection refused).	El servidor no responde (conexión rechazada).
+The server address is not valid (example: wss://snook.example.com/ws).	La dirección del servidor no es válida (ejemplo: wss://snook.example.com/ws).
+The server address has no host name.	La dirección del servidor no tiene nombre de host.
+Welcome to Snook! Be kind, play fair.	¡Bienvenido a Snook! Sé amable y juega limpio.
+Ball in hand: drag the cue ball{zone} to move it	Bola en mano: arrastra la bola blanca{zone} para moverla
+ behind the line	 detrás de la línea
+Ball in hand  ·  {group}	Bola en mano  ·  {group}
+Can't shoot: {e}.	No se puede tirar: {e}.
+Chat ({n})	Chat ({n})
+Computer ({level})	Ordenador ({level})
+Connecting to {server}…	Conectando con {server}…
+Connection lost. Reconnecting (attempt {n})…	Se perdió la conexión. Reconectando (intento {n})…
+Connection lost. Reconnecting…	Se perdió la conexión. Reconectando…
+Elevation {deg}°	Elevación {deg}°
+Power {pct}%	Fuerza {pct}%
+Foul by {shooter}: {foul}.	Falta de {shooter}: {foul}.
+Graphics set to {q} for smooth play. You can change this in Settings.	Gráficos en {q} para jugar con fluidez. Puedes cambiarlo en Ajustes.
+Rating {r} ({d})	Rating {r} ({d})
+Server: {s}	Servidor: {s}
+The {ball} was spotted.	La {ball} volvió a la mesa.
+Waiting for {to} ({kind})…	Esperando a {to} ({kind})…
+rated	con rating
+casual	amistosa
+Waiting for {name}…	Esperando a {name}…
+{by} declined your invitation.	{by} rechazó tu invitación.
+{from} invites you to {kind}	{from} te invita a {kind}
+a rated game	una partida con rating
+a casual game	una partida amistosa
+{name} calls the 8-ball in the {pocket} pocket.	{name} canta la bola 8 en la tronera {pocket}.
+{name} has ball in hand…	{name} tiene bola en mano…
+{name} is aiming…	{name} está apuntando…
+{name} is on the 8: click a pocket to call it	{name} está en la bola 8: haz clic en una tronera para cantarla
+{name} is thinking…	{name} está pensando…
+{name} left the game.	{name} abandonó la partida.
+{name} resigned.	{name} se rindió.
+{name} to break	{name} rompe
+{name} to shoot ({target})	{name} tira ({target})
+{name}'s turn	Turno de {name}
+{next} has ball in hand{where}.	{next} tiene bola en mano{where}.
+ behind the head string	 detrás de la línea de salida
+{opponent} is back.	{opponent} volvió.
+{opponent} lost the connection. Waiting up to {secs} s…	{opponent} perdió la conexión. Esperando hasta {secs} s…
+{opponent} wants a rematch.	{opponent} quiere la revancha.
+{opponent} went back to the lounge.	{opponent} volvió al salón.
+{shooter} pocketed {balls}.	{shooter} metió {balls}.
+{shooter} takes {group}.	{shooter} se queda con las {group}.
+{who} ran out of time: ball in hand for the opponent.	A {who} se le acabó el tiempo: bola en mano para el rival.
+{winner} wins: {reason}!	¡{winner} gana: {reason}!
+{name}  ·  rating {r}  ·  {g} games, {w} wins	{name}  ·  rating {r}  ·  {g} partidas, {w} victorias
+{name} wants a rematch!	¡{name} quiere la revancha!
+{name} wins!	¡{name} gana!
+{name} wins	{name} gana
+{r} · playing	{r} · jugando
+{r} · {g} games	{r} · {g} partidas
+…and {n} more	…y {n} más
+Sound volume  {v}%	Volumen  {v}%
+Could not find the server “{host}”.	No se encontró el servidor «{host}».
+Network error: {e}.	Error de red: {e}.
+Secure connection failed: {e}.	Falló la conexión segura: {e}.
+The server refused the connection (HTTP {code}).	El servidor rechazó la conexión (HTTP {code}).
+Connection error: {e}.	Error de conexión: {e}.
+Called: {pocket}	Cantada: {pocket}
+{name} calls the {pocket} pocket.	{name} canta la tronera {pocket}.
+cue ball	bola blanca
+{n}-ball	bola {n}
+Scratch: the cue ball was pocketed	Falta: la bola blanca entró
+The cue ball left the table	La bola blanca salió de la mesa
+The cue ball didn't hit any ball	La bola blanca no tocó ninguna bola
+Wrong ball hit first ({ball})	Primero tocó una bola equivocada ({ball})
+No ball reached a cushion after contact	Ninguna bola tocó una banda tras el contacto
+The {ball} left the table	La {ball} salió de la mesa
+Illegal break	Saque ilegal
+pocketed the 8-ball	metió la bola 8
+opponent pocketed the 8-ball too early	el rival metió la 8 antes de tiempo
+opponent sank the 8-ball in the wrong pocket	el rival metió la 8 en la tronera equivocada
+opponent fouled on the 8-ball	el rival cometió falta en la 8
+opponent knocked the 8-ball off the table	el rival sacó la 8 de la mesa
+opponent resigned	el rival se rindió
+opponent left the game	el rival abandonó la partida
+head left corner	esquina superior izquierda
+head right corner	esquina superior derecha
+left side	lateral izquierda
+right side	lateral derecha
+foot left corner	esquina inferior izquierda
+foot right corner	esquina inferior derecha
+Easy	Fácil
+Hard	Difícil
+Normal	Normal
+Power	Fuerza
+Drag down to pull the cue back, release to shoot	Arrastra hacia abajo para echar el taco atrás y suelta para tirar
+Drag the power bar down, release	Arrastra la barra de fuerza hacia abajo y suelta
+Top view	Vista cenital
+3D view	Vista 3D
+Reset camera	Centrar cámara
+No messages yet.	Todavía no hay mensajes.
+▼ newer messages	▼ mensajes nuevos
+Right click or Esc cancels	Clic derecho o Esc cancela
+Camera follows the cue	La cámara sigue al taco
+Pull back for shots	Alejar en las tacadas
+Drag the cue around the ball	Arrastra el taco alrededor de la bola
+Drag the cue · click a spot	Arrastra el taco · haz clic en un punto
+Drag up for more power, release to shoot	Arrastra hacia arriba para más fuerza y suelta para tirar
+Drag the power bar up, release	Arrastra la barra de fuerza hacia arriba y suelta
+Time's up: {name}'s shot was played at full power.	Se acabó el tiempo: la tacada de {name} se jugó con fuerza máxima.
+Dark room (spotlight on the table)	Sala oscura (luz solo en la mesa)
+Hide controls	Ocultar controles
+Drag right for more power, release to shoot	Arrastra a la derecha para más fuerza y suelta para tirar
+Drag the power bar right, release	Arrastra la barra de fuerza a la derecha y suelta
+Interface size  {v}%	Tamaño de la interfaz  {v}%
+Drag to set the power	Arrastra para ajustar la fuerza
+Set the power, then press Shoot	Ajusta la fuerza y pulsa Tirar
+Shoot!	¡Tirar!
+Set the power, then press the green button	Ajusta la fuerza y pulsa el botón verde
++{n} coins · {why}	+{n} monedas · {why}
+16-player tournaments, and first place on the waiting list of a full one	Torneos de 16 jugadores y el primer puesto en la lista de espera de un torneo lleno
+30 minutes: play as many games as you can. A win is 2 points, 4 from the third win in a row.	30 minutos: juega todas las partidas que puedas. Una victoria vale 2 puntos, 4 desde la tercera seguida.
+A crown by your name, everywhere (lounge, profile, ranking)	Una corona junto a tu nombre, en todas partes (salón, perfil, ranking)
+Account	Cuenta
+Add friends to give them items.	Añade amigos para regalarles objetos.
+Arena	Arena
+Arena · host {host} · {n} players · {kind}	Arena · anfitrión {host} · {n} jugadores · {kind}
+Back to the shop	Volver a la tienda
+Buy now	Comprar ahora
+Buy · {n}	Comprar · {n}
+Buying…	Comprando…
+Change password	Cambiar contraseña
+Click again to delete	Haz clic otra vez para eliminar
+Code	Código
+Confirm purchase	Confirmar compra
+Copied: send it to a friend.	Copiado: envíalo a un amigo.
+Copy	Copiar
+Current	Actual
+Delete account	Eliminar cuenta
+Entry	Inscripción
+Entry {n} coins	Inscripción {n} monedas
+Every replay kept (free players keep their last 10 games)	Todas las repeticiones guardadas (los gratuitos guardan sus últimas 10 partidas)
+For {name}	Para {name}
+Format	Formato
+Frames	Marcos
+Free	Gratis
+Get coins	Conseguir monedas
+Gift sent!	¡Regalo enviado!
+Give as a gift	Regalar
+Give it	Regalarlo
+Give to a friend	Regalar a un amigo
+Great!	¡Genial!
+If you forget your password, we confirm it's you by this e-mail.	Si olvidas tu contraseña, confirmamos que eres tú con este correo.
+Invite with a code	Invitar con un código
+It goes on right away. Items only change the look, never the game.	Se usa al instante. Los objetos solo cambian el aspecto, nunca el juego.
+Join my table in Snook:	Únete a mi mesa en Snook:
+Join the waiting list	Entrar en la lista de espera
+Join · {n} coins	Unirse · {n} monedas
+Knockout	Eliminatoria
+Name colour	Color del nombre
+Name colours for the lounge and exclusive frames, cloth, cues, balls and effects	Colores de nombre en el salón y marcos, paños, tacos, bolas y efectos exclusivos
+New	Nueva
+No, thanks	No, gracias
+Nothing that wins games: VIP only changes the look	Nada que gane partidas: el VIP solo cambia el aspecto
+Numbers	Números
+ON TV	EN LA TELE
+Play rated games to see your rating here.	Juega partidas con rating para ver tu rating aquí.
+Price	Precio
+Prizes {a} + {b}	Premios {a} + {b}
+Protect your purchases	Protege tus compras
+Purchase complete!	¡Compra completada!
+Recovery e-mail	Correo de recuperación
+Save	Guardar
+The fees make the prize: 70% to the champion, 20% to the runner-up.	Las inscripciones forman el premio: 70% para el campeón, 20% para el subcampeón.
+The server restarts in {m}:{s} for an update. Games in progress go on.	El servidor se reinicia en {m}:{s} por una actualización. Las partidas en curso continúan.
+Try it on the table	Probarlo en la mesa
+Use this e-mail	Usar este correo
+Use {email} to recover your account if you ever forget your password?	¿Usar {email} para recuperar tu cuenta si alguna vez olvidas tu contraseña?
+Watch	Ver
+Watch again	Ver de nuevo
+Winning effects	Efectos de victoria
+You are paired as soon as you and an opponent are free.	Te emparejamos en cuanto tú y un rival estéis libres.
+You can change it any time in your profile (Account).	Puedes cambiarlo cuando quieras en tu perfil (Cuenta).
+You need {n} more coins.	Te faltan {n} monedas.
+Your account	Tu cuenta
+Your account was deleted.	Tu cuenta fue eliminada.
+Your coins	Tus monedas
+Your friend gets it right away.	Tu amigo lo recibe al instante.
+Your game against {name} is starting.	Tu partida contra {name} está empezando.
+Your name, e-mail, friends and items are erased for good. Your opponents keep the games you played (without your name).	Tu nombre, correo, amigos y objetos se borran para siempre. Tus rivales conservan las partidas jugadas (sin tu nombre).
+balls per game	bolas por partida
+best run ever	mejor tacada
+daily bonus	bono diario
+entry fee back	inscripción devuelta
+for the game	por la partida
+for the win	por la victoria
+games counted	partidas contadas
+games left unfinished	partidas abandonadas
+potting success	acierto
+shots with a foul	tiros con falta
+starts in {n} min	empieza en {n} min
+tournament prize	premio de torneo
+turning around the table	girando alrededor de la mesa
+vs	vs
+{from} gave you {item}!	¡{from} te regaló {item}!
+{item} is yours and already in use.	{item} es tuyo y ya está en uso.
+{m}:{s} left	quedan {m}:{s}
+{name} invites you to play.	{name} te invita a jugar.
+{name} is online.	{name} está en línea.
+{name} ran out of time.	A {name} se le acabó el tiempo.
+{name} received {item}.	{name} recibió {item}.
+{n} pts · {g} games	{n} pts · {g} partidas
+{n} watching · avg {r}	{n} mirando · media {r}
+{title}: {how}	{title}: {how}
+Olive	Oliva
+Navy	Azul marino
+Forest	Bosque
+Slate grey	Gris pizarra
+Red wine	Vino tinto
+Burnt orange	Naranja quemado
+Dusty rose	Rosa empolvado
+Sand	Arena
+Ice blue	Azul hielo
+Lime	Lima
+Black tie	Etiqueta negra
+Cobalt	Cobalto
+Emerald	Esmeralda
+Natural maple	Arce natural
+Walnut	Nogal
+Zebrawood	Zebrano
+Bocote	Bocote
+Deep ocean	Océano profundo
+Cherry	Cerezo
+Jade	Jade
+Tiger	Tigre
+Amethyst	Amatista
+Arctic carbon	Carbono ártico
+Inferno	Infierno
+Obsidian gold	Obsidiana y oro
+Tan chalk	Tiza beige
+Grey chalk	Tiza gris
+Orange chalk	Tiza naranja
+Pink chalk	Tiza rosa
+Teal chalk	Tiza verde azulado
+Yellow chalk	Tiza amarilla
+Black chalk	Tiza negra
+White chalk	Tiza blanca
+Silver chalk	Tiza plateada
+TV set	Juego de TV
+Earth tones	Tonos tierra
+Ocean	Océano
+Sunset	Atardecer
+Candy	Caramelo
+Pearl	Perla
+Monochrome	Monocromo
+Chrome	Cromo
+Gold rush	Fiebre del oro
+No frame	Sin marco
+Bronze	Bronce
+Silver	Plata
+Gold	Oro
+Green felt	Fieltro verde
+Mahogany	Caoba
+Ice	Hielo
+Fire	Fuego
+Diamond	Diamante
+VIP crown	Corona VIP
+Rose gold	Oro rosa
+Aqua	Aguamarina
+Violet	Violeta
+Ember	Brasa
+Mint	Menta
+Frost	Escarcha
+No effect	Sin efecto
+Sparks	Chispas
+Confetti	Confeti
+Shockwave	Onda expansiva
+Coin shower	Lluvia de monedas
+Flames	Llamas
+Royal sparks	Chispas reales
+Tier colour	Color de la categoría
+16-player tournaments are for VIP members.	Los torneos de 16 jugadores son para miembros VIP.
+A seat opened: you are in the tournament!	Se abrió un lugar: ¡estás en el torneo!
+Entry fees go up to 1000 coins.	La inscripción llega hasta 1000 monedas.
+Guests can't play for coins.	Los invitados no pueden jugar por monedas.
+Only items sold for coins can be given.	Solo se pueden regalar objetos que se venden por monedas.
+Password changed.	Contraseña cambiada.
+Passwords need 8 or more characters, not only digits.	La contraseña necesita 8 o más caracteres, no solo números.
+Recovery e-mail removed.	Correo de recuperación eliminado.
+Recovery e-mail saved.	Correo de recuperación guardado.
+Something went wrong. Please try again.	Algo salió mal. Inténtalo de nuevo.
+That code is not valid (or the table was closed).	Ese código no es válido (o la mesa se cerró).
+That doesn't look like an e-mail address.	Eso no parece una dirección de correo.
+That game is over.	Esa partida terminó.
+The current password is wrong.	La contraseña actual es incorrecta.
+The server is restarting.	El servidor se está reiniciando.
+The server is restarting: new games start in a moment.	El servidor se está reiniciando: las nuevas partidas empiezan en un momento.
+The tournament is full: you are on the waiting list.	El torneo está lleno: estás en la lista de espera.
+This replay is not available.	Esta repetición no está disponible.
+You can only give items to your friends.	Solo puedes regalar objetos a tus amigos.
+Your friend already has this item.	Tu amigo ya tiene este objeto.
+16 (VIP)	16 (VIP)

@@ -79,7 +79,7 @@ pub fn date(at: i64) -> String {
     let m = if mp < 10 { mp + 3 } else { mp - 9 };
     let y = yoe + era * 400 + if m <= 2 { 1 } else { 0 };
     match crate::i18n::lang() {
-        crate::i18n::Lang::Portuguese => format!("{d:02}/{m:02}/{y}"),
+        crate::i18n::Lang::Portuguese | crate::i18n::Lang::Spanish => format!("{d:02}/{m:02}/{y}"),
         crate::i18n::Lang::English => format!("{y}-{m:02}-{d:02}"),
     }
 }
