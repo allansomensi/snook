@@ -14,6 +14,11 @@
   and while the game loads.
 
 ### Fixes
+- Installing a newer beta over an older one with the .msi kept the old
+  game: Windows Installer ignores the fourth part of a version (the beta
+  number), so it saw the same version and left the old snook.exe, whose
+  file version was also the same. Newer builds now replace older ones of the
+  same version, and snook.exe carries the beta number in its version.
 - The bottom and right cushions were darker than the others: their faces
   were wound the other way, so the light hit them from behind.
 - The side pockets showed a black trapezoid between the jaws: the cloth

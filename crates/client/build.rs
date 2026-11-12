@@ -10,9 +10,14 @@ fn main() {
         return;
     }
     let version = std::env::var("CARGO_PKG_VERSION").unwrap();
-    let mut parts = version.split(['.', '-', '+']).map(|p| p.parse::<u16>().unwrap_or(0));
+    // major.minor.patch, then the pre-release number (0.1.1-beta.2 is
+    // 0.1.1.2, as in the .msi), so each build has its own file version: the
+    // installer doesn't replace a snook.exe whose version is the same.
+    let (core, pre) = version.split_once('-').unwrap_or((&version, ""));
+    let mut parts = core.split('.').map(|p| p.parse::<u16>().unwrap_or(0));
     let mut next = || parts.next().unwrap_or(0);
-    let numeric = format!("{},{},{},0", next(), next(), next());
+    let pre = pre.rsplit('.').next().and_then(|n| n.parse::<u16>().ok()).unwrap_or(0);
+    let numeric = format!("{},{},{},{pre}", next(), next(), next());
     let manifest = PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap());
     let icon = manifest.join("assets/icon/snook.ico").display().to_string().replace('\\', "/");
     // Written out with the values in place: no macros to quote for rc.exe or windres.

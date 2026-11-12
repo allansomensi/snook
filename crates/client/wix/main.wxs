@@ -46,7 +46,13 @@
             SummaryCodepage='1252'
             />
 
+        <!-- Windows Installer compares only the first three parts of a
+             version, and the betas differ only in the fourth (0.1.1-beta.2
+             is 0.1.1.2): without AllowSameVersionUpgrades a new beta would
+             be installed next to the old one and keep its snook.exe. The old
+             version is removed before the new one is installed. -->
         <MajorUpgrade
+            AllowSameVersionUpgrades='yes'
             Schedule='afterInstallInitialize'
             DowngradeErrorMessage='A newer version of [ProductName] is already installed. Setup will now exit.'/>
 
