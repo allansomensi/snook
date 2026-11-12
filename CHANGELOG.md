@@ -1,6 +1,12 @@
 # Changelog
 
-## Unreleased
+## 0.1.2 (protocol 11)
+
+### The game is called Snookered
+- New name everywhere: window, menus, lounge, notifications, the installer
+  and its shortcuts, the server's messages and pages. Installing 0.1.2 over
+  0.1.1 replaces it (now in `Program Files\Snookered`); the settings moved to
+  a new folder, so sign in again once.
 
 ### Distribution
 - The Microsoft Store version: an MSIX package built by the *Microsoft Store*
@@ -8,11 +14,21 @@
   submission (`docs/MSSTORE.md`). It sells nothing through the game's own
   payment pages (coins come from playing), has the C runtime built in, and
   opens the local network ports in the firewall.
+- Pictures for the Store pages: screenshots in three languages
+  (`store-screenshots/`) and the poster, box art, tile icons and hero art
+  (`store-art/`, made by `tools/store_art.py`).
 
 ### Server
 - The privacy policy, in Portuguese (`/privacidade`) and English
   (`/privacy`); `SNOOKERED_GAME_NAME`, `SNOOKERED_PRIVACY_CONTROLLER` and
   `SNOOKERED_PRIVACY_CONTACT` fill in its names.
+- Environment variables are now `SNOOKERED_*`.
+- A test keeps migrations already applied in production unchanged (the
+  server refuses to start when one is edited).
+
+### Fixes
+- Lounge: the featured game's "watching · average" line ran into a long
+  label ("EN LA TELE" in Spanish).
 
 ## 0.1.1 (protocol 11)
 
