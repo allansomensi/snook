@@ -132,7 +132,7 @@ fn parse_args() -> LaunchOptions {
             "--frames" => o.frames = args.next().and_then(|s| s.parse().ok()).unwrap_or(120),
             "--help" | "-h" => {
                 println!(
-                    "Snook\n\n  --vs <easy|medium|hard>  play the computer\n  --hotseat                two players\n  \
+                    "Snookered\n\n  --vs <easy|medium|hard>  play the computer\n  --hotseat                two players\n  \
                      --demo                   computer vs computer\n  --top-view               overhead camera\n  \
                      --online                 open the online lounge\n  \
                      --settings               open the settings\n  \
@@ -159,7 +159,7 @@ fn window_conf() -> macroquad::conf::Conf {
         .and_then(|(w, h)| Some((w.parse().ok()?, h.parse().ok()?)))
         .unwrap_or((1280, 760));
     let window = Conf {
-        window_title: "Snook".into(),
+        window_title: snook_proto::GAME_NAME.into(),
         window_width: size.0,
         window_height: size.1,
         // Safe graphics mode (troubleshooting) also turns multisampling off.
@@ -220,7 +220,7 @@ async fn main() {
         let size = (screen_height() * 0.22).clamp(96.0, 220.0);
         icon::draw((screen_width() - size) / 2.0, screen_height() / 2.0 - size * 0.75, size);
         ui.text_centered(
-            "SNOOK",
+            &snook_proto::GAME_NAME.to_uppercase(),
             screen_width() / 2.0,
             screen_height() / 2.0 + size * 0.35,
             32.0,

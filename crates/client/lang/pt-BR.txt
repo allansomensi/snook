@@ -1,4 +1,4 @@
-# Snook: Brazilian Portuguese.
+# Snookered: Brazilian Portuguese.
 # One text per line: the English text (as written in the code), a tab, the translation.
 # Placeholders like {name} must stay as they are; \n is a new line.
 {name} is on the 8: called pocket {pocket}	{name} está na bola 8: caçapa cantada {pocket}
@@ -306,7 +306,7 @@ That tournament has already started.	Esse torneio já começou.
 That tournament is full.	Esse torneio está cheio.
 That tournament no longer exists.	Esse torneio não existe mais.
 The first connection of the day can take up to a minute while the server wakes up.	A primeira conexão do dia pode levar até um minuto enquanto o servidor acorda.
-The first time, allow Snook through the firewall when asked.	Na primeira vez, permita o Snook no firewall quando for perguntado.
+The first time, allow Snookered through the firewall when asked.	Na primeira vez, permita o Snookered no firewall quando for perguntado.
 The server could not play that shot.	O servidor não conseguiu jogar essa tacada.
 The server is busy. Try again in a moment.	O servidor está ocupado. Tente de novo em instantes.
 The tournament starts when it is full (the host can start it earlier).	O torneio começa quando lotar (o anfitrião pode começar antes).
@@ -575,7 +575,7 @@ call a pocket for the 8-ball	cante a caçapa da bola 8
 That username is taken.	Esse nome de usuário já existe.
 Wrong username or password.	Usuário ou senha incorretos.
 Your session expired. Please log in again.	Sua sessão expirou. Entre novamente.
-This version of Snook is out of date. Please update the game.	Esta versão do Snook está desatualizada. Atualize o jogo.
+This version of Snookered is out of date. Please update the game.	Esta versão do Snookered está desatualizada. Atualize o jogo.
 It's not your turn.	Não é a sua vez.
 That player is not online.	Esse jogador não está online.
 That player is in a game.	Esse jogador está em uma partida.
@@ -594,7 +594,7 @@ The server took too long to answer.	O servidor demorou demais para responder.
 The server is not answering (connection refused).	O servidor não está respondendo (conexão recusada).
 The server address is not valid (example: wss://snook.example.com/ws).	O endereço do servidor não é válido (exemplo: wss://snook.exemplo.com/ws).
 The server address has no host name.	O endereço do servidor não tem nome de host.
-Welcome to Snook! Be kind, play fair.	Bem-vindo ao Snook! Seja gentil, jogue limpo.
+Welcome to Snookered! Be kind, play fair.	Bem-vindo ao Snookered! Seja gentil, jogue limpo.
 Ball in hand: drag the cue ball{zone} to move it	Bola na mão: arraste a branca{zone} para movê-la
  behind the line	 atrás da linha
 Ball in hand  ·  {group}	Bola na mão  ·  {group}
@@ -740,7 +740,7 @@ Great!	Ótimo!
 If you forget your password, we confirm it's you by this e-mail.	Se você esquecer a senha, confirmamos que é você por este e-mail.
 Invite with a code	Convidar com código
 It goes on right away. Items only change the look, never the game.	Já entra em uso. Itens só mudam a aparência, nunca o jogo.
-Join my table in Snook:	Venha jogar na minha mesa no Snook:
+Join my table in Snookered:	Venha jogar na minha mesa no Snookered:
 Join the waiting list	Entrar na lista de espera
 Join · {n} coins	Entrar · {n} moedas
 Knockout	Mata-mata

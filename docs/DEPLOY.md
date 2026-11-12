@@ -1,4 +1,4 @@
-# Running the Snook server
+# Running the Snookered server
 
 The server is a single executable (`snook-server`) that keeps the lounge and
 running matches in memory and stores accounts, ratings, history,
@@ -54,7 +54,7 @@ sudo cp target/release/snook-server /usr/local/bin/
 
 ```ini
 [Unit]
-Description=Snook game server
+Description=Snookered game server
 After=network.target postgresql.service
 
 [Service]

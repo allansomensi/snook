@@ -272,12 +272,12 @@ pub async fn cancelled() -> Html<&'static str> {
 }
 
 const PAGE_THANKS: &str = "<!doctype html><meta charset=utf-8><meta name=viewport content='width=device-width'>\
-<title>Snook</title><body style='background:#140d08;color:#efe3cc;font:18px system-ui;text-align:center;padding:12vh 20px'>\
+<title>Snookered</title><body style='background:#140d08;color:#efe3cc;font:18px system-ui;text-align:center;padding:12vh 20px'>\
 <h1 style='color:#e8bf61'>Obrigado! · Thank you!</h1><p>Pode voltar ao jogo: a compra aparece em instantes.</p>\
 <p>You can go back to the game: your purchase appears in a moment.</p></body>";
 
 const PAGE_CANCELLED: &str = "<!doctype html><meta charset=utf-8><meta name=viewport content='width=device-width'>\
-<title>Snook</title><body style='background:#140d08;color:#efe3cc;font:18px system-ui;text-align:center;padding:12vh 20px'>\
+<title>Snookered</title><body style='background:#140d08;color:#efe3cc;font:18px system-ui;text-align:center;padding:12vh 20px'>\
 <h1 style='color:#e8bf61'>Compra cancelada · Purchase cancelled</h1><p>Nada foi cobrado. · Nothing was charged.</p></body>";
 
 fn str_of<'a>(v: &'a Value, key: &str) -> Option<&'a str> {

@@ -39,12 +39,12 @@ BEGIN
     BEGIN
         BLOCK "040904b0"
         BEGIN
-            VALUE "FileDescription", "Snook"
+            VALUE "FileDescription", "Snookered"
             VALUE "FileVersion", "{version}"
             VALUE "InternalName", "snook"
             VALUE "LegalCopyright", "MIT License"
             VALUE "OriginalFilename", "snook.exe"
-            VALUE "ProductName", "Snook"
+            VALUE "ProductName", "Snookered"
             VALUE "ProductVersion", "{version}"
         END
     END

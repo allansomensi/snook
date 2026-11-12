@@ -809,7 +809,7 @@ async fn handle_socket(server: Arc<Server>, socket: WebSocket, ip: IpAddr) {
                 ClientMsg::Hello { version } if version == PROTOCOL_VERSION => hello = true,
                 ClientMsg::Hello { .. } => {
                     send(ServerMsg::AuthError {
-                        reason: "This version of Snook is out of date. Please update the game."
+                        reason: "This version of Snookered is out of date. Please update the game."
                             .into(),
                     });
                     break;

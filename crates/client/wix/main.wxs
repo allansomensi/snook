@@ -1,12 +1,12 @@
 <?xml version='1.0' encoding='windows-1252'?>
 <!--
-  The Windows installer (.msi) of Snook, built by dist with cargo-wix
+  The Windows installer (.msi) of Snookered, built by dist with cargo-wix
   (WiX Toolset 3). Based on cargo-wix's template, Copyright (C) 2017
   Christopher R. Field, Apache License 2.0.
 
   Edited by hand (dist-workspace.toml has allow-dirty = ["msi"], so
   `dist generate` leaves it alone):
-  - the game installs in Program Files\Snook, with a Start menu shortcut and
+  - the game installs in Program Files\Snookered, with a Start menu shortcut and
     an optional desktop shortcut, and no PATH entry (it isn't a command);
   - the emblem is the icon of the shortcuts and of "Installed apps";
   - the dialogs carry the emblem (assets\icon\wix-*.bmp, made by the
@@ -28,7 +28,7 @@
 
     <Product
         Id='*'
-        Name='Snook'
+        Name='Snookered'
         UpgradeCode='38A3FD0E-86A2-4518-A4AF-067047C4D793'
         Manufacturer='Allan Somensi'
         Language='1033'
@@ -37,7 +37,7 @@
 
         <Package Id='*'
             Keywords='Installer'
-            Description='Snook: 3D eight-ball pool'
+            Description='Snookered: 3D eight-ball pool'
             Manufacturer='Allan Somensi'
             InstallerVersion='450'
             Languages='1033'
@@ -57,7 +57,7 @@
             DowngradeErrorMessage='A newer version of [ProductName] is already installed. Setup will now exit.'/>
 
         <Media Id='1' Cabinet='media1.cab' EmbedCab='yes' DiskPrompt='CD-ROM #1'/>
-        <Property Id='DiskPrompt' Value='Snook Installation'/>
+        <Property Id='DiskPrompt' Value='Snookered Installation'/>
 
         <Icon Id='SnookIcon' SourceFile='$(var.Assets)\snook.ico'/>
         <Property Id='ARPPRODUCTICON' Value='SnookIcon'/>
@@ -66,7 +66,7 @@
 
         <Directory Id='TARGETDIR' Name='SourceDir'>
             <Directory Id='$(var.PlatformProgramFilesFolder)' Name='PFiles'>
-                <Directory Id='APPLICATIONFOLDER' Name='Snook'>
+                <Directory Id='APPLICATIONFOLDER' Name='Snookered'>
                     <Component Id='binary0' Guid='*'>
                         <File
                             Id='exe0'
@@ -86,7 +86,7 @@
                 <Component Id='StartMenuShortcut' Guid='67F2BA8F-B4E2-426A-940B-1EDA367ED15C'>
                     <Shortcut
                         Id='StartMenuShortcut'
-                        Name='Snook'
+                        Name='Snookered'
                         Description='3D eight-ball pool'
                         Target='[APPLICATIONFOLDER]snook.exe'
                         WorkingDirectory='APPLICATIONFOLDER'
@@ -104,7 +104,7 @@
                 <Component Id='DesktopShortcut' Guid='7C1D16AB-8E35-49A9-AB71-4A2B2AB8EC2D'>
                     <Shortcut
                         Id='DesktopShortcut'
-                        Name='Snook'
+                        Name='Snookered'
                         Description='3D eight-ball pool'
                         Target='[APPLICATIONFOLDER]snook.exe'
                         WorkingDirectory='APPLICATIONFOLDER'
@@ -122,7 +122,7 @@
 
         <Feature
             Id='Binaries'
-            Title='Snook'
+            Title='Snookered'
             Description='The game, with a shortcut in the Start menu.'
             Level='1'
             ConfigurableDirectory='APPLICATIONFOLDER'
@@ -136,7 +136,7 @@
             <Feature
                 Id='Desktop'
                 Title='Desktop shortcut'
-                Description='A shortcut to Snook on the desktop.'
+                Description='A shortcut to Snookered on the desktop.'
                 Level='1'
                 AllowAdvertise='no'
                 Absent='allow'>

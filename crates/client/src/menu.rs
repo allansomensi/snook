@@ -66,8 +66,9 @@ impl Menu {
         let size = 92.0;
         crate::icon::draw(left - 4.0, top + 2.0, size);
         let tx = left + size + 10.0;
-        ui.text("SNOOK", tx + 3.0, top + 3.0, 64.0, Color::new(0.0, 0.0, 0.0, 0.6), true);
-        ui.text("SNOOK", tx, top, 64.0, GOLD, true);
+        let name = snook_proto::GAME_NAME.to_uppercase();
+        ui.text(&name, tx + 3.0, top + 3.0, 64.0, Color::new(0.0, 0.0, 0.0, 0.6), true);
+        ui.text(&name, tx, top, 64.0, GOLD, true);
         ui.text(t("eight-ball pool"), tx + 4.0, top + 74.0, 17.0, CREAM, false);
 
         // The four ways to play.

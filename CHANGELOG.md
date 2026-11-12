@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### The game's name
+- The game is now called **Snookered** everywhere players see it: window,
+  menu, lounge, notifications, the installer and its shortcuts, the
+  server's messages and web pages, and the Microsoft Store package. The
+  name lives in one constant (`snook_proto::GAME_NAME`). Internal names
+  (the `snook` executable and crates, the settings folder, the LAN beacon)
+  are unchanged, so updating keeps settings and sign-ins.
+
 ### Distribution
 - The Microsoft Store version: an MSIX package built by the *Microsoft Store*
   workflow from release tags and sent to Partner Center as a draft

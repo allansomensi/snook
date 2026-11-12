@@ -34,6 +34,11 @@ pub struct PackOffer {
 /// The `seat` of a reaction sent by a spectator.
 pub const SPECTATOR_SEAT: usize = 2;
 
+/// The game's name, as players see it (window, menus, store, web pages).
+/// Internal names (the `snook` crates and executable, the settings folder,
+/// the LAN beacon) stay as they are, so updates keep working.
+pub const GAME_NAME: &str = "Snookered";
+
 /// Bumped whenever messages change incompatibly.
 pub const PROTOCOL_VERSION: u32 = 11;
 

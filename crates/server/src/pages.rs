@@ -30,7 +30,7 @@ pub struct PrivacyInfo {
 impl Default for PrivacyInfo {
     fn default() -> Self {
         PrivacyInfo {
-            game: "Snook".into(),
+            game: snook_proto::GAME_NAME.into(),
             controller: "Allan Somensi".into(),
             contact: format!("{}/issues", env!("CARGO_PKG_REPOSITORY")),
         }

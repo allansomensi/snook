@@ -1,6 +1,6 @@
 [package]
 name = "snook"
-description = "Snook: a lightweight 3D eight-ball pool game with an online lounge"
+description = "Snookered: a lightweight 3D eight-ball pool game with an online lounge"
 authors = ["Allan Somensi"]
 version.workspace = true
 edition.workspace = true

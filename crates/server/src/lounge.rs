@@ -63,7 +63,7 @@ impl Default for Rules {
             shot_clock: Duration::from_secs(30),
             reconnect_grace: Duration::from_secs(60),
             chat_history: 60,
-            motd: "Welcome to Snook! Be kind, play fair.".into(),
+            motd: format!("Welcome to {}! Be kind, play fair.", snook_proto::GAME_NAME),
             lan: false,
             max_connections_per_ip: 12,
             tournament_no_show: Duration::from_secs(120),
@@ -627,7 +627,7 @@ impl Lounge {
             return;
         }
         let line = ChatLine {
-            from: "Snook".into(),
+            from: snook_proto::GAME_NAME.into(),
             text,
             at: now(),
             kind: ChatKind::Announcement,

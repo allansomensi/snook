@@ -17,7 +17,7 @@
 //! | `SNOOK_STRIPE_WEBHOOK_SECRET` | — | Stripe webhook signing secret |
 //! | `SNOOK_STRIPE_PRICES` | — | `code=price_id\|label;…` for coin packs and `vip_monthly` |
 //! | `SNOOK_PUBLIC_URL` | — | the server's public address (payment return pages) |
-//! | `SNOOK_GAME_NAME` | `Snook` | the game's name on the privacy policy (`/privacidade`, `/privacy`) |
+//! | `SNOOK_GAME_NAME` | `Snookered` | the game's name on the privacy policy (`/privacidade`, `/privacy`) |
 //! | `SNOOK_PRIVACY_CONTROLLER` | the developer | who is responsible for the data, on the policy |
 //! | `SNOOK_PRIVACY_CONTACT` | the repository's issues | e-mail or web address for privacy requests |
 //! | `SNOOK_DRAIN_SECS` | `240` | on SIGTERM: how long games in progress may go on before they are handed to the next server |
@@ -110,7 +110,11 @@ async fn main() {
         }
     };
     let listener = TcpListener::bind(bind).await.expect("could not bind the server address");
-    tracing::info!("Snook server {} listening on {bind}", env!("CARGO_PKG_VERSION"));
+    tracing::info!(
+        "{} server {} listening on {bind}",
+        snook_proto::GAME_NAME,
+        env!("CARGO_PKG_VERSION")
+    );
     let shutdown = async {
         let ctrl_c = tokio::signal::ctrl_c();
         #[cfg(unix)]

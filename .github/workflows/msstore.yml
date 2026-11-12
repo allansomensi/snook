@@ -95,10 +95,10 @@ jobs:
         run: |
           # Placeholder identity until Partner Center's is set (enough to
           # check the packaging; the Store only accepts its own).
-          $id = if ("${{ vars.MSSTORE_IDENTITY_NAME }}") { "${{ vars.MSSTORE_IDENTITY_NAME }}" } else { "Snook.Development" }
-          $pub = if ("${{ vars.MSSTORE_PUBLISHER }}") { "${{ vars.MSSTORE_PUBLISHER }}" } else { "CN=Snook Development" }
-          $pubName = if ("${{ vars.MSSTORE_PUBLISHER_DISPLAY_NAME }}") { "${{ vars.MSSTORE_PUBLISHER_DISPLAY_NAME }}" } else { "Snook" }
-          $name = if ("${{ vars.MSSTORE_DISPLAY_NAME }}") { "${{ vars.MSSTORE_DISPLAY_NAME }}" } else { "Snook" }
+          $id = if ("${{ vars.MSSTORE_IDENTITY_NAME }}") { "${{ vars.MSSTORE_IDENTITY_NAME }}" } else { "Snookered.Development" }
+          $pub = if ("${{ vars.MSSTORE_PUBLISHER }}") { "${{ vars.MSSTORE_PUBLISHER }}" } else { "CN=Snookered Development" }
+          $pubName = if ("${{ vars.MSSTORE_PUBLISHER_DISPLAY_NAME }}") { "${{ vars.MSSTORE_PUBLISHER_DISPLAY_NAME }}" } else { "Snookered" }
+          $name = if ("${{ vars.MSSTORE_DISPLAY_NAME }}") { "${{ vars.MSSTORE_DISPLAY_NAME }}" } else { "Snookered" }
           ./tools/msix/make-msix.ps1 -IdentityName $id -Publisher $pub -PublisherDisplayName $pubName -DisplayName $name
       - uses: actions/upload-artifact@v4
         with:

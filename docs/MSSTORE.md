@@ -126,15 +126,24 @@ desenvolvedores), no PowerShell, na pasta do projeto:
 ```powershell
 $env:RUSTFLAGS = "-C target-feature=+crt-static"
 cargo build --release --locked -p snook --features store
-./tools/msix/make-msix.ps1 -IdentityName Snook.Teste -Publisher "CN=Teste" `
-  -PublisherDisplayName "Teste" -DisplayName "Snook (teste)" -Register
+./tools/msix/make-msix.ps1 -IdentityName Snookered.Teste -Publisher "CN=Teste" `
+  -PublisherDisplayName "Teste" -DisplayName "Snookered (teste)" -Register
 ```
 
-O jogo aparece no menu Iniciar como "Snook (teste)". Para remover:
-**Configurações → Aplicativos → Snook (teste) → Desinstalar**.
+O jogo aparece no menu Iniciar como "Snookered (teste)". Para remover:
+**Configurações → Aplicativos → Snookered (teste) → Desinstalar**.
 
-## Quando o nome for escolhido
+## O nome
 
-O nome da Store vem das variáveis acima, mas o jogo ainda se chama "Snook"
-por dentro: título da janela, logotipo do menu, o "S" do emblema e os
-ícones. Trocar isso é uma mudança de código à parte.
+O jogo se chama **Snookered**. O nome que o jogador vê vem de uma constante só,
+`snook_proto::GAME_NAME` (janela, menu, salão, notificações, mensagens do
+servidor, páginas web); o instalador `.msi` (`crates/client/wix/main.wxs`),
+os metadados do `.exe` (`crates/client/build.rs`) e os textos traduzidos
+(`crates/client/lang/`) repetem o nome e mudam junto. Os nomes internos
+continuam `snook` (crates, `snook.exe`, a pasta de configurações, o
+identificador da rede local), para que atualizações e logins existentes
+continuem funcionando.
+
+Na Store, o nome vem das variáveis `MSSTORE_DISPLAY_NAME` (GitHub) e
+`SNOOK_GAME_NAME` (Render, para a política de privacidade); use **Snookered**
+nas duas.

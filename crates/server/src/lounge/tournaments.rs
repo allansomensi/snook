@@ -204,7 +204,7 @@ impl Lounge {
         TournamentInfo {
             id: t.id,
             name: t.name.clone(),
-            host: if t.host.is_empty() { "Snook".into() } else { display(&t.host) },
+            host: if t.host.is_empty() { snook_proto::GAME_NAME.into() } else { display(&t.host) },
             size: t.size,
             rated: t.rated,
             private: t.password.is_some(),

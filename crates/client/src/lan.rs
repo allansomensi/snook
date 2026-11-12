@@ -205,7 +205,7 @@ impl LanScreen {
             ui.text(e, x, y, 12.0, ALERT, false);
         } else {
             ui.text(
-                t("The first time, allow Snook through the firewall when asked."),
+                t("The first time, allow Snookered through the firewall when asked."),
                 x,
                 y,
                 12.0,

@@ -1,10 +1,10 @@
-<p align="center"><img src="crates/client/assets/icon/snook-256.png" width="128" alt="Snook"></p>
+<p align="center"><img src="crates/client/assets/icon/snook-256.png" width="128" alt="Snookered"></p>
 
-# Snook
+# Snookered
 
 A lightweight 3D eight-ball pool game for the desktop, written in Rust.
 
-Snook is built around what made the old online pool rooms special: a realistic
+Snookered is built around what made the old online pool rooms special: a realistic
 cue (spin, draw, follow, jump and massé shots), a lounge where you meet people and
 chat, invitations, open tables and tournaments, friends, achievements, and a
 world ranking that keeps everyone coming back.

@@ -271,7 +271,7 @@ impl Config {
 
     pub fn to_text(&self) -> String {
         format!(
-            "# Snook settings\nplayer_name = {}\nsecond_player_name = {}\nguide = {}\nshow_help = {}\nshot_camera = {}\ncamera_follow = {}\ngraphics_checked = {}\nlanguage = {}\nvignette = {}\nfocused_scene = {}\nshow_fps = {}\nshow_ping = {}\naim_sensitivity = {:.2}\nui_size = {:.2}\n\
+            "# Snookered settings\nplayer_name = {}\nsecond_player_name = {}\nguide = {}\nshow_help = {}\nshot_camera = {}\ncamera_follow = {}\ngraphics_checked = {}\nlanguage = {}\nvignette = {}\nfocused_scene = {}\nshow_fps = {}\nshow_ping = {}\naim_sensitivity = {:.2}\nui_size = {:.2}\n\
              quality = {}\nmsaa = {}\nfullscreen = {}\nvolume = {:.2}\nserver = {}\nusername = {}\ntoken = {}\n\
              difficulty = {}\nshot_clock = {}\nlan_name = {}\ncloth = {}\ncue = {}\nchalk = {}\nballs = {}\neffect = {}\nemail_offer_declined = {}\n",
             self.player_name,

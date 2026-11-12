@@ -874,7 +874,14 @@ impl ShopScreen {
         let offers = online.offers.clone().unwrap_or_default();
         let wallet = online.wallet.clone().unwrap_or_default();
         crate::icons::draw(Icon::Crown, vec2(area.x + 22.0, area.y + 18.0), 30.0, GOLD);
-        ui.text("Snook VIP", area.x + 48.0, area.y + 4.0, 24.0, GOLD, true);
+        ui.text(
+            &format!("{} VIP", snook_proto::GAME_NAME),
+            area.x + 48.0,
+            area.y + 4.0,
+            24.0,
+            GOLD,
+            true,
+        );
         let mut y = area.y + 50.0;
         let exclusives: Vec<String> =
             ITEMS.iter().filter(|i| i.price == Price::Vip).map(|i| t(i.name).to_string()).collect();

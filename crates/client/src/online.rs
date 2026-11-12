@@ -1145,8 +1145,9 @@ impl Online {
             action = OnlineAction::Leave;
         }
         crate::icon::draw(header.x + 52.0, header.y + 8.0, 36.0);
-        ui.text("SNOOK", header.x + 96.0, header.y + 12.0, 24.0, GOLD, true);
-        let title_w = ui.text_size("SNOOK", 24.0, true).x;
+        let name = snook_proto::GAME_NAME.to_uppercase();
+        ui.text(&name, header.x + 96.0, header.y + 12.0, 24.0, GOLD, true);
+        let title_w = ui.text_size(&name, 24.0, true).x;
         let title = if self.lan { t("LAN game") } else { t("lounge") };
         ui.text(title, header.x + 106.0 + title_w, header.y + 19.0, 15.0, MUTED, false);
         let online_text = match self.rtt.filter(|_| config.show_ping) {
@@ -1660,7 +1661,7 @@ impl Online {
             if ui.button(Rect::new(r.x + r.w - 92.0, r.y + 9.0, 82.0, 30.0), t("Copy"), true) {
                 macroquad::miniquad::window::clipboard_set(&format!(
                     "{} {link}",
-                    t("Join my table in Snook:")
+                    t("Join my table in Snookered:")
                 ));
                 self.toast(t("Copied: send it to a friend."), true);
             }
