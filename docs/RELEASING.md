@@ -22,11 +22,11 @@ The one-line installers download the right archive for the computer and put
 `snookered` in `~/.local/bin` (or `$XDG_BIN_HOME`):
 
 ```bash
-curl --proto '=https' --tlsv1.2 -LsSf https://github.com/allansomensi/snook/releases/latest/download/snookered-installer.sh | sh
+curl --proto '=https' --tlsv1.2 -LsSf https://github.com/allansomensi/snookered/releases/latest/download/snookered-installer.sh | sh
 ```
 
 ```powershell
-powershell -ExecutionPolicy Bypass -c "irm https://github.com/allansomensi/snook/releases/latest/download/snookered-installer.ps1 | iex"
+powershell -ExecutionPolicy Bypass -c "irm https://github.com/allansomensi/snookered/releases/latest/download/snookered-installer.ps1 | iex"
 ```
 
 The Microsoft Store gets its own package (MSIX) from the same tag; see

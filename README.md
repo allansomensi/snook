@@ -20,7 +20,7 @@ world ranking that keeps everyone coming back.
 ## Download
 
 Get the latest version from the
-[Releases page](https://github.com/allansomensi/snook/releases/latest):
+[Releases page](https://github.com/allansomensi/snookered/releases/latest):
 
 - **Windows**: `snookered-x86_64-pc-windows-msvc.msi` installs the game with a
   Start menu (and optional desktop) shortcut; the `.zip` is a portable copy.
@@ -28,13 +28,13 @@ Get the latest version from the
   `.tar.xz` for your computer, or install from a terminal:
 
   ```bash
-  curl --proto '=https' --tlsv1.2 -LsSf https://github.com/allansomensi/snook/releases/latest/download/snookered-installer.sh | sh
+  curl --proto '=https' --tlsv1.2 -LsSf https://github.com/allansomensi/snookered/releases/latest/download/snookered-installer.sh | sh
   ```
 
 - **Windows from PowerShell**:
 
   ```powershell
-  powershell -ExecutionPolicy Bypass -c "irm https://github.com/allansomensi/snook/releases/latest/download/snookered-installer.ps1 | iex"
+  powershell -ExecutionPolicy Bypass -c "irm https://github.com/allansomensi/snookered/releases/latest/download/snookered-installer.ps1 | iex"
   ```
 
 On Linux the game needs the usual desktop libraries (ALSA, X11, OpenGL),

@@ -7,7 +7,7 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
-homepage = "https://github.com/allansomensi/snook"
+homepage = "https://github.com/allansomensi/snookered"
 readme = "../../README.md"
 
 [package.metadata.wix]

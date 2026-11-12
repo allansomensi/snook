@@ -61,8 +61,8 @@
 
         <Icon Id='SnookeredIcon' SourceFile='$(var.Assets)\snookered.ico'/>
         <Property Id='ARPPRODUCTICON' Value='SnookeredIcon'/>
-        <Property Id='ARPHELPLINK' Value='https://github.com/allansomensi/snook'/>
-        <Property Id='ARPURLINFOABOUT' Value='https://github.com/allansomensi/snook'/>
+        <Property Id='ARPHELPLINK' Value='https://github.com/allansomensi/snookered'/>
+        <Property Id='ARPURLINFOABOUT' Value='https://github.com/allansomensi/snookered'/>
 
         <Directory Id='TARGETDIR' Name='SourceDir'>
             <Directory Id='$(var.PlatformProgramFilesFolder)' Name='PFiles'>
