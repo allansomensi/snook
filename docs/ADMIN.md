@@ -20,8 +20,9 @@ API, CORS and a second set of credentials for no gain at this size.
 | Change roles, reset a password, change the welcome message | | | ✓ |
 
 The first administrators come from `SNOOKERED_ADMINS`; they can then promote
-others from the panel. Nobody can act on their own account (except signing
-out everywhere).
+others from the panel. Nobody can act on their own account, except signing
+out everywhere and, for administrators, their own wallet (coins, items and
+VIP days), which goes in the audit log like any other change.
 
 ## What each action does
 

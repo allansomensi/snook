@@ -768,6 +768,23 @@ async fn admin_panel_requires_staff() {
     )
     .await;
     assert_eq!(code, 200);
+    // An administrator may change their own wallet, not ban themselves.
+    let (code, body) = request(
+        &host,
+        "POST",
+        "/admin/api/users/boss/coins",
+        &token,
+        r#"{"coins":500,"reason":"test"}"#,
+    )
+    .await;
+    assert_eq!(code, 200, "{body}");
+    let (code, body) =
+        request(&host, "POST", "/admin/api/users/boss/vip", &token, r#"{"days":30,"reason":"t"}"#)
+            .await;
+    assert_eq!(code, 200, "{body}");
+    let (code, _) =
+        request(&host, "POST", "/admin/api/users/boss/ban", &token, r#"{"reason":"x"}"#).await;
+    assert_eq!(code, 400, "nobody bans themselves");
     // Eve can't sign in while banned.
     let mut c = Client::connect(&url).await;
     c.send(ClientMsg::Login { username: "eve".into(), password: PASSWORD.into() }).await;

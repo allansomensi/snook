@@ -454,11 +454,14 @@ async fn user_action(
     let s = staff(&server, &headers).await?;
     let body = body.map(|b| b.0).unwrap_or_default();
     let target = find(&server, &name).await?;
-    // Moderators can't act on other staff; nobody acts on themselves.
+    // Moderators can't act on other staff. Nobody bans, mutes or changes the
+    // role of their own account; an administrator may change their own
+    // wallet (coins, items, VIP), which is in the audit log like any other.
     if target.role.is_staff() && s.user.role != Role::Admin {
         return Err(err(StatusCode::FORBIDDEN, "Only administrators can act on staff."));
     }
-    if target.id == s.user.id && action != "logout-all" {
+    let own_wallet = matches!(action.as_str(), "coins" | "item" | "vip");
+    if target.id == s.user.id && action != "logout-all" && !own_wallet {
         return Err(err(StatusCode::BAD_REQUEST, "You can't do that to yourself."));
     }
     let reason = clean_text(&body.reason, 300);
