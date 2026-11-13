@@ -251,7 +251,7 @@ pub fn draw(x: f32, y: f32, size: f32) {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     #[test]
     fn icon_has_transparent_corners_and_opaque_middle() {
         let px = super::render(32);
@@ -336,12 +336,26 @@ mod tests {
         let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("msix/Assets");
         std::fs::create_dir_all(&dir).unwrap();
         // RGBA, transparent around the emblem: (file, width, height, emblem size).
-        for (name, w, h, e) in [
-            ("Square44x44Logo.png", 88, 88, 88),
-            ("Square150x150Logo.png", 300, 300, 216),
-            ("Wide310x150Logo.png", 620, 300, 216),
-            ("StoreLogo.png", 100, 100, 100),
-        ] {
+        let mut files: Vec<(String, usize, usize, usize)> = vec![
+            ("Square44x44Logo.scale-200.png".into(), 88, 88, 88),
+            ("Square150x150Logo.png".into(), 300, 300, 216),
+            ("Wide310x150Logo.png".into(), 620, 300, 216),
+            ("StoreLogo.png".into(), 100, 100, 100),
+        ];
+        // The app list, the taskbar and the title bar ask for these exact
+        // sizes. Without the "unplated" ones Windows draws the icon on a
+        // square of the accent colour (the blue plate).
+        for size in MSIX_TARGET_SIZES {
+            for form in ["", "_altform-unplated", "_altform-lightunplated"] {
+                files.push((
+                    format!("Square44x44Logo.targetsize-{size}{form}.png"),
+                    size,
+                    size,
+                    size,
+                ));
+            }
+        }
+        for (name, w, h, e) in files {
             let emblem = super::render(e);
             let mut px = vec![0u8; w * h * 4];
             let (ox, oy) = ((w - e) / 2, (h - e) / 2);
@@ -361,6 +375,9 @@ mod tests {
             std::fs::write(dir.join(name), bytes).unwrap();
         }
     }
+
+    /// The icon sizes the Windows shell asks a packaged app for.
+    pub const MSIX_TARGET_SIZES: [usize; 9] = [16, 20, 24, 32, 40, 48, 64, 96, 256];
 
     /// An RGB picture: `background(x, y)` with emblems `(size, x, y)` on top.
     fn picture(

@@ -70,15 +70,32 @@ if ($manifest -match '\{\{[A-Z_]+\}\}') { throw "A value was left out of the man
 [xml] $manifest | Out-Null
 Set-Content -Path (Join-Path $stage "AppxManifest.xml") -Value $manifest -Encoding UTF8
 
+# A tool from the newest Windows SDK.
+function Find-SdkTool([string] $name) {
+    Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\$name" -ErrorAction SilentlyContinue |
+        Sort-Object FullName | Select-Object -Last 1
+}
+
+# The resource index. The icons come in several sizes and "unplated" forms
+# (Square44x44Logo.targetsize-32_altform-unplated.png…); without
+# resources.pri Windows can't find them and draws the icon on a plate of
+# the accent colour.
+$makepri = Find-SdkTool "makepri.exe"
+if (-not $makepri) { throw "makepri.exe not found: install the Windows SDK." }
+$priconfig = Join-Path $Out "priconfig.xml"
+& $makepri.FullName createconfig /cf $priconfig /dq en-US /pv 10.0.0 /o
+if ($LASTEXITCODE -ne 0) { throw "makepri createconfig failed ($LASTEXITCODE)." }
+& $makepri.FullName new /pr $stage /cf $priconfig /mn (Join-Path $stage "AppxManifest.xml") `
+    /of (Join-Path $stage "resources.pri") /o
+if ($LASTEXITCODE -ne 0) { throw "makepri new failed ($LASTEXITCODE)." }
+
 if ($Register) {
     Add-AppxPackage -Register (Join-Path $stage "AppxManifest.xml")
     Write-Host "Registered ${DisplayName} ${msixVersion}: it is in the Start menu."
     exit 0
 }
 
-# makeappx from the newest Windows SDK.
-$makeappx = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\makeappx.exe" -ErrorAction SilentlyContinue |
-    Sort-Object FullName | Select-Object -Last 1
+$makeappx = Find-SdkTool "makeappx.exe"
 if (-not $makeappx) { throw "makeappx.exe not found: install the Windows SDK." }
 $package = Join-Path $Out "snookered-$msixVersion-x64.msix"
 & $makeappx.FullName pack /o /h SHA256 /d $stage /p $package
