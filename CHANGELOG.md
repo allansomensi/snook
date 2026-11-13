@@ -12,7 +12,10 @@ Not released yet: the server must go out together with the new game
   A tab beside the lounge chat shows them with the time left.
 - **The board**: notes the staff pin from the panel (for some days or
   until taken down), shown to everyone at once, with the tournaments open
-  for registration. A dot on the tab marks a note not read yet.
+  for registration. A dot on the tab marks a note not read yet. Notes are
+  notices (gold), events (green) or rules (blue), can be pinned at the top
+  and can carry a button (tournaments, shop, VIP, missions). The newest
+  also show on the main menu.
 - Notifications when a tournament starts in a few minutes or one you are
   in begins; Settings → Game turns system notifications off. On Windows
   the toast goes out under the game's Start menu entry, so it shows.
@@ -22,6 +25,11 @@ Not released yet: the server must go out together with the new game
   replay: a wide shot as a turn begins, from behind the shooter while they
   aim, and the rolling balls from above or a high corner. Moving the camera
   pauses it until the view is reset; Settings → Game turns it off.
+- **The crowd**: spectators click a player's card to cheer for them; a bar
+  under the cards shows how the spectators are split.
+- **Replays like a video**: pause, ½× to 4×, the shot before or after
+  (← →) and a time line to drag to any moment, marked where balls were
+  made and fouls committed.
 
 ### Games
 - The game against the computer is kept after every shot: closing the
@@ -32,8 +40,17 @@ Not released yet: the server must go out together with the new game
 ### Shop
 - Give a month of VIP to a friend (a one-off payment, the `vip_gift`
   price in `SNOOKERED_STRIPE_PRICES`). Not in the Microsoft Store version.
+- **The welcome pack**: once per account, the cue "First break" and the
+  cloth "Lagoon" (sold nowhere else) and 600 coins (the `welcome_pack`
+  price). Not in the Microsoft Store version.
 - The Coins tab says first that coins are earned by playing (as the Store
   version does); buying them is only an extra.
+
+### Updates
+- When the server refuses an old version, the sign-in page and the menu
+  offer the update: the Store's updates page for the Store version; the
+  installed (.msi) game downloads the new installer, closes and runs it;
+  other copies open the releases page. The saved session is kept.
 
 ### Server and panel
 - Administrators may change their own wallet (coins, items, VIP days).
