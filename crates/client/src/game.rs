@@ -278,6 +278,41 @@ impl Match {
         m
     }
 
+    /// A game against the computer saved by [`crate::saved`], picked up again.
+    pub fn resume(saved: &crate::saved::SavedGame, guide: AimGuide) -> Match {
+        let settings = MatchSettings {
+            mode: MatchMode::VsComputer(saved.level),
+            names: saved.names.clone(),
+            guide,
+            shot_clock: saved.shot_clock,
+        };
+        let mut m = Match::new(&settings, saved.seed);
+        m.game = saved.game.clone();
+        m.names = saved.names.clone();
+        m.stats = saved.stats;
+        m.wins = saved.wins;
+        m.games_played = saved.games_played;
+        m.begin_turn();
+        m
+    }
+
+    /// A game of a person against the computer (not online, not a replay).
+    pub fn is_against_computer(&self) -> bool {
+        matches!(self.controllers, [Controller::Human, Controller::Computer(_)])
+            && !self.is_online()
+            && !self.is_replay()
+    }
+
+    /// The seed of this match (the computer's choices follow from it).
+    pub fn seed(&self) -> u64 {
+        self.seed
+    }
+
+    /// Between shots: no ball moving, no shot or replay on screen.
+    pub fn at_rest(&self) -> bool {
+        matches!(self.phase, Phase::Turn { .. }) && self.replay.is_none()
+    }
+
     /// Watching a stored game.
     pub fn is_replay(&self) -> bool {
         self.script.is_some()

@@ -32,6 +32,7 @@ mod profile;
 mod ranking;
 mod reactions;
 mod room;
+mod saved;
 mod scene;
 mod settings;
 mod setup;
@@ -247,6 +248,10 @@ async fn main() {
     rig.reset();
     let mut controls = Controls::default();
     let mut current: Option<Match> = None;
+    // The saved game against the computer (object balls left), and what the
+    // last save was taken at.
+    let mut saved_balls = saved::load().map(|s| s.balls_left());
+    let mut save_key = None;
     // The online match came from the LAN game (not the global server).
     let mut match_from_lan = false;
     let mut screen = Screen::Menu;
@@ -647,7 +652,16 @@ async fn main() {
                 None => {
                     let mut next: Option<Screen> = None;
                     match &mut screen {
-                        Screen::Menu => match menu.draw(&mut ui, &online) {
+                        Screen::Menu => match menu.draw(&mut ui, &online, saved_balls) {
+                            MenuAction::ContinueGame => match saved::load() {
+                                Some(s) => {
+                                    current = Some(Match::resume(&s, config.guide));
+                                    save_key = None;
+                                    hud = Hud::new(config.show_help);
+                                    rig.reset();
+                                }
+                                None => saved_balls = None,
+                            },
                             MenuAction::Online => {
                                 online.connect();
                                 next = Some(Screen::Online);
@@ -938,6 +952,22 @@ async fn main() {
             }
             image.export_png(path);
             break;
+        }
+        // The game against the computer is kept between shots, so closing
+        // the window never loses it; a finished game is forgotten.
+        if let Some(m) = current.as_ref().filter(|m| m.is_against_computer()) {
+            let over = m.game.game_over().is_some();
+            let key = (m.games_played, m.game.shots_taken(), m.at_rest(), over);
+            if save_key != Some(key) {
+                save_key = Some(key);
+                if let Some(s) = saved::SavedGame::of(m) {
+                    saved::save(&s);
+                    saved_balls = Some(s.balls_left());
+                } else if over {
+                    saved::delete();
+                    saved_balls = None;
+                }
+            }
         }
         if profiling {
             let ms = frame_start.elapsed().as_secs_f64() * 1000.0;

@@ -2081,6 +2081,7 @@ dependencies = [
  "macroquad",
  "png",
  "rustls",
+ "serde",
  "serde_json",
  "snookered_core",
  "snookered_proto",

@@ -898,3 +898,5 @@ Give a month to a friend · {p}	Regalar un mes a un amigo · {p}
 {from} gave you a month of VIP!	¡{from} te regaló un mes de VIP!
 {name} received a month of VIP.	{name} recibió un mes de VIP.
 Your friend is already VIP.	Tu amigo ya es VIP.
+Game in progress: {n} balls left	Partida en curso: quedan {n} bolas
+Continue	Continuar

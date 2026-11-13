@@ -178,7 +178,7 @@ impl Default for Config {
     }
 }
 
-fn config_dir() -> Option<PathBuf> {
+pub fn config_dir() -> Option<PathBuf> {
     if cfg!(windows) {
         std::env::var_os("APPDATA").map(|p| PathBuf::from(p).join("Snookered"))
     } else if cfg!(target_os = "macos") {

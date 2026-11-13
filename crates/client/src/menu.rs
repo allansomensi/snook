@@ -5,7 +5,7 @@ use macroquad::prelude::*;
 #[allow(unused_imports)]
 use crate::paint::{draw_circle, draw_line, draw_rectangle};
 
-use crate::i18n::t;
+use crate::i18n::{t, tw};
 use crate::icons::Icon;
 use crate::online::{Online, Stage};
 use crate::ui::{BORDER, CREAM, GOLD, MUTED, Ui, rrect, rrect_lines};
@@ -14,6 +14,8 @@ pub enum MenuAction {
     None,
     Online,
     VsComputer,
+    /// Picks up the saved game against the computer.
+    ContinueGame,
     TwoPlayers,
     Lan,
     Ranking,
@@ -45,7 +47,8 @@ fn shade_texture() -> Texture2D {
 }
 
 impl Menu {
-    pub fn draw(&mut self, ui: &mut Ui, online: &Online) -> MenuAction {
+    /// `saved`: object balls left in the saved game against the computer.
+    pub fn draw(&mut self, ui: &mut Ui, online: &Online, saved: Option<usize>) -> MenuAction {
         let sw = crate::ui::vw();
         let sh = crate::ui::vh();
         let dt = get_frame_time();
@@ -72,9 +75,14 @@ impl Menu {
         ui.text(t("eight-ball pool"), tx + 4.0, top + 74.0, 17.0, CREAM, false);
 
         // The four ways to play.
+        let resume_line = saved.map(|n| tw("Game in progress: {n} balls left", &[("n", &n)]));
         let items = [
             (Icon::Globe, t("Play online"), t("Rated games, tables, tournaments and friends")),
-            (Icon::Robot, t("Against the computer"), t("Three levels, from relaxed to ruthless")),
+            (
+                Icon::Robot,
+                t("Against the computer"),
+                resume_line.as_deref().unwrap_or(t("Three levels, from relaxed to ruthless")),
+            ),
             (Icon::People, t("Two players"), t("Take turns on this computer")),
             (Icon::Network, t("Local network"), t("Play with friends on the same network")),
         ];
@@ -138,7 +146,17 @@ impl Menu {
                 Color::new(0.85, 0.8, 0.72, 0.85),
                 false,
             );
-            if hover && ui.clicked(r) {
+            // The saved game: a button of its own inside the card.
+            let resume = (k == 1 && saved.is_some()).then(|| {
+                let bw = 104.0f32.min(w * 0.3);
+                Rect::new(shifted.x + shifted.w - bw - 12.0, shifted.y + (h - 34.0) / 2.0, bw, 34.0)
+            });
+            if let Some(b) = resume
+                && ui.primary_button(b, t("Continue"))
+            {
+                action = MenuAction::ContinueGame;
+            }
+            if hover && ui.clicked(r) && !resume.is_some_and(|b| ui.hovering(b)) {
                 action = match k {
                     0 => MenuAction::Online,
                     1 => MenuAction::VsComputer,
