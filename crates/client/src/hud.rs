@@ -11,7 +11,7 @@ use snookered_core::{BallId, BallInHand, Group};
 use crate::game::{Controller, Match, Phase};
 use crate::icons::Icon;
 use crate::textures::ball_color;
-use crate::ui::{ALERT, BORDER, CREAM, FeedKind, FeedLine, GOLD, MUTED, Ui};
+use crate::ui::{ADMIN_RED, ALERT, BORDER, CREAM, FeedKind, FeedLine, GOLD, MUTED, Ui};
 
 pub struct Hud {
     /// The pause menu is open (online, the game keeps running behind it).
@@ -470,7 +470,13 @@ impl Hud {
         // The elevation and spin panels open in the same corner: while one
         // is open, the chat (or history) steps aside.
         if self.popover.is_none() {
-            if m.is_online() && !m.is_spectating() {
+            // Spectators have no chat, but an administrator watching gets
+            // the players' (only they are sent it): read only.
+            let players_chat = m
+                .online
+                .as_ref()
+                .is_some_and(|o| o.spectator && o.feed.iter().any(|f| f.kind == FeedKind::Player));
+            if m.is_online() && (!m.is_spectating() || players_chat) {
                 self.draw_chat(ui, m);
             } else if !m.is_online() {
                 self.draw_history(ui, m);
@@ -849,13 +855,20 @@ impl Hud {
         o.preview = None;
         let r = Rect::new(12.0, sh - BOTTOM_BAR - chat_h() - 8.0, chat_w(), chat_h());
         ui.panel(r);
-        ui.text(t("Chat"), r.x + 10.0, r.y + 7.0, 14.0, GOLD, true);
+        let watching = o.spectator;
+        let title = if watching { t("Players' chat (administrator)") } else { t("Chat") };
+        ui.text(title, r.x + 10.0, r.y + 7.0, 14.0, if watching { ADMIN_RED } else { GOLD }, true);
         if ui.button(Rect::new(r.x + r.w - 30.0, r.y + 5.0, 24.0, 20.0), "–", true) {
             self.chat_open = false;
         }
-        let log = Rect::new(r.x + 6.0, r.y + 28.0, r.w - 12.0, r.h - 28.0 - 40.0);
+        let input_h = if watching { 0.0 } else { 40.0 };
+        let log = Rect::new(r.x + 6.0, r.y + 28.0, r.w - 12.0, r.h - 28.0 - input_h);
         let me = m.names[o.seat].clone();
-        self.chat_scroll = ui.chat_log(log, &o.feed, Some(&me), false, self.chat_scroll).0;
+        let me = (!watching).then_some(me.as_str());
+        self.chat_scroll = ui.chat_log(log, &o.feed, me, false, self.chat_scroll).0;
+        if watching {
+            return;
+        }
         let input = Rect::new(r.x + 6.0, r.y + r.h - 36.0, r.w - 12.0, 30.0);
         let sent =
             ui.text_input(CHAT_FIELD, input, &mut self.chat_input, snookered_proto::MAX_CHAT_LEN);

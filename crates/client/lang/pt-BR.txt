@@ -973,3 +973,4 @@ Remove without a trace	Remover sem deixar rastro
 The chat was cleared by {name}.	O chat foi limpo por {name}.
 Click again to clear	Clique de novo para limpar
 Clear the chat	Limpar o chat
+Players' chat (administrator)	Chat dos jogadores (administrador)
