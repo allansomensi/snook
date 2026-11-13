@@ -19,8 +19,8 @@ type Row = (Option<(String, Color)>, String, FeedKind);
 /// One line of a chat panel.
 #[derive(Debug, Clone, PartialEq)]
 pub struct FeedLine {
-    /// Who wrote it, with their rating (0: unknown) for the name's colour.
-    pub from: Option<(String, i32)>,
+    /// Who wrote it, with their rating (0: unknown) and role for the name's colour.
+    pub from: Option<(String, i32, snookered_proto::Role)>,
     pub text: String,
     pub kind: FeedKind,
 }
@@ -51,14 +51,29 @@ pub fn tier_color(tier: snookered_proto::Tier) -> Color {
     }
 }
 
+/// The red of administrators' names: theirs alone (no rating tier or VIP
+/// name style is red), so everyone can tell the staff apart.
+pub const ADMIN_RED: Color = Color::new(0.93, 0.27, 0.25, 1.0);
+
+/// The colour of a name from its role and rating: administrators are red,
+/// everyone else has their tier's colour.
+pub fn role_color(role: snookered_proto::Role, rating: i32) -> Color {
+    if role == snookered_proto::Role::Admin {
+        ADMIN_RED
+    } else {
+        tier_color(snookered_proto::Tier::of(rating))
+    }
+}
+
 /// The colour of a player's name.
 pub fn name_color(p: &snookered_proto::PlayerInfo) -> Color {
-    tier_color(p.tier())
+    if p.role == snookered_proto::Role::Admin { ADMIN_RED } else { tier_color(p.tier()) }
 }
 
 /// A VIP name style (two colours), if the player has one.
 pub fn name_style(p: &snookered_proto::PlayerInfo) -> Option<(Color, Color)> {
-    if !p.vip {
+    // Administrators are always red, whatever style they bought.
+    if !p.vip || p.role == snookered_proto::Role::Admin {
         return None;
     }
     match snookered_proto::shop::item(&p.name_style)?.look {
@@ -141,6 +156,10 @@ pub struct Ui {
     pressed: bool,
     released: bool,
     down: bool,
+    /// Where the left button went down (a click counts only if it is also
+    /// released over the same widget: a drag that ends on a button is not a
+    /// click on it).
+    press_at: Option<Vec2>,
     /// The widget being dragged (sliders, the spin ball).
     active: Option<u64>,
     /// The widget whose drag ended this frame.
@@ -185,6 +204,7 @@ impl Ui {
             pressed: false,
             released: false,
             down: false,
+            press_at: None,
             active: None,
             released_active: None,
             focus: None,
@@ -210,6 +230,9 @@ impl Ui {
         self.pressed = is_mouse_button_pressed(MouseButton::Left);
         self.released = is_mouse_button_released(MouseButton::Left);
         self.down = is_mouse_button_down(MouseButton::Left);
+        if self.pressed {
+            self.press_at = Some(self.mouse);
+        }
         self.prev_blocks = std::mem::take(&mut self.blocks);
         let over_ui = self.prev_blocks.iter().any(|r| r.contains(self.mouse));
         self.hovered = over_ui || self.hovered_next || self.active.is_some();
@@ -403,7 +426,7 @@ impl Ui {
         let (label, size) = self.fitted(label, (r.h * 0.45).clamp(13.0, 22.0), r.w - 12.0, true);
         let color = if enabled { CREAM } else { MUTED };
         self.text_centered(&label, r.x + r.w / 2.0, r.y + (r.h - size) / 2.0, size, color, true);
-        enabled && hover && self.released
+        enabled && hover && self.tap(r)
     }
 
     /// A button styled as the main call to action.
@@ -427,7 +450,7 @@ impl Ui {
         rrect_lines(r, 7.0, 1.2, if hover { GOLD } else { Color::new(0.3, 0.7, 0.45, 1.0) });
         let (label, size) = self.fitted(label, (r.h * 0.45).clamp(13.0, 24.0), r.w - 12.0, true);
         self.text_centered(&label, r.x + r.w / 2.0, r.y + (r.h - size) / 2.0, size, WHITE, true);
-        hover && self.released
+        hover && self.tap(r)
     }
 
     pub fn checkbox(&mut self, x: f32, y: f32, label: &str, value: &mut bool) -> bool {
@@ -443,7 +466,7 @@ impl Ui {
             draw_line(x + 7.5, y + 13.0, x + 14.0, y + 5.0, 2.2, GOLD);
         }
         self.text(label, x + 26.0, y + 1.0, 15.0, CREAM, false);
-        if hover && self.released {
+        if hover && self.tap(r) {
             *value = !*value;
             return true;
         }
@@ -460,7 +483,7 @@ impl Ui {
             draw_circle(x + 9.0, y + 9.0, 4.5, GOLD);
         }
         self.text(label, x + 24.0, y + 1.0, 15.0, CREAM, false);
-        hover && self.released
+        hover && self.tap(r)
     }
 
     /// Horizontal slider for `value` in `[min, max]`.
@@ -734,7 +757,7 @@ impl Ui {
         };
         rrect(r, 8.0, bg);
         rrect_lines(r, 8.0, if on { 1.8 } else { 1.2 }, if hover || on { GOLD } else { BORDER });
-        hover && self.released
+        hover && self.tap(r)
     }
 
     /// A tab header; returns true when clicked.
@@ -778,7 +801,7 @@ impl Ui {
             if selected { GOLD } else { CREAM },
             true,
         );
-        hover && self.released && !selected
+        hover && self.tap(r) && !selected
     }
 
     /// Splits `text` into lines no wider than `width`.
@@ -849,14 +872,15 @@ impl Ui {
         let mut rows: Vec<Row> = Vec::new();
         for l in lines.iter().rev() {
             let (prefix, color) = match (&l.from, l.kind) {
-                (Some((name, rating)), FeedKind::Player) => {
+                (Some((name, rating, role)), FeedKind::Player) => {
                     let mine = me.is_some_and(|m| m.eq_ignore_ascii_case(name));
-                    let c = if *rating > 0 {
-                        tier_color(snookered_proto::Tier::of(*rating))
+                    let admin = *role == snookered_proto::Role::Admin;
+                    let c = if admin || *rating > 0 {
+                        role_color(*role, *rating)
                     } else {
                         Color::new(0.55, 0.78, 0.95, 1.0)
                     };
-                    (Some(format!("{name}: ")), if mine { GOLD } else { c })
+                    (Some(format!("{name}: ")), if mine && !admin { GOLD } else { c })
                 }
                 (_, FeedKind::Announcement) => (Some("★ ".to_string()), GOLD),
                 _ => (Some("• ".to_string()), MUTED),
@@ -979,7 +1003,7 @@ impl Ui {
         if hover && !tip.is_empty() {
             self.tooltip(tip, r);
         }
-        enabled && hover && self.released
+        enabled && hover && self.tap(r)
     }
 
     /// A small dark label under (or above, near the bottom) `anchor`. It is
@@ -1141,7 +1165,14 @@ impl Ui {
 
     /// True if the left button was released over `r` this frame (a click).
     pub fn clicked(&self, r: Rect) -> bool {
-        self.released && r.contains(self.mouse)
+        self.tap(r)
+    }
+
+    /// The left button was pressed and released over `r` (a click). A press
+    /// that started elsewhere (dragging the power bar or a slider) and ends
+    /// over `r` is not a click on it.
+    pub fn tap(&self, r: Rect) -> bool {
+        self.released && r.contains(self.mouse) && self.press_at.is_some_and(|p| r.contains(p))
     }
 
     pub fn hovering(&self, r: Rect) -> bool {
@@ -1181,7 +1212,7 @@ impl Ui {
                 color,
                 true,
             );
-            if hover && self.released && i != selected {
+            if hover && self.tap(cell) && i != selected {
                 clicked = Some(i);
             }
         }
@@ -1285,4 +1316,51 @@ fn word_end(chars: &[char], mut i: usize) -> usize {
         i += 1;
     }
     i
+}
+
+#[cfg(test)]
+mod name_colour_tests {
+    use super::*;
+
+    /// Red belongs to administrators: no rating tier and no VIP name style
+    /// may look like it (a new shop item that does fails here).
+    #[test]
+    fn only_administrators_are_red() {
+        let reddish = |r: f32, g: f32, b: f32| r > 0.75 && g < 0.45 && b < 0.45;
+        for tier in snookered_proto::Tier::ALL {
+            let c = tier_color(tier);
+            assert!(!reddish(c.r, c.g, c.b), "{tier:?} looks like the administrators' red");
+        }
+        for item in snookered_proto::shop::ITEMS {
+            if let snookered_proto::shop::Look::Name(Some((a, b))) = item.look {
+                for c in [a, b] {
+                    let f = |v: u8| v as f32 / 255.0;
+                    assert!(
+                        !reddish(f(c[0]), f(c[1]), f(c[2])),
+                        "{} looks like the administrators' red",
+                        item.code
+                    );
+                }
+            }
+        }
+        let admin = snookered_proto::PlayerInfo {
+            username: "staff".into(),
+            rating: 1200,
+            games: 0,
+            wins: 0,
+            status: snookered_proto::PlayerStatus::Available,
+            country: String::new(),
+            role: snookered_proto::Role::Admin,
+            guest: false,
+            vip: true,
+            cue: String::new(),
+            chalk: String::new(),
+            frame: String::new(),
+            name_style: "name_gold".into(),
+            effect: String::new(),
+        };
+        assert_eq!(name_color(&admin), ADMIN_RED);
+        assert!(name_style(&admin).is_none(), "the red wins over a VIP name style");
+        assert_eq!(role_color(snookered_proto::Role::Admin, 2400), ADMIN_RED);
+    }
 }

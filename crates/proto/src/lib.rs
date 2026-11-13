@@ -253,6 +253,9 @@ pub struct LeaderboardEntry {
     /// A VIP member (a crown by the name).
     #[serde(default)]
     pub vip: bool,
+    /// Administrators' names are red.
+    #[serde(default)]
+    pub role: Role,
 }
 
 /// Who wrote a chat line.
@@ -278,6 +281,9 @@ pub struct ChatLine {
     /// The writer's rating (for the name colour); 0 when unknown.
     #[serde(default)]
     pub rating: i32,
+    /// The writer's role (administrators' names are red).
+    #[serde(default)]
+    pub role: Role,
 }
 
 /// The aim of the player at the table, streamed so the opponent sees the cue move.
@@ -406,6 +412,9 @@ pub struct HistoryEntry {
     /// The replay can be watched (seed and strokes were kept).
     #[serde(default)]
     pub replay: bool,
+    /// The opponent's role (administrators' names are red).
+    #[serde(default)]
+    pub opponent_role: Role,
 }
 
 /// Lifetime numbers from every game with stored statistics.

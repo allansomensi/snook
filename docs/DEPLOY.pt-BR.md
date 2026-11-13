@@ -16,18 +16,16 @@ planos gratuitos. Leva uns 20 minutos.
   `GET /api/leaderboard` e `GET /api/status` (JSON público, com CORS) para o site
   mostrar o ranking e quantos estão online.
 
-## O que saber sobre os planos grátis
+## Os planos
 
-| | Limite | O que significa para o jogo |
+| | Plano | O que significa para o jogo |
 |---|---|---|
-| Render Free | dorme após 15 min sem tráfego; acorda em ~30–60 s | A primeira conexão do dia demora. O jogo avisa ("o servidor está acordando") e tenta de novo sozinho. Use o workflow *keep-alive* (passo 7) para evitar. |
-| Render Free | 750 h/mês por conta | Dá para 1 serviço ligado 24/7 (744 h). Não crie um segundo serviço grátis ligado. |
-| Render Free | reinicia a cada deploy | Partidas em andamento são perdidas no deploy. Faça deploys em horários calmos. |
-| Render Free | 512 MB RAM, CPU compartilhada | Suficiente para dezenas de jogadores simultâneos. A simulação das tacadas roda fora do lock principal. |
-| Neon Free | 0,5 GB, suspende após 5 min parado | Centenas de milhares de partidas cabem. Acordar o banco leva <1 s. |
+| Render | **Starter** (pago, ~US$ 7/mês) | Fica ligado o tempo todo: ninguém espera o servidor acordar. 512 MB de RAM dão para dezenas de jogadores simultâneos. |
+| Render | reinicia a cada deploy | As partidas em andamento continuam no servidor novo (são salvas a cada tacada); mesmo assim, prefira horários calmos. |
+| Neon | Free: 0,5 GB, suspende após 5 min parado | Centenas de milhares de partidas cabem. Acordar o banco leva menos de 1 s. |
 
-Quando lançar de verdade: Render Starter (US$ 7/mês, não dorme) resolve os
-três primeiros itens sem mudar nada no código.
+O plano grátis da Render também funciona para testes, mas desliga o servidor
+após 15 minutos sem uso e o primeiro jogador espera cerca de um minuto.
 
 ## 1. Banco de dados no Neon
 
@@ -50,13 +48,13 @@ Não precisa criar tabelas: o servidor aplica as migrations sozinho ao iniciar
 
 1. Crie uma conta em <https://render.com> e conecte seu GitHub.
 2. **New → Blueprint**, escolha o repositório `snookered`. O Render lê o
-   `render.yaml` da raiz e propõe o serviço `snookered-server` (Docker, plano Free,
+   `render.yaml` da raiz e propõe o serviço `snook-server` (Docker, plano Starter,
    região Virginia, health check em `/health`).
 3. Ele vai pedir as variáveis marcadas como secretas:
    - `DATABASE_URL`: a string do Neon do passo 1.
    - `SNOOKERED_ADMINS`: seu nome de usuário no jogo (ex.: `allan`). Vários: `allan,maria`.
-4. **Apply**. O primeiro build (Rust em release) leva ~10–15 min no plano
-   grátis; os seguintes usam cache.
+4. **Apply**. O primeiro build (Rust em release) leva ~10–15 min; os seguintes
+   usam cache.
 5. Quando ficar "Live", teste:
 
    ```bash
@@ -147,15 +145,7 @@ salão, chat, mesas, torneios e partidas como no online.
    do servidor em `ghcr.io/<você>/snookered-server`. Detalhes em
    [RELEASING.md](RELEASING.md).
 
-## 7. (Opcional) Manter o servidor acordado
-
-Defina a variável de repositório `SNOOKERED_HEALTH_URL` =
-`https://snook-server.onrender.com/health`. O workflow **Keep the server
-awake** chama o servidor a cada 10 minutos. O GitHub às vezes atrasa execuções
-agendadas, então ainda pode haver um "acordar" ocasional; no plano pago isso
-some.
-
-## 8. Backups
+## 7. Backups
 
 O Neon grátis mantém histórico de 24 h (restauração a um ponto no tempo pelo
 painel). Para uma cópia sua:
@@ -164,7 +154,7 @@ painel). Para uma cópia sua:
 pg_dump "postgresql://usuario:senha@ep-xxxx.us-east-1.aws.neon.tech/neondb?sslmode=require" -Fc -f snookered-$(date +%F).dump
 ```
 
-## 9. Loja: moedas e VIP com dinheiro real (Stripe)
+## 8. Loja: moedas e VIP com dinheiro real (Stripe)
 
 Sem esta etapa a loja funciona com itens grátis, de conquista e VIP dados
 pelo painel, mas não vende moedas nem VIP. Os pagamentos usam a página
@@ -225,7 +215,7 @@ GitHub, a Stripe é permitida.
 
 | Sintoma | Causa provável |
 |---|---|
-| Jogo fica em "Conectando ao servidor…" ~1 min e entra | Instância grátis acordando. Normal. |
+| Jogo fica em "Conectando ao servidor…" ~1 min e entra | Servidor no plano grátis acordando (no Starter isso não acontece). |
 | `could not start: … password authentication failed` nos logs | `DATABASE_URL` errada. Copie de novo do Neon. |
 | `… prepared statement … already exists` | Usou a string com `-pooler`. Use a conexão direta. |
 | Jogadores recebem "Muitas contas novas desta rede" sem motivo | `SNOOKERED_CLIENT_IP_HEADER` ausente. O painel mostra o aviso "Every player comes from the same address". |

@@ -5,7 +5,7 @@ running matches in memory and stores accounts, ratings, history,
 achievements, friends, reports and the staff audit log in PostgreSQL. It also
 serves the staff panel at `/admin`.
 
-A step-by-step guide for **Render + Neon (free plans)**, in Portuguese, is in
+A step-by-step guide for **Render (Starter) + Neon**, in Portuguese, is in
 [DEPLOY.pt-BR.md](DEPLOY.pt-BR.md). This page is the reference.
 
 ## Configuration

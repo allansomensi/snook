@@ -433,6 +433,7 @@ impl MemoryStore {
                     at: m.ended_at,
                     match_id: index as i64 + 1,
                     replay: m.replay.is_some(),
+                    opponent_role: other.map(|u| u.role).unwrap_or_default(),
                 })
             })
             .take(limit as usize)
@@ -462,6 +463,7 @@ impl MemoryStore {
                 wins: u.wins,
                 country: u.country.clone(),
                 vip: s.wallets.get(&u.id).is_some_and(|w| w.vip_until > now),
+                role: u.role,
             })
             .collect())
     }

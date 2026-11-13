@@ -1,5 +1,30 @@
 # Changelog
 
+## Unreleased
+
+### Game
+- Administrators' names are red everywhere (lounge, chat, match, ranking,
+  profiles, game history), and theirs alone: no rating tier or VIP name
+  style is red (Ember is now orange). Profiles show an "Admin" tag.
+- A click counts only when pressed and released on the same button: dragging
+  the power bar and letting go over the shoot button no longer shoots (the
+  same for every button and the reactions).
+- Profile: with the account, report or country dialog open, the profile
+  under it no longer reacts to the pointer (achievement cards showed through).
+- Deleting the account is on a page of its own, behind a small link in the
+  account dialog, and asks for the password and the username typed again.
+- Games on this computer start with the signed-in player's username as
+  their name.
+
+### Distribution
+- The Store package indexes its icons (resources.pri) and has "unplated"
+  small icons: Windows drew the emblem on a plate in the accent colour (blue
+  corners in the taskbar and Start menu).
+
+### Server
+- Chat lines, the ranking and game history carry the player's role.
+- The server stays on a paid Render plan: the keep-awake workflow is gone.
+
 ## 0.1.2 (protocol 11)
 
 ### The game is called Snookered

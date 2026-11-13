@@ -632,6 +632,7 @@ impl Lounge {
             at: now(),
             kind: ChatKind::Announcement,
             rating: 0,
+            role: snookered_proto::Role::Player,
         };
         self.push_chat(line.clone());
         self.broadcast(&ServerMsg::Chat { line });
@@ -854,6 +855,7 @@ impl Lounge {
             at: now(),
             kind: ChatKind::Player,
             rating: if s.guest { 0 } else { s.user.rating },
+            role: s.user.role,
         };
         self.push_chat(line.clone());
         let msg = ServerMsg::Chat { line };
@@ -876,6 +878,7 @@ impl Lounge {
             at: now(),
             kind: ChatKind::Player,
             rating: if s.guest { 0 } else { s.user.rating },
+            role: s.user.role,
         };
         let sender = s.user.id;
         let Some(id) = s.room else { return };

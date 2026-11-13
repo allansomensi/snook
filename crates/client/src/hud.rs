@@ -162,7 +162,7 @@ fn player_card(ui: &mut Ui, m: &Match, seat: usize, x: f32, y: f32, w: f32) {
     let reserve = if m.online.is_some() || m.clock.is_some() { 96.0 } else { 40.0 };
     match &m.online {
         Some(o) => {
-            let color = crate::ui::tier_color(snookered_proto::Tier::of(o.ratings[seat]));
+            let color = crate::ui::role_color(o.roles[seat], o.ratings[seat]);
             ui.name_with_flag(
                 &m.names[seat],
                 &o.countries[seat],
@@ -798,7 +798,8 @@ impl Hud {
                 if *age > PREVIEW_TIME {
                     o.preview = None;
                 } else {
-                    let who = line.from.as_ref().map(|(n, _)| format!("{n}: ")).unwrap_or_default();
+                    let who =
+                        line.from.as_ref().map(|(n, ..)| format!("{n}: ")).unwrap_or_default();
                     let mut text = line.text.clone();
                     let max_w = 300.0;
                     let who_w = ui.text_size(&who, 13.0, true).x;
@@ -931,7 +932,7 @@ impl Hud {
         if hover && !self.reactions_open {
             ui.tooltip(t("Reactions"), b);
         }
-        let clicked_button = hover && is_mouse_button_released(MouseButton::Left);
+        let clicked_button = hover && ui.tap(b);
         if !self.reactions_open {
             if clicked_button {
                 self.reactions_open = true;
@@ -977,7 +978,7 @@ impl Hud {
                     if hover { 32.0 } else { 28.0 },
                     crate::paint::opacity(),
                 );
-                if hover && is_mouse_button_released(MouseButton::Left) {
+                if hover && ui.tap(c) {
                     chosen = Some(r.code);
                 }
             } else {
@@ -1617,7 +1618,9 @@ fn shoot_button(ui: &mut Ui, r: Rect, enabled: bool) -> bool {
         br * 0.32,
         Color::new(1.0, 1.0, 1.0, 0.85 * a),
     );
-    let clicked = enabled && hover && is_mouse_button_released(MouseButton::Left);
+    // Pressed and released on the button: a drag of the power bar that ends
+    // over it must not shoot.
+    let clicked = enabled && hover && ui.tap(r);
     if hover {
         ui.overlay(move |ui| {
             let label = t("Shoot!");

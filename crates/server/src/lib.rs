@@ -1204,6 +1204,7 @@ fn history_entry(h: crate::store::HistoryRow) -> HistoryEntry {
         at: h.at,
         match_id: h.match_id,
         replay: h.replay,
+        opponent_role: h.opponent_role,
     }
 }
 

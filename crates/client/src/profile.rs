@@ -45,7 +45,11 @@ struct AccountForm {
     old_password: String,
     new_password: String,
     delete_password: String,
-    confirm_delete: bool,
+    /// The account-deletion page (reached from a small link, so it is never
+    /// clicked by accident).
+    deleting: bool,
+    /// The username, typed again to confirm the deletion.
+    delete_name: String,
 }
 
 /// "3 days", "2 months", "1 year".
@@ -104,6 +108,14 @@ impl ProfileScreen {
         online.request_profile(name);
     }
 
+    /// Opens the account dialog ("account") or its deletion page ("delete")
+    /// (development screenshots, `--screen profile:NAME:account`).
+    pub fn dev_dialog(&mut self, which: &str, online: &mut Online) {
+        self.account =
+            Some(AccountForm { deleting: which == "delete", ..AccountForm::default() });
+        online.send(ClientMsg::Account);
+    }
+
     pub fn draw(&mut self, ui: &mut Ui, online: &mut Online) -> ProfileAction {
         let sw = crate::ui::vw();
         let sh = crate::ui::vh();
@@ -113,6 +125,10 @@ impl ProfileScreen {
         let r = Rect::new((sw - w) / 2.0, (sh - h) / 2.0, w, h);
         ui.panel(r);
         let mut action = ProfileAction::None;
+        // A dialog on top (account, report, country): the profile under it
+        // doesn't react to the pointer (no buttons, no achievement cards).
+        let modal = self.account.is_some() || self.report.is_some() || crate::countries::is_open();
+        let saved = modal.then(|| ui.suspend_input());
         if ui.icon_button(
             Rect::new(r.x + 14.0, r.y + 14.0, 34.0, 34.0),
             Icon::Back,
@@ -135,6 +151,9 @@ impl ProfileScreen {
                 MUTED,
                 false,
             );
+            if let Some(saved) = saved {
+                ui.resume_input(saved);
+            }
             return action;
         };
         // Asked before signing in: the server didn't know who was looking.
@@ -157,6 +176,9 @@ impl ProfileScreen {
             Pane::Games => self.history(ui, online, &p, right),
             Pane::Rating => rating_chart(ui, &p, right),
             Pane::Numbers => numbers(ui, &p, right),
+        }
+        if let Some(saved) = saved {
+            ui.resume_input(saved);
         }
         if let Some(code) = crate::countries::draw_picker(ui) {
             online.send(ClientMsg::SetCountry { country: code });
@@ -205,6 +227,9 @@ impl ProfileScreen {
         }
         let tier = player.tier();
         let mut info_x = x;
+        if player.role == snookered_proto::Role::Admin {
+            info_x += ui.pill(t("Admin"), info_x, r.y + 60.0, crate::ui::ADMIN_RED) + 10.0;
+        }
         if !player.guest {
             info_x += ui.pill(t(tier.name()), info_x, r.y + 60.0, tier_color(tier)) + 10.0;
         }
@@ -501,7 +526,7 @@ impl ProfileScreen {
                 Color::new(color.r, color.g, color.b, 0.18),
             );
             ui.text_centered(mark, r.x + 18.0, r.y + 11.0, 14.0, color, true);
-            let opp_color = tier_color(snookered_proto::Tier::of(h.opponent_rating));
+            let opp_color = crate::ui::role_color(h.opponent_role, h.opponent_rating);
             ui.name_with_flag(
                 &h.opponent,
                 &h.opponent_country,
@@ -560,10 +585,18 @@ impl ProfileScreen {
         let sh = crate::ui::vh();
         draw_rectangle(0.0, 0.0, sw, sh, Color::new(0.0, 0.0, 0.0, 0.55));
         let w = 480.0f32.min(sw - 20.0);
-        let h = 530.0f32.min(sh - 20.0);
+        let h = 440.0f32.min(sh - 20.0);
         let r = Rect::new((sw - w) / 2.0, (sh - h) / 2.0, w, h);
         ui.panel(r);
         ui.block(Rect::new(0.0, 0.0, sw, sh));
+        if form.deleting {
+            let me = online.me.as_ref().map(|m| m.username.clone()).unwrap_or_default();
+            if delete_page(ui, online, form, r, &me) {
+                form.deleting = false;
+                ui.focus = None;
+            }
+            return;
+        }
         ui.text(t("Your account"), r.x + 20.0, r.y + 16.0, 20.0, GOLD, true);
         let x = r.x + 20.0;
         let fw = w - 40.0;
@@ -615,43 +648,21 @@ impl ProfileScreen {
                 new: std::mem::take(&mut form.new_password),
             });
         }
-        y += 48.0;
-        draw_line(x, y, x + fw, y, 1.0, BORDER);
-        y += 12.0;
-        // Deleting the account.
-        ui.text(t("Delete account"), x, y, 15.0, ALERT, true);
-        y += 22.0;
-        let note = t(
-            "Your name, e-mail, friends and items are erased for good. Your opponents keep the games you played (without your name).",
-        );
-        for line in ui.wrap(note, fw, 12.0) {
-            ui.text(&line, x, y, 12.0, MUTED, false);
-            y += 16.0;
+        // Deleting the account: only a small link here, the page is separate.
+        let link = t("Delete my account…");
+        let lw = ui.text_size(link, 12.0, false).x;
+        let lr = Rect::new(x, r.y + h - 40.0, lw, 18.0);
+        ui.block(lr);
+        let hover = ui.hovering(lr);
+        ui.text(link, lr.x, lr.y + 2.0, 12.0, if hover { ALERT } else { MUTED }, false);
+        if hover {
+            draw_line(lr.x, lr.y + 16.0, lr.x + lw, lr.y + 16.0, 1.0, ALERT);
         }
-        ui.password_input(
-            74,
-            Rect::new(x, y + 2.0, fw - 170.0, 32.0),
-            &mut form.delete_password,
-            72,
-        );
-        if form.delete_password.is_empty() && ui.focus != Some(74) {
-            ui.text(t("Password"), x + 9.0, y + 11.0, 14.0, MUTED, false);
-        }
-        let label =
-            if form.confirm_delete { t("Click again to delete") } else { t("Delete account") };
-        if ui.button(
-            Rect::new(x + fw - 160.0, y + 2.0, 160.0, 32.0),
-            label,
-            !form.delete_password.is_empty(),
-        ) {
-            if form.confirm_delete {
-                online.send(ClientMsg::DeleteAccount {
-                    password: std::mem::take(&mut form.delete_password),
-                });
-                form.confirm_delete = false;
-            } else {
-                form.confirm_delete = true;
-            }
+        if ui.clicked(lr) {
+            form.deleting = true;
+            form.delete_password.clear();
+            form.delete_name.clear();
+            ui.focus = None;
         }
         if ui.button(
             Rect::new(r.x + (w - 140.0) / 2.0, r.y + h - 50.0, 140.0, 34.0),
@@ -793,4 +804,61 @@ fn numbers(ui: &mut Ui, p: &Profile, area: Rect) {
         let size = ui.fit(12.0, label, r.w - 8.0);
         ui.text_centered(label, r.x + r.w / 2.0, r.y + 40.0, size, MUTED, false);
     }
+}
+
+/// The account-deletion page: the password and the username typed again.
+/// Returns true to go back to the account dialog.
+fn delete_page(
+    ui: &mut Ui,
+    online: &mut Online,
+    form: &mut AccountForm,
+    r: Rect,
+    me: &str,
+) -> bool {
+    let x = r.x + 20.0;
+    let fw = r.w - 40.0;
+    let mut y = r.y + 16.0;
+    ui.text(t("Delete account"), x, y, 20.0, ALERT, true);
+    y += 40.0;
+    let warning = t(
+        "Your name, e-mail, friends and items are erased for good. Your opponents keep the games you played (without your name).",
+    );
+    for line in ui.wrap(warning, fw, 14.0) {
+        ui.text(&line, x, y, 14.0, CREAM, false);
+        y += 19.0;
+    }
+    y += 6.0;
+    for line in ui.wrap(t("This can't be undone, and coins and items are not refunded."), fw, 13.0)
+    {
+        ui.text(&line, x, y, 13.0, ALERT, false);
+        y += 18.0;
+    }
+    y += 16.0;
+    ui.text(t("Your password"), x, y, 13.0, MUTED, false);
+    y += 20.0;
+    ui.password_input(74, Rect::new(x, y, fw, 32.0), &mut form.delete_password, 72);
+    y += 46.0;
+    ui.text(
+        &tw("Type your username ({name}) to confirm", &[("name", &me)]),
+        x,
+        y,
+        13.0,
+        MUTED,
+        false,
+    );
+    y += 20.0;
+    ui.text_input(75, Rect::new(x, y, fw, 32.0), &mut form.delete_name, 32);
+    y += 52.0;
+    let ready = !form.delete_password.is_empty()
+        && !me.is_empty()
+        && form.delete_name.trim().eq_ignore_ascii_case(me);
+    let half = (fw - 12.0) / 2.0;
+    let back = ui.button(Rect::new(x, y, half, 36.0), t("Back"), true)
+        || (is_key_pressed(KeyCode::Escape) && ui.focus.is_none());
+    if ui.button(Rect::new(x + half + 12.0, y, half, 36.0), t("Delete for good"), ready) {
+        online
+            .send(ClientMsg::DeleteAccount { password: std::mem::take(&mut form.delete_password) });
+        form.delete_name.clear();
+    }
+    back
 }

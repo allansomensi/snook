@@ -32,10 +32,24 @@ mod tests {
             );
         }
         let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("msix");
+        // Each picture the manifest names exists, as qualified variants
+        // (`Square44x44Logo.scale-200.png`…) that resources.pri indexes.
+        let files: Vec<String> = std::fs::read_dir(dir.join("Assets"))
+            .unwrap()
+            .filter_map(|e| e.ok()?.file_name().into_string().ok())
+            .collect();
         for asset in m.split("Assets\\").skip(1).filter_map(|s| s.split('"').next()) {
             let asset = asset.split('<').next().unwrap_or(asset);
-            assert!(dir.join("Assets").join(asset).is_file(), "missing msix/Assets/{asset}");
+            let stem = asset.trim_end_matches(".png");
+            assert!(
+                files.iter().any(|f| f.starts_with(&format!("{stem}.scale-"))),
+                "no msix/Assets/{stem}.scale-*.png"
+            );
         }
+        assert!(
+            files.iter().any(|f| f.contains("targetsize-") && f.contains("_altform-unplated")),
+            "the unplated small icons keep Windows from drawing a coloured plate"
+        );
         for key in
             ["IDENTITY_NAME", "PUBLISHER", "PUBLISHER_DISPLAY_NAME", "DISPLAY_NAME", "VERSION"]
         {

@@ -70,18 +70,33 @@ if ($manifest -match '\{\{[A-Z_]+\}\}') { throw "A value was left out of the man
 [xml] $manifest | Out-Null
 Set-Content -Path (Join-Path $stage "AppxManifest.xml") -Value $manifest -Encoding UTF8
 
+# The Windows SDK tools (makepri, makeappx) from its newest version.
+function SdkTool([string] $name) {
+    $tool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\$name" -ErrorAction SilentlyContinue |
+        Sort-Object FullName | Select-Object -Last 1
+    if (-not $tool) { throw "$name not found: install the Windows SDK." }
+    $tool.FullName
+}
+
+# resources.pri: the index of the pictures' scales and target sizes. Without
+# it Windows can't find the "unplated" small icons and draws the emblem on a
+# plate in the accent colour (blue corners in the taskbar and Start menu).
+$makepri = SdkTool "makepri.exe"
+$priconfig = Join-Path $Out "priconfig.xml"
+& $makepri createconfig /cf $priconfig /dq en-US /pv 10.0.0 /o | Out-Host
+if ($LASTEXITCODE -ne 0) { throw "makepri createconfig failed ($LASTEXITCODE)." }
+& $makepri new /pr $stage /cf $priconfig /mn (Join-Path $stage "AppxManifest.xml") /of (Join-Path $stage "resources.pri") /o | Out-Host
+if ($LASTEXITCODE -ne 0) { throw "makepri new failed ($LASTEXITCODE)." }
+
 if ($Register) {
     Add-AppxPackage -Register (Join-Path $stage "AppxManifest.xml")
     Write-Host "Registered ${DisplayName} ${msixVersion}: it is in the Start menu."
     exit 0
 }
 
-# makeappx from the newest Windows SDK.
-$makeappx = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\makeappx.exe" -ErrorAction SilentlyContinue |
-    Sort-Object FullName | Select-Object -Last 1
-if (-not $makeappx) { throw "makeappx.exe not found: install the Windows SDK." }
+$makeappx = SdkTool "makeappx.exe"
 $package = Join-Path $Out "snookered-$msixVersion-x64.msix"
-& $makeappx.FullName pack /o /h SHA256 /d $stage /p $package
+& $makeappx pack /o /h SHA256 /d $stage /p $package
 if ($LASTEXITCODE -ne 0) { throw "makeappx failed ($LASTEXITCODE)." }
 Write-Host "Packed $package"
 if ($env:GITHUB_OUTPUT) { "msix=$package" | Out-File -Append -Encoding utf8 $env:GITHUB_OUTPUT }

@@ -121,7 +121,14 @@ impl Ranking {
                 None => ui.text(&e.rank.to_string(), r.x + 24.0, ty, 14.0, MUTED, true),
             }
             let tier = snookered_proto::Tier::of(e.rating);
-            let color = if mine { GOLD } else { tier_color(tier) };
+            // Administrators are red everywhere, their own row included.
+            let color = if e.role == snookered_proto::Role::Admin {
+                crate::ui::ADMIN_RED
+            } else if mine {
+                GOLD
+            } else {
+                tier_color(tier)
+            };
             let name_w = ui.name_with_flag(
                 &e.username,
                 &e.country,

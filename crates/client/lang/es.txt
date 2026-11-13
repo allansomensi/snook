@@ -717,7 +717,6 @@ Buy now	Comprar ahora
 Buy · {n}	Comprar · {n}
 Buying…	Comprando…
 Change password	Cambiar contraseña
-Click again to delete	Haz clic otra vez para eliminar
 Code	Código
 Confirm purchase	Confirmar compra
 Copied: send it to a friend.	Copiado: envíalo a un amigo.
@@ -890,3 +889,9 @@ Your friend already has this item.	Tu amigo ya tiene este objeto.
 VIP isn't sold in this version of the game.	El VIP no se vende en esta versión del juego.
 In this version of the game, coins are earned by playing:	En esta versión del juego, las monedas se ganan jugando:
 rated games, and a bonus every day you play.	partidas con rating y un bono cada día que juegas.
+Delete my account…	Eliminar mi cuenta…
+This can't be undone, and coins and items are not refunded.	No se puede deshacer, y las monedas y los objetos no se reembolsan.
+Your password	Tu contraseña
+Type your username ({name}) to confirm	Escribe tu nombre de usuario ({name}) para confirmar
+Delete for good	Eliminar para siempre
+Admin	Admin

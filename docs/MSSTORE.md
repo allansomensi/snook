@@ -64,12 +64,11 @@ Na Render (**Environment**), defina:
 No Partner Center, use `https://<seu-servidor>/privacy` como **Privacy policy
 URL**.
 
-### 3. Servidor sempre acordado
+### 3. Servidor sempre ligado
 
-No plano gratuito da Render o servidor dorme e o primeiro jogador espera
-cerca de um minuto. Defina a variável do repositório `SNOOKERED_HEALTH_URL` como
-`https://<seu-servidor>/health` (o workflow *Keep the server awake* passa a
-acordá-lo a cada 10 minutos) ou use um plano pago.
+Use um plano pago da Render (Starter ou maior): no grátis o servidor dorme
+após 15 minutos parado e o primeiro jogador espera cerca de um minuto, o que
+para quem acabou de instalar pela Store parece que o jogo não funciona.
 
 ### 4. Primeiro envio (pelo site)
 

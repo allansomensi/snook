@@ -150,6 +150,8 @@ pub struct OnlineMatch {
     pub rated: bool,
     pub ratings: [i32; 2],
     pub countries: [String; 2],
+    /// Administrators' names are red.
+    pub roles: [snookered_proto::Role; 2],
     pub tournament: Option<u64>,
     pub shot_clock: f32,
     /// Seconds left for the current shot (counts down during a turn).
@@ -336,6 +338,7 @@ impl Match {
                 rated,
                 ratings: [players[0].rating, players[1].rating],
                 countries: [players[0].country.clone(), players[1].country.clone()],
+                roles: [players[0].role, players[1].role],
                 tournament,
                 shot_clock: shot_clock_secs as f32,
                 clock_left,
@@ -1406,7 +1409,7 @@ impl FeedLine {
     pub fn chat(line: &ChatLine) -> FeedLine {
         match line.kind {
             ChatKind::Player => FeedLine {
-                from: Some((line.from.clone(), line.rating)),
+                from: Some((line.from.clone(), line.rating, line.role)),
                 text: line.text.clone(),
                 kind: FeedKind::Player,
             },

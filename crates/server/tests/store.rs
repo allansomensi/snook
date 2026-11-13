@@ -306,6 +306,13 @@ async fn exercise(store: Store) {
     store.set_mute(b.id, Some(t + 50)).await.unwrap();
     store.set_role(a.id, Role::Moderator).await.unwrap();
     assert_eq!(store.user_by_id(a.id).await.unwrap().unwrap().role, Role::Moderator);
+    // The ranking carries each player's role (administrators' names are red).
+    store.set_role(a.id, Role::Admin).await.unwrap();
+    let lb = store.leaderboard(10, snookered_server::now()).await.unwrap();
+    assert_eq!(lb.iter().find(|e| e.username == "Alice").map(|e| e.role), Some(Role::Admin));
+    assert_eq!(lb.iter().find(|e| e.username == "bob").map(|e| e.role), Some(Role::Player));
+    assert_eq!(store.history(b.id, 1).await.unwrap()[0].opponent_role, Role::Admin);
+    store.set_role(a.id, Role::Moderator).await.unwrap();
     store.audit(a.id, "ban", "bob", "1h", t).await.unwrap();
     assert_eq!(store.audit_log(5).await.unwrap()[0].staff, "Alice");
     let (found, total) = store.search_users("o", 0, 10).await.unwrap();

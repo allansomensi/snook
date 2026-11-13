@@ -203,6 +203,7 @@ pub struct HistoryRow {
     pub at: i64,
     pub match_id: i64,
     pub replay: bool,
+    pub opponent_role: Role,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

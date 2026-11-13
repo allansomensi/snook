@@ -290,7 +290,10 @@ async fn main() {
             lan_screen = Some(LanScreen::new());
             screen = Screen::Lan;
         }
-        Some("setup") => screen = Screen::Setup(Setup::new(SetupKind::VsComputer)),
+        Some("setup") => {
+            default_player_name(&mut config, &online);
+            screen = Screen::Setup(Setup::new(SetupKind::VsComputer));
+        }
         Some(tab) if tab.starts_with("shop") => {
             online.connect();
             shop.open(&mut online);
@@ -311,7 +314,13 @@ async fn main() {
             screen = Screen::Online;
         }
         Some(name) if name.starts_with("profile:") => {
-            profile.open(&name["profile:".len()..], &mut online);
+            // "profile:NAME", or "profile:NAME:account" / ":delete" with
+            // the account dialog open (development screenshots).
+            let mut parts = name["profile:".len()..].splitn(2, ':');
+            profile.open(parts.next().unwrap_or_default(), &mut online);
+            if let Some(dialog) = parts.next() {
+                profile.dev_dialog(dialog, &mut online);
+            }
             screen = Screen::Profile;
         }
         _ => {}
@@ -653,9 +662,11 @@ async fn main() {
                                 next = Some(Screen::Online);
                             }
                             MenuAction::VsComputer => {
+                                default_player_name(&mut config, &online);
                                 next = Some(Screen::Setup(Setup::new(SetupKind::VsComputer)))
                             }
                             MenuAction::TwoPlayers => {
+                                default_player_name(&mut config, &online);
                                 next = Some(Screen::Setup(Setup::new(SetupKind::TwoPlayers)))
                             }
                             MenuAction::Lan => {
@@ -980,6 +991,17 @@ fn name_or(name: &str, default: &str) -> String {
 }
 
 /// Draws the in-game HUD, fading it away while the player aims.
+/// Games on this computer: someone signed in plays under their username
+/// (the name stays editable; signed out, the last name typed is kept).
+fn default_player_name(config: &mut Config, online: &online::Online) {
+    let signed_in = online.me.as_ref().filter(|m| !m.guest).map(|m| m.username.clone());
+    let saved =
+        (!config.token.is_empty() && !config.username.is_empty()).then(|| config.username.clone());
+    if let Some(name) = signed_in.or(saved) {
+        config.player_name = name.chars().take(20).collect();
+    }
+}
+
 fn hud_draw(
     hud: &mut Hud,
     ui: &mut Ui,

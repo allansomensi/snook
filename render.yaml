@@ -1,9 +1,10 @@
-# Render Blueprint for the Snookered server (free plan). See docs/DEPLOY.pt-BR.md.
+# Render Blueprint for the Snookered server (Starter: always on). See docs/DEPLOY.pt-BR.md.
 services:
   - type: web
     name: snook-server
     runtime: docker
-    plan: free
+    # Paid: never sleeps (the free plan stopped after 15 idle minutes).
+    plan: starter
     # Closest Render region to South America.
     region: virginia
     dockerfilePath: ./Dockerfile

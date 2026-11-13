@@ -327,21 +327,56 @@ mod tests {
     }
 
     /// Writes the Microsoft Store package's pictures into
-    /// `crates/client/msix/Assets/` (at twice their nominal size, which the
-    /// Store recommends; Windows scales them down):
-    /// `cargo test --release -p snookered export_msix_assets -- --ignored`.
+    /// `crates/client/msix/Assets/`, at the scales and target sizes Windows
+    /// asks for: `cargo test -p snookered export_msix_assets -- --ignored`.
     #[test]
     #[ignore]
     fn export_msix_assets() {
         let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("msix/Assets");
+        if dir.exists() {
+            std::fs::remove_dir_all(&dir).unwrap();
+        }
         std::fs::create_dir_all(&dir).unwrap();
         // RGBA, transparent around the emblem: (file, width, height, emblem size).
-        for (name, w, h, e) in [
-            ("Square44x44Logo.png", 88, 88, 88),
-            ("Square150x150Logo.png", 300, 300, 216),
-            ("Wide310x150Logo.png", 620, 300, 216),
-            ("StoreLogo.png", 100, 100, 100),
-        ] {
+        // Names carry resource qualifiers (scale, target size): the package's
+        // resources.pri (made by tools/msix/make-msix.ps1) lets Windows pick
+        // the right one. The "unplated" small icons are what keep Windows
+        // from drawing them on a plate in the accent colour (the taskbar and
+        // the Start menu showed the emblem with blue corners).
+        let mut files: Vec<(String, usize, usize, usize)> = Vec::new();
+        for (scale, k) in [(100, 1.0), (200, 2.0), (400, 4.0)] {
+            let px = |v: f32| (v * k) as usize;
+            files.push((
+                format!("Square44x44Logo.scale-{scale}.png"),
+                px(44.0),
+                px(44.0),
+                px(44.0),
+            ));
+            files.push((
+                format!("Square150x150Logo.scale-{scale}.png"),
+                px(150.0),
+                px(150.0),
+                px(108.0),
+            ));
+            files.push((
+                format!("Wide310x150Logo.scale-{scale}.png"),
+                px(310.0),
+                px(150.0),
+                px(108.0),
+            ));
+            files.push((format!("StoreLogo.scale-{scale}.png"), px(50.0), px(50.0), px(50.0)));
+        }
+        for size in [16, 20, 24, 30, 32, 36, 40, 48, 60, 64, 72, 80, 96, 256] {
+            for form in ["", "_altform-unplated", "_altform-lightunplated"] {
+                files.push((
+                    format!("Square44x44Logo.targetsize-{size}{form}.png"),
+                    size,
+                    size,
+                    size,
+                ));
+            }
+        }
+        for (name, w, h, e) in files {
             let emblem = super::render(e);
             let mut px = vec![0u8; w * h * 4];
             let (ox, oy) = ((w - e) / 2, (h - e) / 2);
