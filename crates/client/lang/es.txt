@@ -925,3 +925,8 @@ Pot 3 balls in a row in one visit	Mete 3 bolas seguidas en un turno
 Win a game without a foul	Gana una partida sin cometer falta
 Pot 3 balls in a row {n} times	Mete 3 bolas seguidas {n} veces
 Win {n} games without a foul	Gana {n} partidas sin cometer falta
+TV camera when watching	Cámara de TV al mirar
+System notifications	Avisos del sistema
+{name} starts in a few minutes: get ready!	{name} empieza en pocos minutos: ¡prepárate!
+{name} starts in a few minutes: there is still room.	{name} empieza en pocos minutos: aún hay plazas.
+{name} has started!	¡{name} ha empezado!

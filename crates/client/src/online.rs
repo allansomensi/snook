@@ -194,6 +194,8 @@ pub struct Online {
     mission_done: bool,
     /// The notes on the lounge's board, newest first.
     board: Vec<snookered_proto::BoardNote>,
+    /// Scheduled tournaments the player was already told are about to start.
+    told_starting: Vec<u64>,
 }
 
 /// "5 h", "3 days", "12 min": how long until something.
@@ -325,6 +327,7 @@ impl Online {
             missions: None,
             mission_done: false,
             board: Vec::new(),
+            told_starting: Vec::new(),
         }
     }
 
@@ -386,6 +389,7 @@ impl Online {
             toast.1 -= dt;
         }
         self.toasts.retain(|t| t.1 > 0.0);
+        self.tournaments_starting();
         // Outgoing match messages.
         if let Some(m) = current.as_mut()
             && let Some(o) = m.online.as_mut()
@@ -613,6 +617,15 @@ impl Online {
             ServerMsg::TableClosed { id } => self.tables.retain(|t| t.id != id),
             ServerMsg::Tournaments { tournaments } => self.tournaments = tournaments,
             ServerMsg::TournamentUpdated { tournament } => {
+                // A tournament this player is in has just begun.
+                let me = self.me.as_ref().map(|m| m.username.as_str()).unwrap_or("");
+                let was = self.tournaments.iter().find(|t| t.id == tournament.id);
+                if was.is_some_and(|t| t.state == TournamentState::Registering)
+                    && tournament.state == TournamentState::Running
+                    && tournament.players.iter().any(|p| p.username == me)
+                {
+                    self.attention = Some(tw("{name} has started!", &[("name", &tournament.name)]));
+                }
                 match self.tournaments.iter_mut().find(|t| t.id == tournament.id) {
                     Some(t) => *t = tournament,
                     None => self.tournaments.push(tournament),
@@ -1497,6 +1510,40 @@ impl Online {
 
         self.draw_invites(ui, false);
         action
+    }
+
+    /// A scheduled tournament (the weekly cup) starts within ten minutes:
+    /// tell the player once, whether they signed up or not.
+    fn tournaments_starting(&mut self) {
+        if !self.signed_in() || self.lan {
+            return;
+        }
+        let now = crate::game::unix_now();
+        let me = self.me.as_ref().map(|m| m.username.clone()).unwrap_or_default();
+        let soon: Vec<(u64, String, bool)> = self
+            .tournaments
+            .iter()
+            .filter(|t| t.state == TournamentState::Registering && !t.private)
+            .filter(|t| t.starts_at.is_some_and(|at| at > now && at - now <= 600))
+            .filter(|t| !self.told_starting.contains(&t.id))
+            .map(|t| (t.id, t.name.clone(), t.players.iter().any(|p| p.username == me)))
+            .collect();
+        for (id, name, signed_up) in soon {
+            self.told_starting.push(id);
+            let text = if signed_up {
+                tw("{name} starts in a few minutes: get ready!", &[("name", &name)])
+            } else if self
+                .tournaments
+                .iter()
+                .any(|t| t.id == id && t.players.len() < t.size as usize)
+            {
+                tw("{name} starts in a few minutes: there is still room.", &[("name", &name)])
+            } else {
+                continue;
+            };
+            self.toast(text.clone(), true);
+            self.attention = Some(text);
+        }
     }
 
     /// The tabs over the right side of the lounge.

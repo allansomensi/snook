@@ -29,6 +29,15 @@ pub struct SettingsScreen {
 }
 
 impl SettingsScreen {
+    /// Development aid (`--settings` with SNOOKERED_SETTINGS_TAB=game): opens on a tab.
+    pub fn dev_tab(&mut self) {
+        match crate::dev::var("SNOOKERED_SETTINGS_TAB").as_deref() {
+            Some("game") => self.tab = Tab::Game,
+            Some("sound") => self.tab = Tab::Sound,
+            _ => {}
+        }
+    }
+
     pub fn draw(&mut self, ui: &mut Ui, config: &mut Config, in_match: bool) -> SettingsAction {
         let sw = crate::ui::vw();
         let sh = crate::ui::vh();
@@ -162,6 +171,14 @@ impl SettingsScreen {
                 if config.camera_follow {
                     ui.checkbox(x + 260.0, y, t("Pull back for shots"), &mut config.shot_camera);
                 }
+                y += 38.0;
+                ui.checkbox(x, y, t("TV camera when watching"), &mut config.tv_camera);
+                ui.checkbox(
+                    x + 260.0,
+                    y,
+                    t("System notifications"),
+                    &mut config.desktop_notifications,
+                );
                 y += 38.0;
                 if !in_match {
                     ui.text(t("Game server"), x, y + 7.0, 15.0, CREAM, false);

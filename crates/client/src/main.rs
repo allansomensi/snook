@@ -272,6 +272,7 @@ async fn main() {
     let mut back_to_lounge = false;
     let mut settings_open = options.settings;
     let mut settings_screen = SettingsScreen::default();
+    settings_screen.dev_tab();
     if options.top_view {
         rig.mode = CameraMode::Top;
     }
@@ -375,7 +376,9 @@ async fn main() {
         }
         notifier.update();
         for net in [Some(&mut online), lan.as_mut().map(|l| &mut l.net)].into_iter().flatten() {
-            if let Some(text) = net.attention.take() {
+            if let Some(text) = net.attention.take()
+                && config.desktop_notifications
+            {
                 notifier.tell(&text);
             }
         }

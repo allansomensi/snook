@@ -1,6 +1,7 @@
 //! Telling a player who is in another window: a notification from the
 //! system (and, on Windows, a flashing taskbar button) when an invitation
-//! arrives, "Play now" finds an opponent or a friend comes online.
+//! arrives, "Play now" finds an opponent, a friend comes online or a
+//! tournament is about to start. Settings → Game turns them off.
 //!
 //! The game can't see whether its window has the focus, so it notifies when
 //! nobody has touched it for a while (the player is somewhere else).
@@ -127,16 +128,21 @@ mod windows {
         }
     }
 
-    /// A toast from the system (Windows 10 and later).
+    /// A toast from the system (Windows 10 and later). Windows only shows
+    /// toasts from an app it knows: the game's Start menu entry (the
+    /// Microsoft Store package, or the installer's shortcut), else
+    /// PowerShell's own (a portable copy has no entry).
     pub fn toast(text: &str) {
         let quoted = text.replace('\'', "''");
         let script = format!(
-            "[Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime] > $null; \
+            "$id = (Get-StartApps | Where-Object {{ $_.Name -eq '{name}' }} | Select-Object -First 1).AppID; \
+             if (-not $id) {{ $id = '{{1AC14E77-02E7-4E5D-B744-2EB1AE5198B7}}\\WindowsPowerShell\\v1.0\\powershell.exe' }}; \
+             [Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime] > $null; \
              $t = [Windows.UI.Notifications.ToastNotificationManager]::GetTemplateContent([Windows.UI.Notifications.ToastTemplateType]::ToastText02); \
              $n = $t.GetElementsByTagName('text'); \
              $n.Item(0).AppendChild($t.CreateTextNode('{name}')) > $null; \
              $n.Item(1).AppendChild($t.CreateTextNode('{quoted}')) > $null; \
-             [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('{name}').Show([Windows.UI.Notifications.ToastNotification]::new($t))",
+             [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier($id).Show([Windows.UI.Notifications.ToastNotification]::new($t))",
             name = snookered_proto::GAME_NAME
         );
         const CREATE_NO_WINDOW: u32 = 0x0800_0000;
