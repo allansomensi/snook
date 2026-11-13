@@ -940,3 +940,9 @@ See the tournaments	Ver los torneos
 Open the shop	Abrir la tienda
 See VIP	Ver el VIP
 See the missions	Ver las misiones
+A new version of the game is out: update to play online.	Salió una nueva versión del juego: actualiza para jugar en línea.
+Update in the Microsoft Store	Actualizar en Microsoft Store
+Update now	Actualizar ahora
+Download the new version	Descargar la nueva versión
+New version out	Nueva versión disponible
+Get the new version to play online	Consigue la nueva versión para jugar en línea

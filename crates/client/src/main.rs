@@ -39,6 +39,7 @@ mod setup;
 mod shop;
 mod textures;
 mod ui;
+mod update;
 mod util;
 
 use macroquad::prelude::*;
@@ -374,6 +375,11 @@ async fn main() {
             if !before && current.as_ref().is_some_and(|m| m.is_online()) {
                 match_from_lan = true;
             }
+        }
+        // The new version's installer is running: it replaces this copy.
+        if online.quit_for_update {
+            config.save();
+            break;
         }
         notifier.update();
         for net in [Some(&mut online), lan.as_mut().map(|l| &mut l.net)].into_iter().flatten() {
@@ -714,6 +720,9 @@ async fn main() {
                                 shop.open(&mut online);
                                 back_to_lounge = false;
                                 next = Some(Screen::Shop);
+                            }
+                            MenuAction::Update => {
+                                online.quit_for_update = update::start();
                             }
                             MenuAction::Note(a) => match online.note_action(a) {
                                 Some(OnlineAction::ShopVip) => {

@@ -16,6 +16,8 @@ pub enum MenuAction {
     VsComputer,
     /// Picks up the saved game against the computer.
     ContinueGame,
+    /// Get the new version (the server refused this one).
+    Update,
     /// The button under a note on the board.
     Note(snookered_proto::NoteAction),
     TwoPlayers,
@@ -248,6 +250,13 @@ impl Menu {
                 ui.text(&line, r.x + 56.0, r.y + 36.0, 13.0, MUTED, false);
                 draw_circle(r.x + r.w - 16.0, r.y + 16.0, 4.0, Color::new(0.35, 0.85, 0.45, 1.0));
             }
+            None if online.outdated => {
+                // This version is too old for the server.
+                crate::icons::draw(Icon::Refresh, vec2(r.x + 30.0, r.y + 32.0), 26.0, GOLD);
+                ui.text(t("New version out"), r.x + 56.0, r.y + 12.0, 17.0, GOLD, true);
+                let sub = ui.ellipsize(crate::online::update_label(), r.w - 70.0, 12.0);
+                ui.text(&sub, r.x + 56.0, r.y + 37.0, 12.0, CREAM, false);
+            }
             None => {
                 crate::icons::draw(Icon::Person, vec2(r.x + 30.0, r.y + 32.0), 28.0, MUTED);
                 let (title, sub) = match online.stage {
@@ -265,11 +274,19 @@ impl Menu {
             }
         }
         if hover && ui.clicked(r) {
-            *action = if online.me.is_some() { MenuAction::Profile } else { MenuAction::Online };
+            *action = if online.me.is_some() {
+                MenuAction::Profile
+            } else if online.outdated {
+                MenuAction::Update
+            } else {
+                MenuAction::Online
+            };
         }
         if hover {
             let tip = if online.me.is_some() {
                 t("Your profile")
+            } else if online.outdated {
+                t("Get the new version to play online")
             } else {
                 t("Sign in or create an account")
             };

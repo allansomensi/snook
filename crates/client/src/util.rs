@@ -9,6 +9,11 @@ pub fn open_url(url: &str) -> bool {
     open_default(url)
 }
 
+/// The Microsoft Store's "Downloads and updates" page.
+pub fn open_store_updates() -> bool {
+    open_default("ms-windows-store://downloadsandupdates")
+}
+
 /// Windows: ShellExecuteW, which hands the whole address to the browser
 /// without a shell. `explorer <url>` drops everything after `#`, and
 /// Stripe's checkout pages need that part ("This link is incomplete").

@@ -198,6 +198,19 @@ pub struct Online {
     board: Vec<snookered_proto::BoardNote>,
     /// Scheduled tournaments the player was already told are about to start.
     told_starting: Vec<u64>,
+    /// The server refused this version of the game: a newer one is out.
+    pub outdated: bool,
+    /// The new version's installer is on its way: the game should close.
+    pub quit_for_update: bool,
+}
+
+/// The update button, for how this copy of the game is updated.
+pub fn update_label() -> &'static str {
+    match crate::update::how() {
+        crate::update::How::Store => t("Update in the Microsoft Store"),
+        crate::update::How::Installer => t("Update now"),
+        crate::update::How::Page => t("Download the new version"),
+    }
 }
 
 /// A note's colour: gold notices, green events, blue rules.
@@ -388,6 +401,8 @@ impl Online {
             mission_done: false,
             board: Vec::new(),
             told_starting: Vec::new(),
+            outdated: false,
+            quit_for_update: false,
         }
     }
 
@@ -536,6 +551,7 @@ impl Online {
         let mut save = false;
         match msg {
             ServerMsg::AuthOk { player, token } => {
+                self.outdated = false;
                 if let Some(m) = current.as_mut()
                     && matches!(self.stage, Stage::Reconnecting { .. })
                 {
@@ -570,7 +586,10 @@ impl Online {
                 }
             }
             ServerMsg::AuthError { reason } => {
-                if self.auto_resume && !self.token.is_empty() {
+                // This version is too old for the server: the saved session
+                // is still good for the new one.
+                self.outdated = reason.contains("out of date");
+                if self.auto_resume && !self.token.is_empty() && !self.outdated {
                     // The saved session expired (or the account was banned).
                     self.token.clear();
                     config.token.clear();
@@ -1234,6 +1253,12 @@ impl Online {
         }
         y += 54.0;
         match &self.error {
+            Some(_) if self.outdated => {
+                let msg = t("A new version of the game is out: update to play online.");
+                for (k, line) in ui.wrap(msg, inner, 14.0).iter().take(2).enumerate() {
+                    ui.text_centered(line, sw / 2.0, y + k as f32 * 18.0, 14.0, GOLD, true);
+                }
+            }
             Some(e) => {
                 for (k, line) in ui.wrap(e, inner, 14.0).iter().take(3).enumerate() {
                     ui.text_centered(line, sw / 2.0, y + k as f32 * 18.0, 14.0, ALERT, false);
@@ -1252,7 +1277,15 @@ impl Online {
         if let Some(code) = crate::countries::draw_picker(ui) {
             self.country = code;
         }
-        if !connected
+        if self.outdated && self.error.is_some() {
+            // Trying again can't help: the new version can.
+            let label = update_label();
+            let w = (ui.text_size(label, 14.0, true).x + 40.0).min(inner - 130.0);
+            let b = Rect::new(x + inner - w, r.y + r.h - 46.0, w, 34.0);
+            if ui.primary_button(b, label) {
+                self.quit_for_update = crate::update::start();
+            }
+        } else if !connected
             && ui.button(
                 Rect::new(x + inner - 110.0, r.y + r.h - 44.0, 110.0, 30.0),
                 t("Retry"),
