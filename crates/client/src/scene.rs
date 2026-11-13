@@ -1021,10 +1021,11 @@ impl Default for Looks {
 
 /// A cue of the given design, chalked with `chalk` (shop codes).
 pub fn cue_mesh(cue: &str, chalk: &str, white: &Texture2D) -> gfx::Model {
+    use snookered_proto::shop::CueStyle;
     use snookered_proto::shop::{Look, item};
-    let (butt, accent, ring) = match item(cue).map(|i| i.look) {
-        Some(Look::Cue { butt, accent, ring, .. }) => (butt, accent, ring),
-        _ => ([35, 20, 12], [20, 20, 24], [240, 238, 228]),
+    let (butt, accent, ring, style) = match item(cue).map(|i| i.look) {
+        Some(Look::Cue { butt, accent, ring, style }) => (butt, accent, ring, style),
+        _ => ([35, 20, 12], [20, 20, 24], [240, 238, 228], CueStyle::Plain),
     };
     let chalk = match item(chalk).map(|i| i.look) {
         Some(Look::Chalk(c)) => c,
@@ -1036,7 +1037,24 @@ pub fn cue_mesh(cue: &str, chalk: &str, white: &Texture2D) -> gfx::Model {
     m.frustum(0.0, 0.0062, 0.018, 0.0063, 12, rgb(240, 238, 228)); // ferrule
     m.frustum(0.018, 0.0063, 0.80, 0.0105, 16, rgb(222, 190, 135)); // maple shaft
     m.frustum(0.80, 0.0105, 0.815, 0.0106, 16, c(ring)); // joint ring
-    m.frustum(0.815, 0.0106, 1.10, 0.0125, 16, c(butt)); // forearm
+    // The forearm, with the cue's pattern in the accent colour (as in the
+    // shop), so everyone at the table can tell the cue apart.
+    let (b, a) = (c(butt), c(accent));
+    match style {
+        CueStyle::Plain => m.frustum(0.815, 0.0106, 1.10, 0.0125, 16, b),
+        CueStyle::Points => m.painted_frustum(0.815, 0.0106, 1.10, 0.0125, 32, 40, |u, v| {
+            // Four points rising from the butt end towards the tip.
+            let side = ((u * 4.0).fract() - 0.5).abs() * 2.0;
+            if v > 0.12 + 0.88 * side { a } else { b }
+        }),
+        CueStyle::Spiral => m.painted_frustum(0.815, 0.0106, 1.10, 0.0125, 32, 40, |u, v| {
+            if (u * 2.0 + v * 3.0).fract() < 0.38 { a } else { b }
+        }),
+        CueStyle::Weave => m.painted_frustum(0.815, 0.0106, 1.10, 0.0125, 24, 30, |u, v| {
+            let (i, j) = ((u * 12.0) as i32, (v * 15.0) as i32);
+            if (i + j) % 2 == 0 { a } else { b }
+        }),
+    }
     m.frustum(1.10, 0.0125, 1.115, 0.0126, 16, c(ring)); // ring
     m.frustum(1.115, 0.0126, 1.35, 0.0138, 16, c(accent)); // wrap
     m.frustum(1.35, 0.0138, 1.47, 0.0148, 16, c(butt)); // butt

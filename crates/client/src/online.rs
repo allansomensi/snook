@@ -624,6 +624,13 @@ impl Online {
                 if self.me.as_ref().is_some_and(|me| me.username == player.username) {
                     self.me = Some(player.clone());
                 }
+                // Someone at this table changed their cue, chalk or effect.
+                if let Some(m) = current.as_mut().filter(|m| m.is_online())
+                    && let Some(seat) = m.names.iter().position(|n| *n == player.username)
+                {
+                    m.cue_looks[seat] = (player.cue.clone(), player.chalk.clone());
+                    m.effects[seat] = player.effect.clone();
+                }
                 for f in &mut self.friends.friends {
                     if f.player.username == player.username {
                         f.player = player.clone();

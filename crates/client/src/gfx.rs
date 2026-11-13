@@ -823,6 +823,46 @@ impl MeshBuilder {
         }
     }
 
+    /// A frustum painted cell by cell: `paint(u, v)` gives the colour at
+    /// `u` round the side (0..1) and `v` along it (0 at `y0`, 1 at `y1`).
+    /// Each cell has its own vertices, so patterns keep sharp edges.
+    #[allow(clippy::too_many_arguments)]
+    pub fn painted_frustum(
+        &mut self,
+        y0: f32,
+        r0: f32,
+        y1: f32,
+        r1: f32,
+        segments: u32,
+        rows: u32,
+        paint: impl Fn(f32, f32) -> Color,
+    ) {
+        for row in 0..rows {
+            let (v0, v1) = (row as f32 / rows as f32, (row + 1) as f32 / rows as f32);
+            let (ya, yb) = (y0 + (y1 - y0) * v0, y0 + (y1 - y0) * v1);
+            let (ra, rb) = (r0 + (r1 - r0) * v0, r0 + (r1 - r0) * v1);
+            for k in 0..segments {
+                let u = (k as f32 + 0.5) / segments as f32;
+                let color = paint(u, (v0 + v1) / 2.0);
+                let a0 = k as f32 / segments as f32 * std::f32::consts::TAU;
+                let a1 = (k + 1) as f32 / segments as f32 * std::f32::consts::TAU;
+                let d0 = vec3(a0.cos(), 0.0, a0.sin());
+                let d1 = vec3(a1.cos(), 0.0, a1.sin());
+                let p = [
+                    d0 * ra + Vec3::Y * ya,
+                    d1 * ra + Vec3::Y * ya,
+                    d1 * rb + Vec3::Y * yb,
+                    d0 * rb + Vec3::Y * yb,
+                ];
+                let i: Vec<u16> = [(0, d0), (1, d1), (2, d1), (3, d0)]
+                    .iter()
+                    .map(|&(k, n)| self.push(p[k], Vec2::ZERO, n, color))
+                    .collect();
+                self.indices.extend_from_slice(&[i[0], i[2], i[1], i[0], i[3], i[2]]);
+            }
+        }
+    }
+
     pub fn frustum(&mut self, y0: f32, r0: f32, y1: f32, r1: f32, segments: u32, color: Color) {
         for k in 0..segments {
             let a0 = k as f32 / segments as f32 * std::f32::consts::TAU;
