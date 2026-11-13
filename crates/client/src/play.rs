@@ -132,6 +132,7 @@ impl Controls {
             self.orbit_drag += delta.length();
             // A few pixels of slack, so a click doesn't nudge the view.
             if self.orbit_drag > 4.0 {
+                rig.tv_paused = true;
                 self.orbit(rig, delta);
             }
         }
@@ -140,6 +141,7 @@ impl Controls {
         }
         if !typing {
             if is_key_pressed(KeyCode::Tab) || is_key_pressed(KeyCode::T) {
+                rig.tv_paused = true;
                 if rig.mode == CameraMode::Top {
                     rig.enter_3d();
                 } else {
@@ -155,6 +157,7 @@ impl Controls {
             if wheel != 0.0 {
                 let step = if wheel > 0.0 { 0.88 } else { 1.0 / 0.88 };
                 let toward = pointer_on_table(cam, 0.0).map(|p| surface(p, 0.0));
+                rig.tv_paused = true;
                 rig.zoom(step, toward);
             }
         }

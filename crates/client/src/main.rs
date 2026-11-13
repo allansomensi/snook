@@ -407,6 +407,11 @@ async fn main() {
         }
 
         rig.follow_shots = config.shot_camera;
+        // Watching someone else's game (live or a replay): the broadcast camera.
+        rig.tv = config.tv_camera
+            && current.as_ref().is_some_and(|m| {
+                m.is_spectating() || m.is_replay() || crate::dev::flag("SNOOKERED_TV")
+            });
         if rig.follow_cue != config.camera_follow {
             rig.follow_cue = config.camera_follow;
             rig.reset();
@@ -635,7 +640,10 @@ async fn main() {
                         }
                         HudAction::Settings => settings_open = true,
                         HudAction::ResetCamera => rig.reset(),
-                        HudAction::Zoom(z) => rig.set_zoom_level(z),
+                        HudAction::Zoom(z) => {
+                            rig.tv_paused = true;
+                            rig.set_zoom_level(z);
+                        }
                         HudAction::None => {
                             if m.is_online() {
                                 let net = if match_from_lan {

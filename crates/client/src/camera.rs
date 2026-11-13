@@ -36,6 +36,28 @@ pub struct CameraRig {
     initialised: bool,
     /// Current field of view (narrower overhead, so the table looks flat).
     fovy: f32,
+    /// Watching a game: the camera directs itself and cuts between angles
+    /// like a television broadcast.
+    pub tv: bool,
+    /// The viewer moved the camera: the broadcast waits until the view is
+    /// reset.
+    pub tv_paused: bool,
+    tv_state: TvState,
+}
+
+/// What the broadcast is showing.
+#[derive(Debug, Clone, Copy, Default)]
+struct TvState {
+    /// The balls were rolling last frame.
+    rolling: bool,
+    /// Seconds since the last change of what is happening.
+    time: f32,
+    /// Shots shown so far (picks the angle of the next one).
+    shots: u32,
+    /// The establishing shot of this turn is over.
+    close: bool,
+    /// The previous frame's angle (a change is a cut).
+    angle: u8,
 }
 
 pub const DEFAULT_PITCH: f32 = 0.42;
@@ -66,6 +88,9 @@ impl Default for CameraRig {
             up: Vec3::Y,
             initialised: false,
             fovy: 36f32.to_radians(),
+            tv: false,
+            tv_paused: false,
+            tv_state: TvState::default(),
         }
     }
 }
@@ -141,7 +166,9 @@ impl CameraRig {
         } else {
             (FIXED_PITCH, FIXED_DISTANCE)
         };
-        self.mode == CameraMode::Top
+        // A paused broadcast: resetting the view brings it back.
+        !(self.tv && self.tv_paused)
+            && self.mode == CameraMode::Top
             && self.orbit.abs() < 1e-3
             && self.focus.length() < 1e-3
             && (self.pitch - pitch).abs() < 1e-3
@@ -149,6 +176,7 @@ impl CameraRig {
     }
 
     pub fn reset(&mut self) {
+        self.tv_paused = false;
         self.mode = CameraMode::Top;
         self.orbit = 0.0;
         self.focus = Vec3::ZERO;
@@ -174,7 +202,94 @@ impl CameraRig {
         e
     }
 
+    /// The broadcast's view of `m`: (eye, target, field of view, angle).
+    /// A wide establishing shot when a turn begins, then from behind the
+    /// shooter while they aim; the rolling balls from above, from a high
+    /// corner or from high behind the shot, in turn.
+    fn tv_view(&mut self, dt: f32, m: &Match) -> (Vec3, Vec3, f32, u8) {
+        let center = vec3(0.0, TABLE_HEIGHT, 0.0);
+        let rolling = matches!(m.phase, Phase::Simulating(_) | Phase::Pause(_));
+        let st = &mut self.tv_state;
+        if rolling != st.rolling {
+            st.rolling = rolling;
+            st.time = 0.0;
+            st.close = false;
+            if rolling {
+                st.shots += 1;
+            }
+        }
+        st.time += dt;
+        let cue = to_world(m.game.ball(snookered_core::BallId::CUE).position);
+        let yaw = -(m.aim.yaw as f32);
+        let forward = vec3(yaw.cos(), 0.0, yaw.sin());
+        let side = if m.game.current_player() == 0 { 1.0 } else { -1.0 };
+        if !rolling {
+            // While the shooter studies the table: the whole table first.
+            if !st.close && st.time < 2.4 {
+                let eye = center + vec3(-0.35 * side, 1.25, 1.85 * side);
+                return (eye, center + vec3(0.0, -0.05, 0.0), 44f32.to_radians(), 1);
+            }
+            st.close = true;
+            let (pitch, dist) = (0.34f32, 1.3f32);
+            let eye = cue - forward * dist * pitch.cos() + Vec3::Y * dist * pitch.sin();
+            let look = cue + forward * 0.55;
+            return (Self::constrain(eye), look, 48f32.to_radians(), 2);
+        }
+        // The balls in motion: where the action is.
+        let moving: Vec<Vec3> = m
+            .balls()
+            .iter()
+            .filter(|b| b.in_play() && b.velocity.length() > 0.02)
+            .map(|b| to_world(b.position))
+            .collect();
+        let action = if moving.is_empty() {
+            center
+        } else {
+            moving.iter().fold(Vec3::ZERO, |a, p| a + *p) / moving.len() as f32
+        };
+        let look = center.lerp(vec3(action.x, TABLE_HEIGHT, action.z), 0.45);
+        match st.shots % 3 {
+            0 => (center + Vec3::Y * 2.9, center, 40f32.to_radians(), 3),
+            1 => {
+                let corner = vec3(2.1 * side, TABLE_HEIGHT + 1.35, -1.35 * side);
+                (corner, look, 46f32.to_radians(), 4)
+            }
+            _ => {
+                let (pitch, dist) = (0.78f32, 2.5f32);
+                let eye = look - forward * dist * pitch.cos() + Vec3::Y * dist * pitch.sin();
+                (Self::constrain(eye), look, 48f32.to_radians(), 5)
+            }
+        }
+    }
+
     pub fn update(&mut self, dt: f32, m: Option<&Match>, elapsed: f32) -> SceneCamera {
+        if self.tv
+            && !self.tv_paused
+            && let Some(m) = m
+        {
+            let (eye, target, fov, angle) = self.tv_view(dt, m);
+            let cut = angle != self.tv_state.angle || !self.initialised;
+            self.tv_state.angle = angle;
+            if cut {
+                // A cut: straight to the new angle, as on television.
+                self.eye = eye;
+                self.target = target;
+                self.fovy = fov;
+                self.initialised = true;
+            } else {
+                // Within one angle the camera glides after the play.
+                let k = 1.0 - (-dt * 3.0).exp();
+                self.eye = self.eye.lerp(eye, k);
+                self.target = self.target.lerp(target, k);
+                self.fovy += (fov - self.fovy) * k;
+            }
+            self.up = Vec3::Y;
+            let dir = (self.target - self.eye).normalize_or(Vec3::NEG_Z);
+            let up = if dir.cross(Vec3::Y).length() < 1e-3 { Vec3::NEG_Z } else { Vec3::Y };
+            return SceneCamera { eye: self.eye, target: self.target, up, fovy: self.fovy };
+        }
+        // Back from the broadcast: the next one starts with a wide shot.
+        self.tv_state.angle = 0;
         let center = vec3(0.0, TABLE_HEIGHT, 0.0);
         let mut rate = 7.0;
         let (eye, target, up) = match m {
