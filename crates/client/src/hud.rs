@@ -963,7 +963,8 @@ impl Hud {
         let h = rows as f32 * CELL + 40.0;
         let p = Rect::new(b.x.min(crate::ui::vw() - w - 8.0), b.y - h - 8.0, w, h);
         ui.panel(p);
-        let open = snookered_proto::REACTIONS.iter().filter(|r| r.unlocked(&o.unlocked)).count();
+        let open =
+            snookered_proto::REACTIONS.iter().filter(|r| r.available(&o.unlocked, o.vip)).count();
         ui.text(
             &tw("Reactions {n}/{total}", &[("n", &open), ("total", &n)]),
             p.x + 10.0,
@@ -982,7 +983,7 @@ impl Hud {
                 CELL,
             );
             let center = vec2(c.x + c.w / 2.0, c.y + c.h / 2.0);
-            let unlocked = r.unlocked(&o.unlocked);
+            let unlocked = r.available(&o.unlocked, o.vip);
             let hover = ui.hovering(c);
             if unlocked {
                 if hover {
@@ -1005,7 +1006,9 @@ impl Hud {
                     11.0,
                     MUTED,
                 );
-                if hover {
+                if hover && r.is_vip() {
+                    tip = Some((t("For VIP members").to_string(), c));
+                } else if hover {
                     let how = r
                         .unlock
                         .and_then(|a| snookered_proto::ACHIEVEMENTS.iter().find(|x| x.code == a))

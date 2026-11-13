@@ -962,6 +962,10 @@ impl ShopScreen {
             t("Name colours for the lounge and exclusive frames, cloth, cues, balls and effects")
                 .to_string(),
             tw("Exclusive items: {list}", &[("list", &exclusives.join(", "))]),
+            tw(
+                "{n} reactions of your own to send during games",
+                &[("n", &snookered_proto::REACTIONS.iter().filter(|r| r.is_vip()).count())],
+            ),
             t("Every replay kept (free players keep their last 10 games)").to_string(),
             t("16-player tournaments, and first place on the waiting list of a full one")
                 .to_string(),

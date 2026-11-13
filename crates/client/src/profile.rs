@@ -389,7 +389,9 @@ impl ProfileScreen {
         let ry = area.y + 28.0 + rows as f32 * (cell + 6.0) + 14.0;
         if ry + 60.0 < area.y + area.h {
             let codes: Vec<&str> = p.achievements.iter().map(|(c, _)| c.as_str()).collect();
-            let open = snookered_proto::REACTIONS.iter().filter(|r| r.unlocked(&codes)).count();
+            let vip = p.player.vip;
+            let open =
+                snookered_proto::REACTIONS.iter().filter(|r| r.available(&codes, vip)).count();
             ui.text(
                 &tw(
                     "Reactions {n}/{total}",
@@ -411,7 +413,7 @@ impl ProfileScreen {
                 if c.y + size / 2.0 > area.y + area.h {
                     break;
                 }
-                if r.unlocked(&codes) {
+                if r.available(&codes, vip) {
                     crate::reactions::draw(r.code, c, size, 1.0);
                 } else {
                     crate::reactions::draw_locked(r.code, c, size * 0.9);

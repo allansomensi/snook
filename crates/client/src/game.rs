@@ -288,6 +288,8 @@ pub struct OnlineMatch {
     pub preview: Option<(FeedLine, f32)>,
     /// Achievements of this player (they unlock reactions).
     pub unlocked: Vec<String>,
+    /// This player is VIP (the VIP reactions).
+    pub vip: bool,
     /// Reactions on screen: who sent which (a seat, or [`SPECTATOR_SEAT`]),
     /// and for how long it has shown.
     pub reactions: Vec<(usize, &'static str, f32)>,
@@ -537,6 +539,7 @@ impl Match {
                 reactions: Vec::new(),
                 spectator: spectating,
                 spectators: 0,
+                vip: false,
                 support: [0, 0],
                 cheering: None,
                 remote_aimed: false,

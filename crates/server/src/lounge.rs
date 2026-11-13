@@ -932,7 +932,7 @@ impl Lounge {
     fn react(&mut self, k: &str, code: &str) {
         let Some(r) = snookered_proto::reaction(code) else { return };
         let Some(s) = self.sessions.get_mut(k) else { return };
-        if !r.unlocked(&s.achievements) || !s.reaction_bucket.take() {
+        if !r.available(&s.achievements, s.look.vip) || !s.reaction_bucket.take() {
             return;
         }
         if s.user.is_muted(now()) {

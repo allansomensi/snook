@@ -410,6 +410,10 @@ async fn main() {
             }
         }
 
+        // VIP reactions follow the wallet.
+        if let Some(o) = current.as_mut().and_then(|m| m.online.as_mut()) {
+            o.vip = !match_from_lan && online.wallet.as_ref().is_some_and(|w| w.is_vip());
+        }
         if let Some(m) = current.as_mut() {
             if !hud.paused || m.is_online() {
                 m.update(dt);

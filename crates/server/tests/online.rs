@@ -280,8 +280,10 @@ async fn reactions_need_to_be_unlocked() {
     alice.expect("achievements", |m| matches!(m, ServerMsg::MyAchievements { .. })).await;
     let (mut bob, _) = Client::register(&url, "bob").await;
     start_match(&mut alice, &mut bob, "bob", "alice", false).await;
-    // The crown needs a 1900 rating: dropped. The clap is for everyone.
+    // The crown needs a 1900 rating, the gem VIP: dropped. The clap is for
+    // everyone.
     alice.send(ClientMsg::React { code: "crown".into() }).await;
+    alice.send(ClientMsg::React { code: "gem".into() }).await;
     alice.send(ClientMsg::React { code: "nonsense".into() }).await;
     alice.send(ClientMsg::React { code: "clap".into() }).await;
     let ServerMsg::Reaction { code, .. } =
@@ -1265,4 +1267,23 @@ async fn withdrawing_while_waiting_for_an_opponent_frees_the_player() {
         unreachable!()
     };
     assert_eq!(tournament.champion.as_deref(), Some("cid"));
+}
+
+#[tokio::test]
+async fn vip_members_have_their_own_reactions() {
+    let (url, server) = start_on(snookered_server::store::Store::memory()).await;
+    let (mut alice, _) = Client::register(&url, "alice").await;
+    let (mut bob, _) = Client::register(&url, "bob").await;
+    let user = server.store.user_by_name("alice").await.unwrap().unwrap();
+    server.store.set_vip(user.id, snookered_server::now() + 86_400, false).await.unwrap();
+    snookered_server::shop::push_wallet(&server, &user).await;
+    alice.expect("wallet", |m| matches!(m, ServerMsg::Wallet { .. })).await;
+    start_match(&mut alice, &mut bob, "bob", "alice", false).await;
+    alice.send(ClientMsg::React { code: "gem".into() }).await;
+    let ServerMsg::Reaction { code, .. } =
+        bob.expect("reaction", |m| matches!(m, ServerMsg::Reaction { .. })).await
+    else {
+        unreachable!()
+    };
+    assert_eq!(code, "gem");
 }

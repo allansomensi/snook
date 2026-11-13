@@ -960,3 +960,5 @@ Play (Space)	Reproduzir (Espaço)
 Pause (Space)	Pausar (Espaço)
 Speed	Velocidade
 Shot {n} of {total}	Tacada {n} de {total}
+For VIP members	Para membros VIP
+{n} reactions of your own to send during games	{n} reações exclusivas para mandar nas partidas
