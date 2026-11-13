@@ -1,9 +1,16 @@
 # Changelog
 
-## Unreleased (protocol 12)
+## 0.1.3 (protocol 12)
 
-Not released yet: the server must go out together with the new game
-(protocol 12), so 0.1.2 players are asked to update.
+The server still lets 0.1.2 in (protocol 11): it ignores what is new, so
+nobody is locked out while the update (and the Store's review of it)
+reaches everyone.
+
+### Economy
+- Coins come much more slowly: 4 per rated game and 6 more for a win (up
+  to 50 a day), a daily bonus of 10, and smaller mission rewards (10–15 a
+  day, 50–70 a week). Items cost 2.5 times as much (400 to 6250 coins).
+  Coin packs, VIP and the welcome pack bring the same coins as before.
 
 ### Lounge
 - **Missions**: three a day and two a week, the same for everyone (play,
