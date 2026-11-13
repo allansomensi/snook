@@ -13,6 +13,7 @@ use axum::response::{Html, IntoResponse, Response};
 use serde_json::Value;
 use snookered_proto::shop::{
     self, COIN_PACKS, Category, Price, VIP_GIFT, VIP_GIFT_SECS, VIP_MONTHLY_COINS, VIP_PLAN,
+    WELCOME_COINS, WELCOME_ITEMS, WELCOME_PACK,
 };
 use snookered_proto::{ClientMsg, PackOffer, ServerMsg};
 
@@ -105,6 +106,7 @@ fn shop_info(server: &Server) -> ServerMsg {
             vip_price: stripe.label(VIP_PLAN).unwrap_or_default(),
             vip_coins: VIP_MONTHLY_COINS,
             vip_gift_price: stripe.label(VIP_GIFT).unwrap_or_default(),
+            welcome_price: stripe.label(WELCOME_PACK).unwrap_or_default(),
         },
         None => ServerMsg::ShopInfo {
             payments: false,
@@ -112,6 +114,7 @@ fn shop_info(server: &Server) -> ServerMsg {
             vip_price: String::new(),
             vip_coins: VIP_MONTHLY_COINS,
             vip_gift_price: String::new(),
+            welcome_price: String::new(),
         },
     }
 }
@@ -199,6 +202,23 @@ pub async fn handle(server: &Arc<Server>, me: &User, msg: ClientMsg, send: &impl
                 Ok(url) => send(ServerMsg::PaymentPage { url }),
                 Err(e) => {
                     tracing::warn!("checkout for {}: {e}", me.username);
+                    error("The payment page could not be opened. Try again in a moment.")
+                }
+            }
+        }
+        ClientMsg::BuyWelcomePack => {
+            let Some(stripe) = &server.stripe else { return error("Purchases are not available.") };
+            let w = server.store.wallet(me.id).await.unwrap_or_default();
+            if shop::has_welcome_pack(&w.owned) {
+                return error("You already have the welcome pack.");
+            }
+            match stripe
+                .checkout_pack(me.id, &me.username, w.stripe_customer.as_deref(), WELCOME_PACK)
+                .await
+            {
+                Ok(url) => send(ServerMsg::PaymentPage { url }),
+                Err(e) => {
+                    tracing::warn!("welcome pack checkout for {}: {e}", me.username);
                     error("The payment page could not be opened. Try again in a moment.")
                 }
             }
@@ -503,6 +523,56 @@ async fn vip_gift_paid(
     Ok(())
 }
 
+/// The welcome pack was paid (checkout session `obj`): its items and
+/// coins. Safe to run more than once.
+async fn welcome_paid(server: &Server, user: &User, obj: &Value) -> Result<(), String> {
+    let err = |e: crate::store::StoreError| e.to_string();
+    let payment_id = str_of(obj, "payment_intent").or(str_of(obj, "id")).unwrap_or("");
+    if server.store.payment(payment_id).await.map_err(err)?.is_some_and(|p| p.refunded) {
+        return Ok(());
+    }
+    server
+        .store
+        .record_payment(&Payment {
+            id: payment_id.to_string(),
+            user_id: user.id,
+            kind: "welcome".into(),
+            coins: WELCOME_COINS as i64,
+            amount: obj["amount_total"].as_i64().unwrap_or(0),
+            currency: str_of(obj, "currency").unwrap_or("").to_string(),
+            at: now(),
+            refunded: false,
+            email: email_of(obj),
+        })
+        .await
+        .map_err(err)?;
+    for code in WELCOME_ITEMS {
+        server.store.grant_item(user.id, code, "welcome pack", now()).await.map_err(err)?;
+    }
+    let applied = server
+        .store
+        .credit(
+            user.id,
+            WELCOME_COINS as i64,
+            "welcome pack",
+            Some(&format!("pay:{payment_id}")),
+            now(),
+        )
+        .await
+        .map_err(err)?;
+    if applied {
+        tracing::info!(user = user.id, "welcome pack bought");
+        // Bought to be used: the new cue goes on straight away.
+        let cue = WELCOME_ITEMS[0];
+        let _ = server.store.equip(user.id, Category::Cue.code(), cue).await;
+        notify(server, user, "Your welcome pack is here!").await;
+        offer_email(server, user).await;
+    } else {
+        push_wallet(server, user).await;
+    }
+    Ok(())
+}
+
 /// Applies one Stripe event. Safe to run more than once.
 pub async fn apply_event(server: &Server, event: &Value) -> Result<(), String> {
     let kind = str_of(event, "type").unwrap_or("");
@@ -541,6 +611,9 @@ pub async fn apply_event(server: &Server, event: &Value) -> Result<(), String> {
                 && str_of(obj, "payment_status") == Some("paid")
             {
                 let pack = obj.pointer("/metadata/pack").and_then(Value::as_str).unwrap_or("");
+                if pack == WELCOME_PACK {
+                    return welcome_paid(server, &user, obj).await;
+                }
                 let Some(pack) = shop::coin_pack(pack) else {
                     return Err(format!("unknown pack {pack}"));
                 };

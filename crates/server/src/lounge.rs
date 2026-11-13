@@ -813,6 +813,7 @@ impl Lounge {
             | ClientMsg::SubscribeVip
             | ClientMsg::ManageVip
             | ClientMsg::GiftVip { .. }
+            | ClientMsg::BuyWelcomePack
             | ClientMsg::FriendRequest { .. }
             | ClientMsg::FriendAnswer { .. }
             | ClientMsg::FriendRemove { .. }

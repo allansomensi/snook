@@ -232,3 +232,23 @@ async fn a_vip_month_given_to_a_friend_is_theirs_once_and_taken_back_on_refund()
     apply_event(&server, &gift).await.unwrap();
     assert!(server.store.wallet(friend).await.unwrap().vip_until <= now());
 }
+
+#[tokio::test]
+async fn the_welcome_pack_brings_its_items_and_coins_once() {
+    use snookered_proto::shop::{WELCOME_COINS, WELCOME_ITEMS, has_welcome_pack};
+    let (server, id) = setup().await;
+    let mut paid = checkout(id, "paid", "checkout.session.completed");
+    paid["data"]["object"]["metadata"]["pack"] = json!("welcome_pack");
+    paid["data"]["object"]["payment_intent"] = json!("pi_welcome");
+    apply_event(&server, &paid).await.unwrap();
+    apply_event(&server, &paid).await.unwrap(); // delivered twice
+    let w = server.store.wallet(id).await.unwrap();
+    assert_eq!(w.coins, WELCOME_COINS as i64, "once");
+    assert!(WELCOME_ITEMS.iter().all(|c| w.owned.iter().any(|o| o == c)));
+    assert!(has_welcome_pack(&w.owned));
+    let cue = w.equipped.get("cue").map(String::as_str);
+    assert_eq!(cue, Some(WELCOME_ITEMS[0]), "the new cue is in use");
+    let refund = json!({ "type": "charge.refunded", "data": { "object": { "payment_intent": "pi_welcome" } } });
+    apply_event(&server, &refund).await.unwrap();
+    assert_eq!(server.store.wallet(id).await.unwrap().coins, 0);
+}

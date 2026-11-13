@@ -104,6 +104,8 @@ pub struct ShopOffers {
     pub vip_coins: u32,
     /// The price of a VIP month given to a friend (empty: not on sale).
     pub vip_gift_price: String,
+    /// The price of the welcome pack (empty: not on sale).
+    pub welcome_price: String,
 }
 
 pub struct Online {
@@ -892,9 +894,22 @@ impl Online {
                 }
                 self.wallet = Some(wallet);
             }
-            ServerMsg::ShopInfo { payments, packs, vip_price, vip_coins, vip_gift_price } => {
-                self.offers =
-                    Some(ShopOffers { payments, packs, vip_price, vip_coins, vip_gift_price });
+            ServerMsg::ShopInfo {
+                payments,
+                packs,
+                vip_price,
+                vip_coins,
+                vip_gift_price,
+                welcome_price,
+            } => {
+                self.offers = Some(ShopOffers {
+                    payments,
+                    packs,
+                    vip_price,
+                    vip_coins,
+                    vip_gift_price,
+                    welcome_price,
+                });
             }
             ServerMsg::VipGift { from, to } => {
                 let text = if self.me.as_ref().is_some_and(|me| me.username == to) {

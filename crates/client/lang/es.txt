@@ -948,3 +948,9 @@ New version out	Nueva versión disponible
 Get the new version to play online	Consigue la nueva versión para jugar en línea
 Cheer for {name}	Animar a {name}
 Crowd: {a} for {p0}, {b} for {p1}	Público: {a} con {p0}, {b} con {p1}
+welcome pack	pack de bienvenida
+Welcome pack	Pack de bienvenida
+Cue “{cue}”, cloth “{cloth}” and {n} coins · only once, sold nowhere else	Taco “{cue}”, paño “{cloth}” y {n} monedas · una sola vez, exclusivo
+Lagoon	Laguna
+You already have the welcome pack.	Ya tienes el pack de bienvenida.
+Your welcome pack is here!	¡Tu pack de bienvenida llegó!

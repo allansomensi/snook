@@ -152,6 +152,8 @@ pub enum Price {
     Achievement(&'static str),
     /// Only for VIP members (while they are VIP).
     Vip,
+    /// Comes with the welcome pack (and is kept).
+    Pack,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -283,6 +285,7 @@ pub const ITEMS: &[Item] = &[
     cloth("cloth_midnight", "Midnight", Price::Vip, [12, 17, 40]),
     cloth("cloth_emerald", "Emerald", Price::Vip, [6, 110, 74]),
     cloth("cloth_champion", "Champion's red", Price::Achievement("tournament_win"), [110, 12, 16]),
+    cloth("cloth_welcome", "Lagoon", Price::Pack, [14, 100, 112]),
     // Cues.
     cue("cue_classic", "Classic", Price::Free, [35, 20, 12], [20, 20, 24], [240, 238, 228], Plain),
     cue(
@@ -418,6 +421,15 @@ pub const ITEMS: &[Item] = &[
         [24, 10, 8],
         [240, 90, 20],
         [250, 200, 60],
+        Spiral,
+    ),
+    cue(
+        "cue_welcome",
+        "First break",
+        Price::Pack,
+        [30, 44, 52],
+        [40, 190, 200],
+        [235, 235, 228],
         Spiral,
     ),
     cue("cue_royal", "Crown", Price::Vip, [24, 30, 80], [190, 150, 60], [230, 200, 110], Points),
@@ -772,11 +784,22 @@ pub const VIP_GIFT: &str = "vip_gift";
 /// How long a given VIP month lasts, in seconds.
 pub const VIP_GIFT_SECS: i64 = 31 * 86_400;
 
+/// The welcome pack: a one-off purchase, once per account, with two items
+/// sold nowhere else and some coins.
+pub const WELCOME_PACK: &str = "welcome_pack";
+pub const WELCOME_ITEMS: [&str; 2] = ["cue_welcome", "cloth_welcome"];
+pub const WELCOME_COINS: u32 = 600;
+
+/// The player has the welcome pack already.
+pub fn has_welcome_pack(owned: &[String]) -> bool {
+    owned.iter().any(|o| o == WELCOME_ITEMS[0])
+}
+
 /// Whether a player owns or may use `item`.
 pub fn can_use(item: &Item, owned: &[String], achievements: &[String], vip: bool) -> bool {
     match item.price {
         Price::Free => true,
-        Price::Coins(_) => owned.iter().any(|o| o == item.code),
+        Price::Coins(_) | Price::Pack => owned.iter().any(|o| o == item.code),
         Price::Achievement(a) => achievements.iter().any(|c| c == a),
         Price::Vip => vip,
     }
@@ -804,6 +827,10 @@ mod tests {
                 assert!(crate::ACHIEVEMENTS.iter().any(|x| x.code == a), "{a}");
             }
         }
+        for code in WELCOME_ITEMS {
+            assert_eq!(item(code).map(|i| i.price), Some(Price::Pack), "{code}");
+        }
+        assert!(ITEMS.iter().filter(|i| i.price == Price::Pack).count() == WELCOME_ITEMS.len());
         let none: Vec<String> = Vec::new();
         assert!(can_use(item("cloth_green").unwrap(), &none, &none, false));
         assert!(!can_use(item("cloth_blue").unwrap(), &none, &none, false));

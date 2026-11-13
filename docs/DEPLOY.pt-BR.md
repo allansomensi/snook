@@ -183,6 +183,9 @@ segura da Stripe (cartão, Pix, boleto): o jogo nunca vê dados de cartão.
    - `vip_gift` (opcional): um mês de VIP de presente para um amigo, preço
      **único** (one-off). Sugestão: R$ 14,90. Sem ele, o botão de presentear
      VIP não aparece.
+   - `welcome_pack` (opcional): o pacote de boas-vindas (taco e pano
+     exclusivos e 600 moedas, uma vez por conta), preço **único**. Sugestão:
+     R$ 4,90. Sem ele, o pacote não aparece.
    Copie o **ID do preço** de cada um (começa com `price_`).
 5. **Settings → Billing → Customer portal:** ative o portal e permita
    cancelar a assinatura (é por ele que o jogador gerencia o VIP).
@@ -200,10 +203,10 @@ segura da Stripe (cartão, Pix, boleto): o jogo nunca vê dados de cartão.
    | `SNOOKERED_STRIPE_SECRET` | a chave secreta (`sk_test_…` ou `sk_live_…`) |
    | `SNOOKERED_STRIPE_WEBHOOK_SECRET` | o `whsec_…` do passo 6 |
    | `SNOOKERED_PUBLIC_URL` | `https://snook-server.onrender.com` |
-   | `SNOOKERED_STRIPE_PRICES` | `coins_500=price_A\|R$ 4,90;coins_1200=price_B\|R$ 9,90;coins_2800=price_C\|R$ 19,90;coins_7000=price_D\|R$ 44,90;vip_monthly=price_V\|R$ 14,90/mês;vip_gift=price_G\|R$ 14,90` |
+   | `SNOOKERED_STRIPE_PRICES` | `coins_500=price_A\|R$ 4,90;coins_1200=price_B\|R$ 9,90;coins_2800=price_C\|R$ 19,90;coins_7000=price_D\|R$ 44,90;vip_monthly=price_V\|R$ 14,90/mês;vip_gift=price_G\|R$ 14,90;welcome_pack=price_W\|R$ 4,90` |
 
    O texto depois de `|` é o preço mostrado no jogo: mantenha igual ao da
-   Stripe. Salve: o servidor reinicia e o log mostra `payments on (6 prices)`.
+   Stripe. Salve: o servidor reinicia e o log mostra `payments on (7 prices)`.
 8. No jogo: **Loja → Moedas → Comprar**. Paga no navegador; as moedas
    chegam em segundos. No painel `/admin`, a ficha do jogador mostra a
    carteira, os pagamentos e o extrato.

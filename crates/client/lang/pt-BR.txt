@@ -948,3 +948,9 @@ New version out	Nova versão disponível
 Get the new version to play online	Pegue a nova versão para jogar online
 Cheer for {name}	Torcer por {name}
 Crowd: {a} for {p0}, {b} for {p1}	Torcida: {a} por {p0}, {b} por {p1}
+welcome pack	pacote de boas-vindas
+Welcome pack	Pacote de boas-vindas
+Cue “{cue}”, cloth “{cloth}” and {n} coins · only once, sold nowhere else	Taco “{cue}”, pano “{cloth}” e {n} moedas · uma vez só, exclusivo
+Lagoon	Lagoa
+You already have the welcome pack.	Você já tem o pacote de boas-vindas.
+Your welcome pack is here!	Seu pacote de boas-vindas chegou!

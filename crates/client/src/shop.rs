@@ -232,7 +232,15 @@ fn price_label(item: &Item, usable: bool) -> String {
         Price::Coins(_) => t("for coins").to_string(),
         Price::Vip => "VIP".to_string(),
         Price::Achievement(_) => t("achievement").to_string(),
+        Price::Pack if usable => t("yours").to_string(),
+        Price::Pack => t("welcome pack").to_string(),
     }
+}
+
+/// Items the shop lists: the welcome pack's only where it is sold (or
+/// for those who have them).
+fn listed(item: &Item, online: &Online) -> bool {
+    item.price != Price::Pack || crate::channel::real_money_purchases() || online.can_use(item)
 }
 
 impl ShopScreen {
@@ -374,7 +382,7 @@ impl ShopScreen {
                 .iter()
                 .filter(|i| i.category == c && (i.price == Price::Free || online.can_use(i)))
                 .count();
-            let total = ITEMS.iter().filter(|i| i.category == c).count();
+            let total = ITEMS.iter().filter(|i| i.category == c && listed(i, online)).count();
             let tr = Rect::new(side.x, y, side.w, 34.0);
             let count = if signed_in { format!("{owned}/{total}") } else { String::new() };
             if ui.tab_with_count(tr, category_name(c), &count, self.tab == tab) {
@@ -423,7 +431,8 @@ impl ShopScreen {
         category: Category,
         area: Rect,
     ) -> Option<ShopAction> {
-        let items: Vec<&'static Item> = ITEMS.iter().filter(|i| i.category == category).collect();
+        let items: Vec<&'static Item> =
+            ITEMS.iter().filter(|i| i.category == category && listed(i, online)).collect();
         // Room for the scroll bar on the right.
         let area = Rect::new(area.x, area.y, area.w - 14.0, area.h);
         let signed_in = online.signed_in();
@@ -524,6 +533,11 @@ impl ShopScreen {
                     Price::Vip => {
                         if ui.button(b, t("VIP only"), true) {
                             self.tab = Tab::Vip;
+                        }
+                    }
+                    Price::Pack => {
+                        if ui.button(b, t("Welcome pack"), true) {
+                            self.tab = Tab::Coins;
                         }
                     }
                     Price::Achievement(a) => {
@@ -835,7 +849,41 @@ impl ShopScreen {
             return;
         }
         ui.text(t("If you like, you can also buy them:"), area.x, below, 15.0, MUTED, false);
-        let area = Rect::new(area.x, below + 32.0, area.w, area.h - (below + 32.0 - area.y));
+        let mut top = below + 32.0;
+        // The welcome pack, once per account.
+        let owned = online.wallet.as_ref().map(|w| w.owned.clone()).unwrap_or_default();
+        if !offers.welcome_price.is_empty() && !snookered_proto::shop::has_welcome_pack(&owned) {
+            let card = Rect::new(area.x, top, area.w, 74.0);
+            rrect(card, 10.0, Color::new(0.91, 0.75, 0.38, 0.10));
+            rrect_lines(card, 10.0, 1.6, GOLD);
+            crate::icons::draw(Icon::Gift, vec2(card.x + 30.0, card.y + 37.0), 30.0, GOLD);
+            ui.text(t("Welcome pack"), card.x + 58.0, card.y + 12.0, 17.0, GOLD, true);
+            let names: Vec<String> = snookered_proto::shop::WELCOME_ITEMS
+                .iter()
+                .filter_map(|c| snookered_proto::shop::item(c))
+                .map(|i| t(i.name).to_string())
+                .collect();
+            let what = tw(
+                "Cue “{cue}”, cloth “{cloth}” and {n} coins · only once, sold nowhere else",
+                &[
+                    ("cue", &names.first().cloned().unwrap_or_default()),
+                    ("cloth", &names.get(1).cloned().unwrap_or_default()),
+                    ("n", &snookered_proto::shop::WELCOME_COINS),
+                ],
+            );
+            let what = ui.ellipsize(&what, card.w - 230.0, 13.0);
+            ui.text(&what, card.x + 58.0, card.y + 40.0, 13.0, CREAM, false);
+            let b = Rect::new(card.x + card.w - 150.0, card.y + 18.0, 136.0, 38.0);
+            if online.signed_in() {
+                if ui.primary_button(b, &offers.welcome_price) {
+                    online.send(ClientMsg::BuyWelcomePack);
+                }
+            } else {
+                ui.button(b, &offers.welcome_price, false);
+            }
+            top += card.h + 14.0;
+        }
+        let area = Rect::new(area.x, top, area.w, area.h - (top - area.y));
         let signed_in = online.signed_in();
         let n = offers.packs.len();
         let cols = n.min(((area.w + 12.0) / 200.0).floor().max(1.0) as usize);

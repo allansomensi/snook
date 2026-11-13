@@ -675,6 +675,8 @@ pub enum ClientMsg {
     },
     /// Starts the VIP subscription (a payment page).
     SubscribeVip,
+    /// Starts paying for the welcome pack (once per account).
+    BuyWelcomePack,
     /// Opens the page that manages (or cancels) the subscription.
     ManageVip,
     /// Starts paying for a month of VIP for a friend (a payment page).
@@ -992,6 +994,9 @@ pub enum ServerMsg {
         /// The price of a VIP month given to a friend (empty: not on sale).
         #[serde(default)]
         vip_gift_price: String,
+        /// The price of the welcome pack (empty: not on sale).
+        #[serde(default)]
+        welcome_price: String,
     },
     /// This player's coins, VIP time, items and what they use (after
     /// signing in and whenever it changes).
