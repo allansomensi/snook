@@ -9,11 +9,11 @@ use crate::store::{User, day_of};
 use crate::{Server, now, token_hash};
 
 /// Coins for a finished rated game, and extra for winning it.
-pub const COINS_PER_GAME: i64 = 10;
-pub const COINS_PER_WIN: i64 = 15;
+pub const COINS_PER_GAME: i64 = 4;
+pub const COINS_PER_WIN: i64 = 6;
 /// Most coins a day from games (the daily bonus is on top).
-pub const DAILY_EARN_CAP: i64 = 150;
-pub const DAILY_BONUS: i64 = 20;
+pub const DAILY_EARN_CAP: i64 = 50;
+pub const DAILY_BONUS: i64 = 10;
 /// A game this short (in shots) earns nothing: it was arranged or abandoned.
 pub const MIN_SHOTS_FOR_COINS: u32 = 8;
 

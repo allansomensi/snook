@@ -1097,7 +1097,9 @@ async fn replays_coins_featured_table_and_codes() {
         unreachable!()
     };
     let alice_won = result.winner == sa;
-    assert_eq!(amount, if alice_won { 25 } else { 10 });
+    use snookered_server::account::{COINS_PER_GAME, COINS_PER_WIN};
+    let expected = COINS_PER_GAME + if alice_won { COINS_PER_WIN } else { 0 };
+    assert_eq!(amount as i64, expected);
     // The game moved the missions on: one game played, one won (or not).
     let ServerMsg::Missions { daily, weekly, day_ends, week_ends } =
         alice.expect("missions", |m| matches!(m, ServerMsg::Missions { .. })).await

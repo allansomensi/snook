@@ -264,24 +264,24 @@ use CueStyle::{Plain, Points, Spiral, Weave};
 pub const ITEMS: &[Item] = &[
     // Cloth.
     cloth("cloth_green", "Tournament green", Price::Free, [24, 96, 48]),
-    cloth("cloth_blue", "Electric blue", Price::Coins(400), [16, 54, 112]),
-    cloth("cloth_burgundy", "Burgundy", Price::Coins(400), [76, 13, 22]),
-    cloth("cloth_olive", "Olive", Price::Coins(400), [62, 72, 30]),
-    cloth("cloth_navy", "Navy", Price::Coins(500), [14, 28, 64]),
-    cloth("cloth_charcoal", "Charcoal", Price::Coins(600), [32, 34, 38]),
-    cloth("cloth_teal", "Teal", Price::Coins(600), [10, 78, 80]),
-    cloth("cloth_forest", "Forest", Price::Coins(600), [18, 58, 34]),
-    cloth("cloth_slate", "Slate grey", Price::Coins(700), [58, 66, 74]),
-    cloth("cloth_wine", "Red wine", Price::Coins(700), [96, 18, 40]),
-    cloth("cloth_purple", "Royal purple", Price::Coins(900), [50, 22, 84]),
-    cloth("cloth_camel", "Camel", Price::Coins(900), [116, 84, 44]),
-    cloth("cloth_orange", "Burnt orange", Price::Coins(900), [150, 62, 18]),
-    cloth("cloth_rose", "Dusty rose", Price::Coins(1000), [138, 70, 82]),
-    cloth("cloth_sand", "Sand", Price::Coins(1000), [150, 128, 92]),
-    cloth("cloth_ice", "Ice blue", Price::Coins(1200), [70, 118, 150]),
-    cloth("cloth_lime", "Lime", Price::Coins(1200), [92, 138, 24]),
-    cloth("cloth_black", "Black tie", Price::Coins(1500), [16, 16, 18]),
-    cloth("cloth_cobalt", "Cobalt", Price::Coins(1500), [20, 64, 168]),
+    cloth("cloth_blue", "Electric blue", Price::Coins(1000), [16, 54, 112]),
+    cloth("cloth_burgundy", "Burgundy", Price::Coins(1000), [76, 13, 22]),
+    cloth("cloth_olive", "Olive", Price::Coins(1000), [62, 72, 30]),
+    cloth("cloth_navy", "Navy", Price::Coins(1250), [14, 28, 64]),
+    cloth("cloth_charcoal", "Charcoal", Price::Coins(1500), [32, 34, 38]),
+    cloth("cloth_teal", "Teal", Price::Coins(1500), [10, 78, 80]),
+    cloth("cloth_forest", "Forest", Price::Coins(1500), [18, 58, 34]),
+    cloth("cloth_slate", "Slate grey", Price::Coins(1750), [58, 66, 74]),
+    cloth("cloth_wine", "Red wine", Price::Coins(1750), [96, 18, 40]),
+    cloth("cloth_purple", "Royal purple", Price::Coins(2250), [50, 22, 84]),
+    cloth("cloth_camel", "Camel", Price::Coins(2250), [116, 84, 44]),
+    cloth("cloth_orange", "Burnt orange", Price::Coins(2250), [150, 62, 18]),
+    cloth("cloth_rose", "Dusty rose", Price::Coins(2500), [138, 70, 82]),
+    cloth("cloth_sand", "Sand", Price::Coins(2500), [150, 128, 92]),
+    cloth("cloth_ice", "Ice blue", Price::Coins(3000), [70, 118, 150]),
+    cloth("cloth_lime", "Lime", Price::Coins(3000), [92, 138, 24]),
+    cloth("cloth_black", "Black tie", Price::Coins(3750), [16, 16, 18]),
+    cloth("cloth_cobalt", "Cobalt", Price::Coins(3750), [20, 64, 168]),
     cloth("cloth_midnight", "Midnight", Price::Vip, [12, 17, 40]),
     cloth("cloth_emerald", "Emerald", Price::Vip, [6, 110, 74]),
     cloth("cloth_champion", "Champion's red", Price::Achievement("tournament_win"), [110, 12, 16]),
@@ -291,7 +291,7 @@ pub const ITEMS: &[Item] = &[
     cue(
         "cue_maple",
         "Natural maple",
-        Price::Coins(300),
+        Price::Coins(750),
         [196, 150, 96],
         [120, 80, 40],
         [30, 24, 20],
@@ -300,7 +300,7 @@ pub const ITEMS: &[Item] = &[
     cue(
         "cue_rosewood",
         "Rosewood",
-        Price::Coins(500),
+        Price::Coins(1250),
         [92, 34, 22],
         [40, 18, 12],
         [200, 170, 110],
@@ -309,7 +309,7 @@ pub const ITEMS: &[Item] = &[
     cue(
         "cue_walnut",
         "Walnut",
-        Price::Coins(600),
+        Price::Coins(1500),
         [70, 44, 26],
         [190, 160, 110],
         [210, 200, 180],
@@ -318,7 +318,7 @@ pub const ITEMS: &[Item] = &[
     cue(
         "cue_ebony",
         "Ebony & silver",
-        Price::Coins(800),
+        Price::Coins(2000),
         [14, 12, 12],
         [60, 60, 66],
         [200, 205, 215],
@@ -327,7 +327,7 @@ pub const ITEMS: &[Item] = &[
     cue(
         "cue_zebra",
         "Zebrawood",
-        Price::Coins(900),
+        Price::Coins(2250),
         [150, 110, 60],
         [40, 26, 16],
         [230, 220, 200],
@@ -336,7 +336,7 @@ pub const ITEMS: &[Item] = &[
     cue(
         "cue_bocote",
         "Bocote",
-        Price::Coins(1000),
+        Price::Coins(2500),
         [140, 96, 44],
         [30, 20, 12],
         [200, 160, 80],
@@ -345,7 +345,7 @@ pub const ITEMS: &[Item] = &[
     cue(
         "cue_carbon",
         "Carbon",
-        Price::Coins(1200),
+        Price::Coins(3000),
         [30, 32, 36],
         [200, 30, 30],
         [30, 32, 36],
@@ -354,7 +354,7 @@ pub const ITEMS: &[Item] = &[
     cue(
         "cue_ocean",
         "Deep ocean",
-        Price::Coins(1200),
+        Price::Coins(3000),
         [16, 40, 70],
         [60, 170, 200],
         [220, 230, 240],
@@ -363,7 +363,7 @@ pub const ITEMS: &[Item] = &[
     cue(
         "cue_cherry",
         "Cherry",
-        Price::Coins(1200),
+        Price::Coins(3000),
         [120, 26, 30],
         [240, 230, 210],
         [200, 170, 110],
@@ -372,7 +372,7 @@ pub const ITEMS: &[Item] = &[
     cue(
         "cue_jade",
         "Jade",
-        Price::Coins(1400),
+        Price::Coins(3500),
         [24, 80, 60],
         [200, 230, 210],
         [190, 150, 70],
@@ -381,7 +381,7 @@ pub const ITEMS: &[Item] = &[
     cue(
         "cue_ivory",
         "Ivory inlay",
-        Price::Coins(1500),
+        Price::Coins(3750),
         [235, 225, 200],
         [35, 20, 12],
         [190, 150, 70],
@@ -390,7 +390,7 @@ pub const ITEMS: &[Item] = &[
     cue(
         "cue_tiger",
         "Tiger",
-        Price::Coins(1600),
+        Price::Coins(4000),
         [200, 120, 30],
         [20, 16, 12],
         [20, 16, 12],
@@ -399,7 +399,7 @@ pub const ITEMS: &[Item] = &[
     cue(
         "cue_amethyst",
         "Amethyst",
-        Price::Coins(1800),
+        Price::Coins(4500),
         [60, 24, 90],
         [200, 170, 240],
         [220, 220, 230],
@@ -408,7 +408,7 @@ pub const ITEMS: &[Item] = &[
     cue(
         "cue_arctic",
         "Arctic carbon",
-        Price::Coins(2000),
+        Price::Coins(5000),
         [210, 220, 228],
         [60, 140, 220],
         [40, 44, 50],
@@ -417,7 +417,7 @@ pub const ITEMS: &[Item] = &[
     cue(
         "cue_inferno",
         "Inferno",
-        Price::Coins(2400),
+        Price::Coins(6000),
         [24, 10, 8],
         [240, 90, 20],
         [250, 200, 60],
@@ -453,17 +453,17 @@ pub const ITEMS: &[Item] = &[
     ),
     // Chalk.
     chalk("chalk_blue", "Blue chalk", Price::Free, [40, 80, 150]),
-    chalk("chalk_green", "Green chalk", Price::Coins(150), [40, 130, 70]),
-    chalk("chalk_red", "Red chalk", Price::Coins(150), [170, 40, 40]),
-    chalk("chalk_tan", "Tan chalk", Price::Coins(150), [180, 150, 100]),
-    chalk("chalk_grey", "Grey chalk", Price::Coins(150), [120, 124, 130]),
-    chalk("chalk_purple", "Purple chalk", Price::Coins(200), [110, 50, 160]),
-    chalk("chalk_orange", "Orange chalk", Price::Coins(200), [220, 110, 30]),
-    chalk("chalk_pink", "Pink chalk", Price::Coins(200), [220, 110, 160]),
-    chalk("chalk_teal", "Teal chalk", Price::Coins(200), [30, 150, 150]),
-    chalk("chalk_yellow", "Yellow chalk", Price::Coins(250), [230, 200, 50]),
-    chalk("chalk_black", "Black chalk", Price::Coins(300), [28, 28, 32]),
-    chalk("chalk_white", "White chalk", Price::Coins(300), [235, 235, 230]),
+    chalk("chalk_green", "Green chalk", Price::Coins(400), [40, 130, 70]),
+    chalk("chalk_red", "Red chalk", Price::Coins(400), [170, 40, 40]),
+    chalk("chalk_tan", "Tan chalk", Price::Coins(400), [180, 150, 100]),
+    chalk("chalk_grey", "Grey chalk", Price::Coins(400), [120, 124, 130]),
+    chalk("chalk_purple", "Purple chalk", Price::Coins(500), [110, 50, 160]),
+    chalk("chalk_orange", "Orange chalk", Price::Coins(500), [220, 110, 30]),
+    chalk("chalk_pink", "Pink chalk", Price::Coins(500), [220, 110, 160]),
+    chalk("chalk_teal", "Teal chalk", Price::Coins(500), [30, 150, 150]),
+    chalk("chalk_yellow", "Yellow chalk", Price::Coins(600), [230, 200, 50]),
+    chalk("chalk_black", "Black chalk", Price::Coins(750), [28, 28, 32]),
+    chalk("chalk_white", "White chalk", Price::Coins(750), [235, 235, 230]),
     chalk("chalk_gold", "Gold chalk", Price::Vip, [210, 170, 60]),
     chalk("chalk_silver", "Silver chalk", Price::Vip, [190, 196, 205]),
     // Balls.
@@ -471,7 +471,7 @@ pub const ITEMS: &[Item] = &[
     balls(
         "balls_tv",
         "TV set",
-        Price::Coins(700),
+        Price::Coins(1750),
         [
             [255, 214, 0],
             [0, 90, 220],
@@ -488,7 +488,7 @@ pub const ITEMS: &[Item] = &[
     balls(
         "balls_vintage",
         "Vintage",
-        Price::Coins(900),
+        Price::Coins(2250),
         [
             [214, 170, 40],
             [40, 64, 130],
@@ -505,7 +505,7 @@ pub const ITEMS: &[Item] = &[
     balls(
         "balls_earth",
         "Earth tones",
-        Price::Coins(1000),
+        Price::Coins(2500),
         [
             [196, 160, 70],
             [60, 80, 100],
@@ -522,7 +522,7 @@ pub const ITEMS: &[Item] = &[
     balls(
         "balls_pastel",
         "Pastel",
-        Price::Coins(1200),
+        Price::Coins(3000),
         [
             [250, 220, 110],
             [120, 160, 230],
@@ -539,7 +539,7 @@ pub const ITEMS: &[Item] = &[
     balls(
         "balls_ocean",
         "Ocean",
-        Price::Coins(1200),
+        Price::Coins(3000),
         [
             [120, 220, 230],
             [10, 50, 140],
@@ -556,7 +556,7 @@ pub const ITEMS: &[Item] = &[
     balls(
         "balls_sunset",
         "Sunset",
-        Price::Coins(1300),
+        Price::Coins(3250),
         [
             [255, 200, 60],
             [140, 40, 110],
@@ -573,7 +573,7 @@ pub const ITEMS: &[Item] = &[
     balls(
         "balls_forest",
         "Forest",
-        Price::Coins(1300),
+        Price::Coins(3250),
         [
             [200, 190, 80],
             [40, 90, 70],
@@ -590,7 +590,7 @@ pub const ITEMS: &[Item] = &[
     balls(
         "balls_neon",
         "Neon",
-        Price::Coins(1500),
+        Price::Coins(3750),
         [
             [230, 255, 0],
             [0, 200, 255],
@@ -607,7 +607,7 @@ pub const ITEMS: &[Item] = &[
     balls(
         "balls_candy",
         "Candy",
-        Price::Coins(1500),
+        Price::Coins(3750),
         [
             [255, 230, 120],
             [120, 200, 255],
@@ -624,7 +624,7 @@ pub const ITEMS: &[Item] = &[
     balls(
         "balls_pearl",
         "Pearl",
-        Price::Coins(2000),
+        Price::Coins(5000),
         CLASSIC,
         [30, 30, 36],
         [248, 246, 240],
@@ -633,7 +633,7 @@ pub const ITEMS: &[Item] = &[
     balls(
         "balls_mono",
         "Monochrome",
-        Price::Coins(2000),
+        Price::Coins(5000),
         [
             [230, 230, 230],
             [60, 60, 66],
@@ -650,7 +650,7 @@ pub const ITEMS: &[Item] = &[
     balls(
         "balls_chrome",
         "Chrome",
-        Price::Coins(2500),
+        Price::Coins(6250),
         [
             [230, 190, 60],
             [70, 110, 190],
@@ -700,15 +700,15 @@ pub const ITEMS: &[Item] = &[
     ),
     // Frames.
     frame("frame_none", "No frame", Price::Free, [0, 0, 0], [0, 0, 0], false),
-    frame("frame_bronze", "Bronze", Price::Coins(300), [176, 112, 60], [110, 66, 34], false),
-    frame("frame_silver", "Silver", Price::Coins(600), [214, 218, 226], [130, 136, 146], false),
-    frame("frame_gold", "Gold", Price::Coins(1000), [240, 200, 90], [170, 120, 40], true),
-    frame("frame_felt", "Green felt", Price::Coins(400), [40, 140, 80], [16, 70, 40], false),
-    frame("frame_wood", "Mahogany", Price::Coins(500), [130, 60, 34], [70, 30, 16], false),
-    frame("frame_ice", "Ice", Price::Coins(900), [190, 230, 250], [90, 160, 210], true),
-    frame("frame_fire", "Fire", Price::Coins(1200), [255, 180, 40], [210, 40, 20], true),
-    frame("frame_neon", "Neon", Price::Coins(1200), [0, 240, 220], [220, 40, 240], true),
-    frame("frame_diamond", "Diamond", Price::Coins(2500), [230, 250, 255], [140, 200, 255], true),
+    frame("frame_bronze", "Bronze", Price::Coins(750), [176, 112, 60], [110, 66, 34], false),
+    frame("frame_silver", "Silver", Price::Coins(1500), [214, 218, 226], [130, 136, 146], false),
+    frame("frame_gold", "Gold", Price::Coins(2500), [240, 200, 90], [170, 120, 40], true),
+    frame("frame_felt", "Green felt", Price::Coins(1000), [40, 140, 80], [16, 70, 40], false),
+    frame("frame_wood", "Mahogany", Price::Coins(1250), [130, 60, 34], [70, 30, 16], false),
+    frame("frame_ice", "Ice", Price::Coins(2250), [190, 230, 250], [90, 160, 210], true),
+    frame("frame_fire", "Fire", Price::Coins(3000), [255, 180, 40], [210, 40, 20], true),
+    frame("frame_neon", "Neon", Price::Coins(3000), [0, 240, 220], [220, 40, 240], true),
+    frame("frame_diamond", "Diamond", Price::Coins(6250), [230, 250, 255], [140, 200, 255], true),
     frame("frame_crown", "VIP crown", Price::Vip, [250, 214, 110], [190, 130, 40], true),
     frame("frame_amethyst", "Amethyst", Price::Vip, [200, 150, 255], [100, 40, 170], true),
     frame(
@@ -736,17 +736,23 @@ pub const ITEMS: &[Item] = &[
     name_style("name_frost", "Frost", [240, 248, 255], [160, 200, 240]),
     // Winning effects.
     effect("effect_none", "No effect", Price::Free, EffectKind::None, [0, 0, 0]),
-    effect("effect_sparks", "Sparks", Price::Coins(500), EffectKind::Sparks, [255, 210, 120]),
-    effect("effect_confetti", "Confetti", Price::Coins(800), EffectKind::Confetti, [255, 255, 255]),
+    effect("effect_sparks", "Sparks", Price::Coins(1250), EffectKind::Sparks, [255, 210, 120]),
+    effect(
+        "effect_confetti",
+        "Confetti",
+        Price::Coins(2000),
+        EffectKind::Confetti,
+        [255, 255, 255],
+    ),
     effect(
         "effect_shockwave",
         "Shockwave",
-        Price::Coins(1000),
+        Price::Coins(2500),
         EffectKind::Shockwave,
         [120, 220, 255],
     ),
-    effect("effect_coins", "Coin shower", Price::Coins(1200), EffectKind::Coins, [240, 200, 80]),
-    effect("effect_flames", "Flames", Price::Coins(1500), EffectKind::Flames, [255, 120, 30]),
+    effect("effect_coins", "Coin shower", Price::Coins(3000), EffectKind::Coins, [240, 200, 80]),
+    effect("effect_flames", "Flames", Price::Coins(3750), EffectKind::Flames, [255, 120, 30]),
     effect("effect_fireworks", "Fireworks", Price::Vip, EffectKind::Fireworks, [255, 220, 140]),
     effect("effect_royal", "Royal sparks", Price::Vip, EffectKind::Sparks, [200, 150, 255]),
 ];
