@@ -588,7 +588,10 @@ async fn main() {
             );
         }
 
-        // 2D interface.
+        // 2D interface. The e-mail offer is drawn over the page at the end:
+        // until then the page doesn't react to the pointer.
+        let offer_saved = (current.is_none() && !settings_open && online.email_offer.is_some())
+            .then(|| ui.suspend_input());
         if settings_open {
             let before = config.clone();
             let action = settings_screen.draw(&mut ui, &mut config, current.is_some());
@@ -924,6 +927,9 @@ async fn main() {
                 config.graphics_checked = true;
                 config.save();
             }
+        }
+        if let Some(saved) = offer_saved {
+            ui.resume_input(saved);
         }
         if let Some((text, t)) = &mut toast {
             *t -= dt;

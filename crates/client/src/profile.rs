@@ -142,6 +142,10 @@ impl ProfileScreen {
         {
             p.relation = Relation::Me;
         }
+        // A dialog over the page (account, report, country): the page under
+        // it doesn't react to the pointer (no hover hints through it).
+        let modal = self.account.is_some() || self.report.is_some() || crate::countries::is_open();
+        let saved = modal.then(|| ui.suspend_input());
         self.header(ui, online, &p, r);
         let body = Rect::new(r.x + 20.0, r.y + 204.0, r.w - 40.0, r.h - 224.0);
         let half = (body.w - 20.0) / 2.0;
@@ -157,6 +161,9 @@ impl ProfileScreen {
             Pane::Games => self.history(ui, online, &p, right),
             Pane::Rating => rating_chart(ui, &p, right),
             Pane::Numbers => numbers(ui, &p, right),
+        }
+        if let Some(saved) = saved {
+            ui.resume_input(saved);
         }
         if let Some(code) = crate::countries::draw_picker(ui) {
             online.send(ClientMsg::SetCountry { country: code });

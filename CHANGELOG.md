@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Fixes
+- Profile: the hover hints of the achievements showed through the account
+  dialog (and any dialog over the page); the page under a dialog (and
+  under the e-mail offer) no longer reacts to the pointer.
+- Microsoft Store: the icon no longer sits on a blue plate in the Start
+  menu and the taskbar (the package has every size Windows asks for,
+  plated and unplated, and the resource index that finds them).
+
 ## 0.1.3 (protocol 12)
 
 The server still lets 0.1.2 in (protocol 11): it ignores what is new, so
