@@ -169,7 +169,7 @@ fn player_card(ui: &mut Ui, m: &Match, seat: usize, x: f32, y: f32, w: f32) {
     let reserve = if m.online.is_some() || m.clock.is_some() { 96.0 } else { 40.0 };
     match &m.online {
         Some(o) => {
-            let color = crate::ui::tier_color(snookered_proto::Tier::of(o.ratings[seat]));
+            let color = crate::ui::name_color_of(o.admins[seat], o.ratings[seat]);
             ui.name_with_flag(
                 &m.names[seat],
                 &o.countries[seat],
@@ -855,7 +855,7 @@ impl Hud {
         }
         let log = Rect::new(r.x + 6.0, r.y + 28.0, r.w - 12.0, r.h - 28.0 - 40.0);
         let me = m.names[o.seat].clone();
-        self.chat_scroll = ui.chat_log(log, &o.feed, Some(&me), self.chat_scroll);
+        self.chat_scroll = ui.chat_log(log, &o.feed, Some(&me), false, self.chat_scroll).0;
         let input = Rect::new(r.x + 6.0, r.y + r.h - 36.0, r.w - 12.0, 30.0);
         let sent =
             ui.text_input(CHAT_FIELD, input, &mut self.chat_input, snookered_proto::MAX_CHAT_LEN);
@@ -909,13 +909,14 @@ impl Hud {
                 from: None,
                 text: text.clone(),
                 kind: if *important { FeedKind::Alert } else { FeedKind::Event },
+                ..Default::default()
             })
             .collect();
         let log = Rect::new(r.x + 6.0, r.y + 28.0, r.w - 12.0, r.h - 34.0);
         if lines.is_empty() {
             ui.text(t("Nothing yet."), log.x + 6.0, log.y + 6.0, 13.0, MUTED, false);
         } else {
-            self.chat_scroll = ui.chat_log(log, &lines, None, self.chat_scroll);
+            self.chat_scroll = ui.chat_log(log, &lines, None, false, self.chat_scroll).0;
         }
     }
 

@@ -147,6 +147,10 @@ pub fn server_text(text: &str) -> String {
     if let Some(t) = translate(lang(), text) {
         return t.to_string();
     }
+    if let Some(rest) = text.strip_prefix("The chat was cleared by ") {
+        let name = rest.trim_end_matches('.');
+        return tw("The chat was cleared by {name}.", &[("name", &name)]);
+    }
     if let Some(rest) = text.strip_prefix("You are muted for ") {
         let n = rest.split_whitespace().next().unwrap_or("?");
         return tw("You are muted for {n} more minutes.", &[("n", &n)]);

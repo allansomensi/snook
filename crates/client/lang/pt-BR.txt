@@ -966,3 +966,10 @@ Items {a}–{b} of {n}	Itens {a}–{b} de {n}
 ▲ Previous	▲ Anteriores
 More items ▼ ({n})	Mais itens ▼ ({n})
 More items ▼	Mais itens ▼
+(message deleted by its author)	(mensagem apagada pelo autor)
+(message deleted by an administrator)	(mensagem apagada por um administrador)
+Delete (it shows as deleted)	Apagar (aparece como apagada)
+Remove without a trace	Remover sem deixar rastro
+The chat was cleared by {name}.	O chat foi limpo por {name}.
+Click again to clear	Clique de novo para limpar
+Clear the chat	Limpar o chat

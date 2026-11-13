@@ -202,6 +202,9 @@ pub struct Online {
     told_starting: Vec<u64>,
     /// The server refused this version of the game: a newer one is out.
     pub outdated: bool,
+    /// An administrator clicked "Clear the chat" once (at this time): a
+    /// second click clears it.
+    clear_armed: Option<f64>,
     /// The new version's installer is on its way: the game should close.
     pub quit_for_update: bool,
 }
@@ -404,6 +407,7 @@ impl Online {
             board: Vec::new(),
             told_starting: Vec::new(),
             outdated: false,
+            clear_armed: None,
             quit_for_update: false,
         }
     }
@@ -661,6 +665,23 @@ impl Online {
                 if self.outgoing.as_ref().is_some_and(|(to, _)| *to == username) {
                     self.outgoing = None;
                 }
+            }
+            ServerMsg::ChatDeleted { id, by } => {
+                if let Some(l) = self.chat.iter_mut().find(|l| l.id == id) {
+                    l.deleted = Some(by);
+                    l.text.clear();
+                }
+            }
+            ServerMsg::ChatRemoved { id } => self.chat.retain(|l| l.id != id),
+            ServerMsg::ChatCleared { by } => {
+                self.chat.clear();
+                self.chat_scroll = 0;
+                let text = tw("The chat was cleared by {name}.", &[("name", &by)]);
+                self.chat.push(FeedLine {
+                    text,
+                    kind: crate::ui::FeedKind::Event,
+                    ..Default::default()
+                });
             }
             ServerMsg::ChatHistory { lines } => {
                 self.chat = lines.iter().map(FeedLine::chat).collect();
@@ -1599,7 +1620,28 @@ impl Online {
         );
         rrect(log, 6.0, Color::new(0.0, 0.0, 0.0, 0.25));
         let me = self.me.as_ref().map(|m| m.username.clone());
-        self.chat_scroll = ui.chat_log(log, &self.chat, me.as_deref(), self.chat_scroll);
+        let admin = self.me.as_ref().is_some_and(|m| m.role == snookered_proto::Role::Admin);
+        let (scroll, act) = ui.chat_log(log, &self.chat, me.as_deref(), admin, self.chat_scroll);
+        // Administrators: clear the chat (a second click confirms).
+        if admin && !self.lan {
+            let now = get_time();
+            let armed = self.clear_armed.is_some_and(|t| now - t < 4.0);
+            let label = if armed { t("Click again to clear") } else { t("Clear the chat") };
+            let w = ui.text_size(label, 12.0, true).x + 20.0;
+            let b = Rect::new(log.x + log.w - w - 6.0, log.y + 4.0, w, 22.0);
+            if ui.button(b, label, true) {
+                if armed {
+                    self.send(ClientMsg::ClearChat);
+                    self.clear_armed = None;
+                } else {
+                    self.clear_armed = Some(now);
+                }
+            }
+        }
+        self.chat_scroll = scroll;
+        if let Some(crate::ui::ChatAction::Delete { id, silent }) = act {
+            self.send(ClientMsg::DeleteChat { id, silent });
+        }
         let input = Rect::new(
             right_panel.x + 12.0,
             right_panel.y + right_panel.h - input_h - 12.0,

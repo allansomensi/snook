@@ -267,6 +267,8 @@ pub struct OnlineMatch {
     #[allow(dead_code)]
     pub rated: bool,
     pub ratings: [i32; 2],
+    /// The players who are administrators (their names are red).
+    pub admins: [bool; 2],
     pub countries: [String; 2],
     pub tournament: Option<u64>,
     pub shot_clock: f32,
@@ -522,6 +524,7 @@ impl Match {
                 seat,
                 rated,
                 ratings: [players[0].rating, players[1].rating],
+                admins: players.each_ref().map(|p| p.role == snookered_proto::Role::Admin),
                 countries: [players[0].country.clone(), players[1].country.clone()],
                 tournament,
                 shot_clock: shot_clock_secs as f32,
@@ -1648,19 +1651,14 @@ impl Match {
 
 impl FeedLine {
     pub fn chat(line: &ChatLine) -> FeedLine {
-        match line.kind {
-            ChatKind::Player => FeedLine {
-                from: Some((line.from.clone(), line.rating)),
-                text: line.text.clone(),
-                kind: FeedKind::Player,
-            },
-            ChatKind::Announcement => {
-                FeedLine { from: None, text: line.text.clone(), kind: FeedKind::Announcement }
+        let (from, text, kind) = match line.kind {
+            ChatKind::Player => {
+                (Some((line.from.clone(), line.rating)), line.text.clone(), FeedKind::Player)
             }
-            ChatKind::System => {
-                FeedLine { from: None, text: line.text.clone(), kind: FeedKind::Event }
-            }
-        }
+            ChatKind::Announcement => (None, line.text.clone(), FeedKind::Announcement),
+            ChatKind::System => (None, crate::i18n::server_text(&line.text), FeedKind::Event),
+        };
+        FeedLine { from, text, kind, id: line.id, admin: line.admin, deleted: line.deleted }
     }
 
     pub fn event(text: &str, important: bool) -> FeedLine {
@@ -1668,6 +1666,7 @@ impl FeedLine {
             from: None,
             text: text.to_string(),
             kind: if important { FeedKind::Alert } else { FeedKind::Event },
+            ..Default::default()
         }
     }
 }

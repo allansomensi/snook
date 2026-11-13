@@ -728,10 +728,10 @@ pub const ITEMS: &[Item] = &[
         look: Look::Name(None),
     },
     name_style("name_gold", "Gold", [252, 216, 120], [214, 160, 60]),
-    name_style("name_rose", "Rose gold", [250, 190, 170], [210, 120, 110]),
+    name_style("name_rose", "Rose gold", [250, 196, 186], [214, 140, 160]),
     name_style("name_aqua", "Aqua", [140, 240, 240], [60, 170, 230]),
     name_style("name_violet", "Violet", [220, 170, 255], [150, 90, 240]),
-    name_style("name_ember", "Ember", [255, 200, 90], [240, 90, 50]),
+    name_style("name_ember", "Ember", [255, 214, 100], [242, 140, 40]),
     name_style("name_mint", "Mint", [170, 250, 200], [70, 210, 150]),
     name_style("name_frost", "Frost", [240, 248, 255], [160, 200, 240]),
     // Winning effects.

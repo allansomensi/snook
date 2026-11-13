@@ -14,20 +14,36 @@ pub const ALERT: Color = Color::new(1.0, 0.56, 0.44, 1.0);
 pub const GREEN: Color = Color::new(0.12, 0.45, 0.25, 1.0);
 
 /// A wrapped chat row: the coloured prefix (on its first row), the text, the kind.
-type Row = (Option<(String, Color)>, String, FeedKind);
+/// A line on screen: the name (first row of a message), the text, the kind,
+/// and which message it belongs to.
+type Row = (Option<(String, Color)>, String, FeedKind, usize);
 
 /// One line of a chat panel.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct FeedLine {
     /// Who wrote it, with their rating (0: unknown) for the name's colour.
     pub from: Option<(String, i32)>,
     pub text: String,
     pub kind: FeedKind,
+    /// The lounge chat line's number (0: not one, can't be deleted).
+    pub id: u64,
+    /// Written by an administrator (the name is red).
+    pub admin: bool,
+    /// Deleted, and by whom (the text is gone).
+    pub deleted: Option<snookered_proto::Deleted>,
 }
 
+/// What the reader did with a line of [`Ui::chat_log`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ChatAction {
+    /// Delete line `id` (`silent`: without a trace, administrators).
+    Delete { id: u64, silent: bool },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum FeedKind {
     /// A message from a player.
+    #[default]
     Player,
     /// From the staff.
     Announcement,
@@ -46,19 +62,29 @@ pub fn tier_color(tier: snookered_proto::Tier) -> Color {
         Tier::Skilled => Color::new(0.45, 0.86, 0.52, 1.0),
         Tier::Expert => Color::new(0.42, 0.72, 1.0, 1.0),
         Tier::Master => Color::new(0.78, 0.56, 1.0, 1.0),
-        Tier::Grandmaster => Color::new(1.0, 0.55, 0.28, 1.0),
+        Tier::Grandmaster => Color::new(1.0, 0.63, 0.22, 1.0),
         Tier::Legend => Color::new(1.0, 0.83, 0.30, 1.0),
     }
 }
 
-/// The colour of a player's name.
-pub fn name_color(p: &snookered_proto::PlayerInfo) -> Color {
-    tier_color(p.tier())
+/// The colour of administrators' names everywhere; no one else's name is
+/// red (no tier and no name style from the shop is).
+pub const ADMIN_RED: Color = Color::new(1.0, 0.32, 0.27, 1.0);
+
+/// The colour of a name: red for administrators, else the rating tier's.
+pub fn name_color_of(admin: bool, rating: i32) -> Color {
+    if admin { ADMIN_RED } else { tier_color(snookered_proto::Tier::of(rating)) }
 }
 
-/// A VIP name style (two colours), if the player has one.
+/// The colour of a player's name.
+pub fn name_color(p: &snookered_proto::PlayerInfo) -> Color {
+    if p.role == snookered_proto::Role::Admin { ADMIN_RED } else { tier_color(p.tier()) }
+}
+
+/// A VIP name style (two colours), if the player has one (administrators
+/// keep their red).
 pub fn name_style(p: &snookered_proto::PlayerInfo) -> Option<(Color, Color)> {
-    if !p.vip {
+    if !p.vip || p.role == snookered_proto::Role::Admin {
         return None;
     }
     match snookered_proto::shop::item(&p.name_style)?.look {
@@ -947,14 +973,16 @@ impl Ui {
 
     /// A scrollable chat log (newest at the bottom) mixing player messages
     /// and what happened in the game. `scroll` counts lines up from the
-    /// bottom; the new value is returned.
+    /// bottom. `admin`: the reader may delete anyone's lines. Returns the
+    /// new scroll and what the reader asked for.
     pub fn chat_log(
         &mut self,
         r: Rect,
         lines: &[FeedLine],
         me: Option<&str>,
+        admin: bool,
         scroll: usize,
-    ) -> usize {
+    ) -> (usize, Option<ChatAction>) {
         self.block(r);
         let size = 14.0;
         let line_h = 19.0;
@@ -963,28 +991,46 @@ impl Ui {
         // the expensive part with a long history).
         let needed = visible + scroll + 1;
         let mut rows: Vec<Row> = Vec::new();
-        for l in lines.iter().rev() {
+        for (index, l) in lines.iter().enumerate().rev() {
             let (prefix, color) = match (&l.from, l.kind) {
                 (Some((name, rating)), FeedKind::Player) => {
                     let mine = me.is_some_and(|m| m.eq_ignore_ascii_case(name));
-                    let c = if *rating > 0 {
+                    let c = if l.admin {
+                        ADMIN_RED
+                    } else if mine {
+                        GOLD
+                    } else if *rating > 0 {
                         tier_color(snookered_proto::Tier::of(*rating))
                     } else {
                         Color::new(0.55, 0.78, 0.95, 1.0)
                     };
-                    (Some(format!("{name}: ")), if mine { GOLD } else { c })
+                    (Some(format!("{name}: ")), c)
                 }
                 (_, FeedKind::Announcement) => (Some("★ ".to_string()), GOLD),
                 _ => (Some("• ".to_string()), MUTED),
             };
+            let text = match l.deleted {
+                Some(snookered_proto::Deleted::Author) => {
+                    crate::i18n::t("(message deleted by its author)").to_string()
+                }
+                Some(snookered_proto::Deleted::Admin) => {
+                    crate::i18n::t("(message deleted by an administrator)").to_string()
+                }
+                None => l.text.clone(),
+            };
             let bold = l.kind == FeedKind::Player;
             let name_w = prefix.as_ref().map(|p| self.text_size(p, size, bold).x).unwrap_or(0.0);
-            let wrapped = self.wrap(&l.text, (r.w - 16.0 - name_w).max(60.0), size);
+            let wrapped = self.wrap(&text, (r.w - 16.0 - name_w).max(60.0), size);
             let mut block: Vec<Row> = wrapped
                 .into_iter()
                 .enumerate()
                 .map(|(k, w)| {
-                    (if k == 0 { prefix.clone().map(|p| (p, color)) } else { None }, w, l.kind)
+                    (
+                        if k == 0 { prefix.clone().map(|p| (p, color)) } else { None },
+                        w,
+                        l.kind,
+                        index,
+                    )
                 })
                 .collect();
             block.append(&mut rows);
@@ -1005,9 +1051,35 @@ impl Ui {
         }
         let end = rows.len() - scroll;
         let start = end.saturating_sub(visible);
+        // The message under the pointer, if it may be deleted by this reader.
+        let hovered = (r.contains(self.mouse))
+            .then(|| ((self.mouse.y - r.y - 4.0) / line_h).floor())
+            .filter(|k| *k >= 0.0)
+            .map(|k| start + k as usize)
+            .filter(|&k| k < end)
+            .map(|k| rows[k].3)
+            .filter(|&i| {
+                let l = &lines[i];
+                let mine = me.is_some_and(|m| {
+                    l.from.as_ref().is_some_and(|(n, _)| n.eq_ignore_ascii_case(m))
+                });
+                l.id > 0 && l.deleted.is_none() && l.kind == FeedKind::Player && (mine || admin)
+            });
         let mut indent = 0.0;
-        for (k, (name, text, kind)) in rows[start..end].iter().enumerate() {
+        let mut action = None;
+        let mut buttons_drawn = false;
+        for (k, (name, text, kind, index)) in rows[start..end].iter().enumerate() {
             let y = r.y + 4.0 + k as f32 * line_h;
+            let deleted = lines[*index].deleted.is_some();
+            if hovered == Some(*index) {
+                draw_rectangle(
+                    r.x + 2.0,
+                    y - 1.0,
+                    r.w - 4.0,
+                    line_h,
+                    Color::new(1.0, 1.0, 1.0, 0.05),
+                );
+            }
             let bold = *kind == FeedKind::Player;
             if let Some((name, color)) = name {
                 self.text(name, r.x + 8.0, y, size, *color, bold);
@@ -1015,13 +1087,17 @@ impl Ui {
             }
             // Game events are quieter than what people write.
             let color = match kind {
+                _ if deleted => Color::new(0.62, 0.56, 0.5, 0.8),
                 FeedKind::Player => CREAM,
                 FeedKind::Announcement => Color::new(1.0, 0.9, 0.65, 1.0),
                 FeedKind::Alert => Color::new(0.88, 0.58, 0.48, 0.95),
                 FeedKind::Event => Color::new(0.70, 0.64, 0.56, 0.85),
             };
-            let text_size =
-                if matches!(kind, FeedKind::Event | FeedKind::Alert) { 13.0 } else { size };
+            let text_size = if matches!(kind, FeedKind::Event | FeedKind::Alert) || deleted {
+                13.0
+            } else {
+                size
+            };
             self.text(
                 text,
                 r.x + 8.0 + indent,
@@ -1030,6 +1106,25 @@ impl Ui {
                 color,
                 false,
             );
+            // Delete buttons on the hovered message's first row on screen.
+            if hovered == Some(*index) && !buttons_drawn {
+                buttons_drawn = true;
+                let id = lines[*index].id;
+                let mut bx = r.x + r.w - 26.0;
+                let b = Rect::new(bx, y - 1.0, 20.0, 18.0);
+                let tip = crate::i18n::t("Delete (it shows as deleted)");
+                if self.icon_button_ex(b, crate::icons::Icon::Close, tip, true, true) {
+                    action = Some(ChatAction::Delete { id, silent: false });
+                }
+                if admin {
+                    bx -= 24.0;
+                    let b = Rect::new(bx, y - 1.0, 20.0, 18.0);
+                    let tip = crate::i18n::t("Remove without a trace");
+                    if self.icon_button_ex(b, crate::icons::Icon::Minus, tip, true, true) {
+                        action = Some(ChatAction::Delete { id, silent: true });
+                    }
+                }
+            }
         }
         if scroll > 0 {
             let label = crate::i18n::t("▼ newer messages");
@@ -1046,7 +1141,7 @@ impl Ui {
         if rows.is_empty() {
             self.text(crate::i18n::t("No messages yet."), r.x + 8.0, r.y + 6.0, 14.0, MUTED, false);
         }
-        scroll
+        (scroll, action)
     }
 
     /// A square button with an icon; `tip` is shown while hovering.

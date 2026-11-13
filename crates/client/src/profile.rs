@@ -517,7 +517,7 @@ impl ProfileScreen {
                 Color::new(color.r, color.g, color.b, 0.18),
             );
             ui.text_centered(mark, r.x + 18.0, r.y + 11.0, 14.0, color, true);
-            let opp_color = tier_color(snookered_proto::Tier::of(h.opponent_rating));
+            let opp_color = crate::ui::name_color_of(h.opponent_admin, h.opponent_rating);
             ui.name_with_flag(
                 &h.opponent,
                 &h.opponent_country,
