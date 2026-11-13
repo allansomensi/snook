@@ -221,6 +221,7 @@ pub struct HistoryRow {
     pub opponent: String,
     pub opponent_country: String,
     pub opponent_rating: i32,
+    pub opponent_admin: bool,
     pub won: bool,
     pub reason: String,
     pub rated: bool,

@@ -1238,6 +1238,7 @@ fn history_entry(h: crate::store::HistoryRow) -> HistoryEntry {
         opponent: h.opponent,
         opponent_country: h.opponent_country,
         opponent_rating: h.opponent_rating,
+        opponent_admin: h.opponent_admin,
         won: h.won,
         reason: parse_reason(&h.reason),
         rated: h.rated,

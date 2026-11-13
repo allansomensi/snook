@@ -42,6 +42,9 @@ tr.click:hover td { background: var(--panel2); }
 .tag.ban { color: var(--red); border-color: #7a3328; }
 .tag.mute { color: #f0b860; border-color: #7a5a28; }
 .tag.staff { color: var(--blue); border-color: #2c4b6b; }
+/* Administrators are red everywhere (in the game too); only they are. */
+.tag.staff.admin { color: var(--red); border-color: #7a3328; }
+#me.admin { color: var(--red); }
 .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
 .row input { max-width: 320px; }
 .actions { display: flex; gap: 6px; flex-wrap: wrap; margin: 10px 0; }

@@ -892,7 +892,7 @@ impl PgStore {
     pub async fn history(&self, user_id: i64, limit: u32) -> StoreResult<Vec<HistoryRow>> {
         let rows = query(
             "SELECT m.*, CASE WHEN m.player0 = $1 THEN 0 ELSE 1 END AS seat,
-                    o.username AS opp_name, o.country AS opp_country
+                    o.username AS opp_name, o.country AS opp_country, o.role AS opp_role
              FROM matches m
              JOIN users o ON o.id = CASE WHEN m.player0 = $1 THEN m.player1 ELSE m.player0 END
              WHERE m.player0 = $1 OR m.player1 = $1
@@ -913,6 +913,7 @@ impl PgStore {
                 Ok(HistoryRow {
                     opponent: r.try_get("opp_name")?,
                     opponent_country: r.try_get("opp_country")?,
+                    opponent_admin: Role::from_i16(r.try_get("opp_role")?) == Role::Admin,
                     opponent_rating: r.try_get(opp_rating)?,
                     won: winner as i32 == seat,
                     reason: r.try_get("reason")?,
@@ -931,7 +932,7 @@ impl PgStore {
 
     pub async fn leaderboard(&self, limit: u32, now: i64) -> StoreResult<Vec<LeaderboardEntry>> {
         let rows = query(
-            "SELECT u.username, u.rating, u.games, u.wins, u.country,
+            "SELECT u.username, u.rating, u.games, u.wins, u.country, u.role,
                     COALESCE(w.vip_until, 0) > $2 AS vip
              FROM users u LEFT JOIN wallets w ON w.user_id = u.id
              WHERE u.games > 0 AND (u.banned_until IS NULL OR u.banned_until <= $2)
@@ -953,6 +954,7 @@ impl PgStore {
                 wins: r.get::<i32, _>("wins") as u32,
                 country: r.get("country"),
                 vip: r.get("vip"),
+                admin: Role::from_i16(r.get("role")) == Role::Admin,
             })
             .collect())
     }

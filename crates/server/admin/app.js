@@ -57,7 +57,7 @@ function statusTags(u) {
   const now = Date.now() / 1000;
   return el("span", {},
     u.online ? el("span", { class: "tag on" }, "online") : null, " ",
-    u.role !== "player" ? el("span", { class: "tag staff" }, u.role) : null, " ",
+    u.role !== "player" ? el("span", { class: "tag staff " + u.role }, u.role) : null, " ",
     u.banned_until && u.banned_until > now ? el("span", { class: "tag ban" }, "banned") : null, " ",
     u.muted_until && u.muted_until > now ? el("span", { class: "tag mute" }, "muted") : null);
 }
@@ -146,6 +146,13 @@ const views = {
       }, "Pin to the board")), notes);
     loadNotes().catch((e) => toast(e.message));
     if (me && me.role === "admin") {
+      box.append(el("h2", {}, "Lounge chat"), el("div", { class: "actions" }, el("button", {
+        class: "danger", onclick: async () => {
+          if (!confirm("Clear the lounge chat for everyone?")) return;
+          try { await api("/chat/clear", { method: "POST" }); toast("The chat was cleared."); }
+          catch (e) { toast(e.message); }
+        },
+      }, "Clear the chat")));
       const motd = el("input", { maxlength: "300" });
       motd.value = o.motd;
       box.append(el("h2", {}, "Welcome message"), motd, el("div", { class: "actions" }, el("button", {
@@ -441,6 +448,7 @@ async function start() {
   try {
     me = await api("/me");
     $("#me").textContent = me.username + " · " + me.role;
+    $("#me").className = me.role === "admin" ? "admin" : "";
     $("#login").classList.add("hidden");
     $("#app").classList.remove("hidden");
     render();

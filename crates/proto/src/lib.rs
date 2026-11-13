@@ -337,6 +337,9 @@ pub struct LeaderboardEntry {
     /// A VIP member (a crown by the name).
     #[serde(default)]
     pub vip: bool,
+    /// An administrator (the name is red).
+    #[serde(default)]
+    pub admin: bool,
 }
 
 /// Who wrote a chat line.
@@ -362,6 +365,25 @@ pub struct ChatLine {
     /// The writer's rating (for the name colour); 0 when unknown.
     #[serde(default)]
     pub rating: i32,
+    /// The line's number in the lounge chat (0: not a lounge chat line).
+    #[serde(default)]
+    pub id: u64,
+    /// Written by an administrator (the name is red).
+    #[serde(default)]
+    pub admin: bool,
+    /// Deleted (its text is gone): by whom.
+    #[serde(default)]
+    pub deleted: Option<Deleted>,
+}
+
+/// Who deleted a chat line.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Deleted {
+    /// The one who wrote it.
+    Author,
+    /// An administrator.
+    Admin,
 }
 
 /// The aim of the player at the table, streamed so the opponent sees the cue move.
@@ -474,6 +496,9 @@ pub struct HistoryEntry {
     pub opponent: String,
     pub opponent_country: String,
     pub opponent_rating: i32,
+    /// The opponent is an administrator (the name is red).
+    #[serde(default)]
+    pub opponent_admin: bool,
     pub won: bool,
     pub reason: GameOverReason,
     pub rated: bool,
@@ -651,6 +676,15 @@ pub enum ClientMsg {
     Chat {
         text: String,
     },
+    /// Deletes a lounge chat line: one's own, or any (administrators).
+    /// `silent` (administrators): it disappears without a trace.
+    DeleteChat {
+        id: u64,
+        #[serde(default)]
+        silent: bool,
+    },
+    /// Clears the lounge chat (administrators).
+    ClearChat,
     /// Chat with the opponent during a match.
     MatchChat {
         text: String,
@@ -885,6 +919,19 @@ pub enum ServerMsg {
     },
     ChatHistory {
         lines: Vec<ChatLine>,
+    },
+    /// A lounge chat line was deleted: show that it was, by whom.
+    ChatDeleted {
+        id: u64,
+        by: Deleted,
+    },
+    /// A lounge chat line was taken away without a trace.
+    ChatRemoved {
+        id: u64,
+    },
+    /// An administrator (`by`) cleared the lounge chat.
+    ChatCleared {
+        by: String,
     },
     Chat {
         line: ChatLine,

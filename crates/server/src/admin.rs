@@ -51,6 +51,7 @@ pub fn router() -> Router<Arc<Server>> {
         .route("/admin/api/replay/{id}", get(replay))
         .route("/admin/api/announce", post(announce))
         .route("/admin/api/motd", post(motd))
+        .route("/admin/api/chat/clear", post(clear_chat))
         .route("/admin/api/board", get(board).post(pin_note))
         .route("/admin/api/payments/{id}/test", post(payment_test))
         .route("/admin/api/board/{id}", axum::routing::delete(unpin_note))
@@ -665,6 +666,14 @@ async fn announce(
     }
     server.with(|l| l.announce_text(&text));
     log(&server, &s, "announce", "lounge", &text).await;
+    Ok(Json(json!({ "ok": true })))
+}
+
+async fn clear_chat(State(server): State<Arc<Server>>, headers: HeaderMap) -> ApiResult {
+    let s = staff(&server, &headers).await?;
+    require_admin(&s)?;
+    server.with(|l| l.clear_chat(&s.user.username));
+    log(&server, &s, "clear-chat", "lounge", "").await;
     Ok(Json(json!({ "ok": true })))
 }
 

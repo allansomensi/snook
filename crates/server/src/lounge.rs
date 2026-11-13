@@ -243,6 +243,13 @@ pub struct Lounge {
     pub queue_waits: VecDeque<u32>,
     /// The notes on the board (the store has them; this is what players see).
     board: Vec<snookered_proto::BoardNote>,
+    /// The last lounge chat line's number.
+    chat_id: u64,
+    /// Lounge chat lines deleted (shown as such), and by whom. The text is
+    /// kept for reports.
+    chat_deleted: HashMap<u64, snookered_proto::Deleted>,
+    /// Lounge chat lines taken away without a trace (or cleared).
+    chat_removed: HashSet<u64>,
 }
 
 struct Queued {
@@ -509,7 +516,7 @@ impl Lounge {
             .filter(|l| {
                 !self.sessions.get(&key(&l.from)).is_some_and(|s| blocked.contains(&s.user.id))
             })
-            .cloned()
+            .filter_map(|l| self.shown(l))
             .collect();
         self.send(&k, ServerMsg::ChatHistory { lines });
         let tables = self.tables.values().filter_map(|t| self.table_info(t)).collect();
@@ -639,8 +646,11 @@ impl Lounge {
             at: now(),
             kind: ChatKind::Announcement,
             rating: 0,
+            id: 0,
+            admin: false,
+            deleted: None,
         };
-        self.push_chat(line.clone());
+        let line = self.push_chat(line);
         self.broadcast(&ServerMsg::Chat { line });
     }
 
@@ -654,11 +664,79 @@ impl Lounge {
         self.rules.motd = clean_text(motd, 300);
     }
 
-    fn push_chat(&mut self, line: ChatLine) {
-        self.chat.push_back(line);
+    /// Adds a line to the lounge chat (numbered); returns it.
+    fn push_chat(&mut self, mut line: ChatLine) -> ChatLine {
+        self.chat_id += 1;
+        line.id = self.chat_id;
+        self.chat.push_back(line.clone());
         while self.chat.len() > self.rules.chat_history {
-            self.chat.pop_front();
+            if let Some(old) = self.chat.pop_front() {
+                self.chat_deleted.remove(&old.id);
+                self.chat_removed.remove(&old.id);
+            }
         }
+        line
+    }
+
+    /// A lounge chat line as players see it: none if taken away, without
+    /// its text if deleted.
+    fn shown(&self, l: &ChatLine) -> Option<ChatLine> {
+        if self.chat_removed.contains(&l.id) {
+            return None;
+        }
+        let mut l = l.clone();
+        if let Some(&by) = self.chat_deleted.get(&l.id) {
+            l.text = String::new();
+            l.deleted = Some(by);
+        }
+        Some(l)
+    }
+
+    /// Deletes lounge chat line `id`: the writer their own, an administrator
+    /// any (`silent`: without a trace).
+    fn delete_chat(&mut self, k: &str, id: u64, silent: bool) {
+        let Some(s) = self.sessions.get(k) else { return };
+        let admin = s.user.role == snookered_proto::Role::Admin;
+        let Some(line) = self.chat.iter().find(|l| l.id == id && l.kind == ChatKind::Player) else {
+            return;
+        };
+        let own = key(&line.from) == k;
+        if self.chat_removed.contains(&id) || !(own || admin) || (silent && !admin) {
+            return;
+        }
+        tracing::info!(by = k, line = id, silent, "chat line deleted");
+        if silent {
+            self.chat_deleted.remove(&id);
+            self.chat_removed.insert(id);
+            self.broadcast(&ServerMsg::ChatRemoved { id });
+        } else {
+            let by = if own {
+                snookered_proto::Deleted::Author
+            } else {
+                snookered_proto::Deleted::Admin
+            };
+            self.chat_deleted.insert(id, by);
+            self.broadcast(&ServerMsg::ChatDeleted { id, by });
+        }
+    }
+
+    /// An administrator clears the lounge chat (the lines stay for reports).
+    pub fn clear_chat(&mut self, by: &str) {
+        let ids: Vec<u64> = self.chat.iter().map(|l| l.id).collect();
+        self.chat_removed.extend(ids);
+        self.chat_deleted.clear();
+        self.broadcast(&ServerMsg::ChatCleared { by: by.to_string() });
+        let line = ChatLine {
+            from: snookered_proto::GAME_NAME.into(),
+            text: format!("The chat was cleared by {by}."),
+            at: now(),
+            kind: ChatKind::System,
+            rating: 0,
+            id: 0,
+            admin: false,
+            deleted: None,
+        };
+        self.push_chat(line);
     }
 
     /// Recent chat lines involving `target`, attached to a report.
@@ -748,6 +826,16 @@ impl Lounge {
         }
         match msg {
             ClientMsg::Chat { text } => self.chat(&k, &text),
+            ClientMsg::DeleteChat { id, silent } => self.delete_chat(&k, id, silent),
+            ClientMsg::ClearChat => {
+                if let Some(s) =
+                    self.sessions.get(&k).filter(|s| s.user.role == snookered_proto::Role::Admin)
+                {
+                    let by = s.user.username.clone();
+                    tracing::info!(by = %by, "lounge chat cleared");
+                    self.clear_chat(&by);
+                }
+            }
             ClientMsg::MatchChat { text } => self.match_chat(&k, &text),
             ClientMsg::React { code } => self.react(&k, &code),
             ClientMsg::Cheer { seat } => self.cheer(&k, seat),
@@ -871,8 +959,11 @@ impl Lounge {
             at: now(),
             kind: ChatKind::Player,
             rating: if s.guest { 0 } else { s.user.rating },
+            id: 0,
+            admin: s.user.role == snookered_proto::Role::Admin,
+            deleted: None,
         };
-        self.push_chat(line.clone());
+        let line = self.push_chat(line);
         let msg = ServerMsg::Chat { line };
         for (other, session) in &self.sessions {
             if !session.blocked.contains(&sender) {
@@ -893,6 +984,9 @@ impl Lounge {
             at: now(),
             kind: ChatKind::Player,
             rating: if s.guest { 0 } else { s.user.rating },
+            id: 0,
+            admin: s.user.role == snookered_proto::Role::Admin,
+            deleted: None,
         };
         let sender = s.user.id;
         let Some(id) = s.room else { return };
@@ -907,6 +1001,21 @@ impl Lounge {
                 self.send(&p, ServerMsg::MatchChat { line: line.clone() });
             }
         }
+        // The players' chat stays between them, except for administrators
+        // watching the game.
+        for w in self.admin_spectators(id) {
+            self.send(&w, ServerMsg::MatchChat { line: line.clone() });
+        }
+    }
+
+    /// Administrators watching room `id`.
+    fn admin_spectators(&self, id: u64) -> Vec<String> {
+        self.spectators(id)
+            .into_iter()
+            .filter(|w| {
+                self.sessions.get(w).is_some_and(|s| s.user.role == snookered_proto::Role::Admin)
+            })
+            .collect()
     }
 
     /// Sets what others see of `name`'s shop items (and tells everyone).
@@ -1158,6 +1267,12 @@ impl Lounge {
         if let Some(room) = self.rooms.get(&id) {
             let clock = self.rules.shot_clock.as_secs() as u32;
             self.send(w, room.started_msg(seat, &self.sessions, clock, true));
+            // An administrator also gets what the players said so far.
+            if self.sessions.get(w).is_some_and(|s| s.user.role == snookered_proto::Role::Admin) {
+                for line in &room.chat {
+                    self.send(w, ServerMsg::MatchChat { line: line.clone() });
+                }
+            }
         }
     }
 

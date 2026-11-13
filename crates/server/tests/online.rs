@@ -1287,3 +1287,98 @@ async fn vip_members_have_their_own_reactions() {
     };
     assert_eq!(code, "gem");
 }
+
+#[tokio::test]
+async fn chat_lines_can_be_deleted_and_the_chat_cleared() {
+    use snookered_proto::Deleted;
+    let (url, _) = start_with(Rules::default(), vec!["boss".into()]).await;
+    let (mut boss, _) = Client::register(&url, "boss").await;
+    let (mut bob, _) = Client::register(&url, "bob").await;
+    bob.send(ClientMsg::Chat { text: "oops".into() }).await;
+    let oops = said(&mut boss, "oops").await;
+    assert!(oops.id > 0 && !oops.admin);
+    boss.send(ClientMsg::Chat { text: "rules".into() }).await;
+    let rules = said(&mut bob, "rules").await;
+    assert!(rules.admin, "an administrator's line");
+    bob.send(ClientMsg::Chat { text: "rude".into() }).await;
+    let rude = said(&mut boss, "rude").await;
+
+    // Bob deletes his own line; he can't delete the administrator's.
+    bob.send(ClientMsg::DeleteChat { id: rules.id, silent: false }).await;
+    bob.send(ClientMsg::DeleteChat { id: oops.id, silent: true }).await; // not his to make vanish
+    bob.send(ClientMsg::DeleteChat { id: oops.id, silent: false }).await;
+    let m = boss.expect("deleted", |m| matches!(m, ServerMsg::ChatDeleted { .. })).await;
+    assert_eq!(m, ServerMsg::ChatDeleted { id: oops.id, by: Deleted::Author });
+    // The administrator makes a line vanish.
+    boss.send(ClientMsg::DeleteChat { id: rude.id, silent: true }).await;
+    let m = bob.expect("removed", |m| matches!(m, ServerMsg::ChatRemoved { .. })).await;
+    assert_eq!(m, ServerMsg::ChatRemoved { id: rude.id });
+
+    // Someone arriving now sees the deleted line without its text, and no
+    // trace of the other.
+    let (mut eve, _) = Client::register(&url, "eve").await;
+    let ServerMsg::ChatHistory { lines } =
+        eve.expect("history", |m| matches!(m, ServerMsg::ChatHistory { .. })).await
+    else {
+        unreachable!()
+    };
+    let ids: Vec<u64> = lines.iter().map(|l| l.id).collect();
+    assert_eq!(ids, vec![oops.id, rules.id]);
+    assert_eq!((lines[0].text.as_str(), lines[0].deleted), ("", Some(Deleted::Author)));
+
+    // Only administrators clear the chat.
+    bob.send(ClientMsg::ClearChat).await;
+    boss.send(ClientMsg::ClearChat).await;
+    let m = eve.expect("cleared", |m| matches!(m, ServerMsg::ChatCleared { .. })).await;
+    assert_eq!(m, ServerMsg::ChatCleared { by: "boss".into() });
+    let (mut late, _) = Client::register(&url, "late").await;
+    let ServerMsg::ChatHistory { lines } =
+        late.expect("history", |m| matches!(m, ServerMsg::ChatHistory { .. })).await
+    else {
+        unreachable!()
+    };
+    assert_eq!(lines.len(), 1, "only the note that the chat was cleared: {lines:?}");
+    assert!(lines[0].text.contains("boss"));
+}
+
+async fn said(c: &mut Client, text: &str) -> snookered_proto::ChatLine {
+    let ServerMsg::Chat { line } =
+        c.expect("line", |m| matches!(m, ServerMsg::Chat { line } if line.text == text)).await
+    else {
+        unreachable!()
+    };
+    line
+}
+
+#[tokio::test]
+async fn administrators_watching_see_the_players_chat() {
+    let (url, _) = start_with(Rules::default(), vec!["boss".into()]).await;
+    let (mut alice, _) = Client::register(&url, "alice").await;
+    let (mut bob, _) = Client::register(&url, "bob").await;
+    let (mut boss, _) = Client::register(&url, "boss").await;
+    let (mut eve, _) = Client::register(&url, "eve").await;
+    start_match(&mut alice, &mut bob, "bob", "alice", false).await;
+    let ServerMsg::Featured { featured: Some(featured) } =
+        boss.expect("featured", |m| matches!(m, ServerMsg::Featured { featured: Some(_) })).await
+    else {
+        unreachable!()
+    };
+    let match_id = featured.match_id;
+    alice.send(ClientMsg::MatchChat { text: "before".into() }).await;
+    bob.expect("before", |m| matches!(m, ServerMsg::MatchChat { .. })).await;
+    for c in [&mut boss, &mut eve] {
+        c.send(ClientMsg::WatchMatch { match_id }).await;
+        c.expect("watching", |m| matches!(m, ServerMsg::MatchStarted { .. })).await;
+    }
+    // The administrator gets what was said before they came, and after.
+    boss.expect("earlier", |m| matches!(m, ServerMsg::MatchChat { line } if line.text == "before"))
+        .await;
+    alice.send(ClientMsg::MatchChat { text: "gg".into() }).await;
+    boss.expect("chat", |m| matches!(m, ServerMsg::MatchChat { line } if line.text == "gg")).await;
+    // Anyone else watching doesn't.
+    alice.send(ClientMsg::Resign).await;
+    let m = eve
+        .expect("end", |m| matches!(m, ServerMsg::MatchChat { .. } | ServerMsg::MatchEnded { .. }))
+        .await;
+    assert!(matches!(m, ServerMsg::MatchEnded { .. }), "a spectator saw the players' chat: {m:?}");
+}

@@ -495,6 +495,7 @@ impl MemoryStore {
                 Some(HistoryRow {
                     opponent: other.map(|u| u.username.clone()).unwrap_or_default(),
                     opponent_country: other.map(|u| u.country.clone()).unwrap_or_default(),
+                    opponent_admin: other.is_some_and(|u| u.role == Role::Admin),
                     opponent_rating: m.ratings_after[1 - seat],
                     won: m.winner == seat,
                     reason: crate::reason_code(m.reason).to_string(),
@@ -534,6 +535,7 @@ impl MemoryStore {
                 wins: u.wins,
                 country: u.country.clone(),
                 vip: s.wallets.get(&u.id).is_some_and(|w| w.vip_until > now),
+                admin: u.role == Role::Admin,
             })
             .collect())
     }
