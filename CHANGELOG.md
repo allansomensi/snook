@@ -1,5 +1,45 @@
 # Changelog
 
+## Unreleased (protocol 12)
+
+Not released yet: the server must go out together with the new game
+(protocol 12), so 0.1.2 players are asked to update.
+
+### Lounge
+- **Missions**: three a day and two a week, the same for everyone (play,
+  win, pot balls, pot with spin, three in a row, win without a foul). They
+  count rated games played to the end and pay their coins once complete.
+  A tab beside the lounge chat shows them with the time left.
+- **The board**: notes the staff pin from the panel (for some days or
+  until taken down), shown to everyone at once, with the tournaments open
+  for registration. A dot on the tab marks a note not read yet.
+- Notifications when a tournament starts in a few minutes or one you are
+  in begins; Settings → Game turns system notifications off. On Windows
+  the toast goes out under the game's Start menu entry, so it shows.
+
+### Watching
+- A television camera when watching a friend, the featured table or a
+  replay: a wide shot as a turn begins, from behind the shooter while they
+  aim, and the rolling balls from above or a high corner. Moving the camera
+  pauses it until the view is reset; Settings → Game turns it off.
+
+### Games
+- The game against the computer is kept after every shot: closing the
+  game no longer loses it, and the menu offers to continue it.
+- End of game: besides the numbers, the momentum (who was on top, shot by
+  shot) and a map of where every shot was played from.
+
+### Shop
+- Give a month of VIP to a friend (a one-off payment, the `vip_gift`
+  price in `SNOOKERED_STRIPE_PRICES`). Not in the Microsoft Store version.
+- The Coins tab says first that coins are earned by playing (as the Store
+  version does); buying them is only an extra.
+
+### Server and panel
+- Administrators may change their own wallet (coins, items, VIP days).
+- Migration 0005 (missions and the board).
+- The README lists Spanish among the languages.
+
 ## 0.1.2 (protocol 11)
 
 ### The game is called Snookered
