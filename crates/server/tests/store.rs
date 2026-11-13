@@ -352,6 +352,31 @@ async fn exercise(store: Store) {
     assert_eq!(history.len(), 2, "the other player's history stays");
     assert_eq!(history[0].opponent, format!("deleted-{}", b.id));
     assert!(store.leaderboard(10, t).await.unwrap().iter().all(|e| e.username != gone.username));
+
+    // Missions: progress adds up to the target, per period.
+    let day = "d19700".to_string();
+    assert_eq!(store.advance_mission(a.id, &day, "d_balls", 9, 15, t + 50).await.unwrap(), 9);
+    assert_eq!(store.advance_mission(a.id, &day, "d_balls", 9, 15, t + 50).await.unwrap(), 15);
+    assert_eq!(store.advance_mission(a.id, "w2800", "w_win", 1, 10, t + 500).await.unwrap(), 1);
+    let mut rows = store.mission_progress(a.id, &[day.clone(), "w2800".into()]).await.unwrap();
+    rows.sort();
+    assert_eq!(
+        rows,
+        vec![(day.clone(), "d_balls".into(), 15), ("w2800".into(), "w_win".into(), 1)]
+    );
+    assert!(store.mission_progress(a.id, &["d1".into()]).await.unwrap().is_empty());
+    assert_eq!(store.purge_missions(t + 100).await.unwrap(), 1, "the day is over");
+    assert_eq!(store.mission_progress(a.id, &[day]).await.unwrap(), vec![]);
+
+    // The lounge's board.
+    let first = store.add_board_note("Welcome!", a.id, t, None).await.unwrap();
+    let second = store.add_board_note("Cup on Saturday", a.id, t + 1, Some(t + 60)).await.unwrap();
+    let notes = store.board_notes(t + 10).await.unwrap();
+    assert_eq!(notes.iter().map(|n| n.id).collect::<Vec<_>>(), vec![second, first]);
+    assert_eq!(notes[0].author, "Alice");
+    assert_eq!(store.board_notes(t + 61).await.unwrap().len(), 1, "expired");
+    assert!(store.remove_board_note(first).await.unwrap());
+    assert!(!store.remove_board_note(first).await.unwrap());
 }
 
 #[tokio::test]

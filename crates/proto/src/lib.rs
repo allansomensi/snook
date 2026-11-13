@@ -10,6 +10,7 @@
 
 mod achievements;
 mod countries;
+pub mod missions;
 mod reactions;
 pub mod replay;
 pub mod shop;
@@ -29,6 +30,19 @@ pub struct PackOffer {
     pub coins: u32,
     pub bonus: u32,
     pub price: String,
+}
+
+/// A note the staff pinned on the lounge's board.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct BoardNote {
+    pub id: i64,
+    pub text: String,
+    pub author: String,
+    /// Unix seconds.
+    pub at: i64,
+    /// Taken down at this time (Unix seconds), if set.
+    #[serde(default)]
+    pub expires_at: Option<i64>,
 }
 
 /// The `seat` of a reaction sent by a spectator.
@@ -729,6 +743,8 @@ pub enum ClientMsg {
         to: String,
         code: String,
     },
+    /// Today's and this week's missions, with this player's progress.
+    Missions,
     /// This player's games that can be watched again.
     Replays,
     /// The strokes of a stored game.
@@ -1026,6 +1042,20 @@ pub enum ServerMsg {
     CoinsEarned {
         amount: u32,
         reason: String,
+    },
+    /// The notes on the lounge's board, newest first (after signing in and
+    /// whenever they change).
+    Board {
+        notes: Vec<BoardNote>,
+    },
+    /// Today's and this week's missions and how far this player is (after
+    /// signing in, when asked and whenever progress is made).
+    Missions {
+        daily: Vec<missions::MissionState>,
+        weekly: Vec<missions::MissionState>,
+        /// When today's and this week's missions end (Unix seconds).
+        day_ends: i64,
+        week_ends: i64,
     },
     Replays {
         games: Vec<HistoryEntry>,

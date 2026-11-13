@@ -16,6 +16,7 @@ pub mod admin;
 pub mod lan;
 pub mod limits;
 pub mod lounge;
+pub mod missions;
 pub mod pages;
 pub mod payments;
 pub mod shop;
@@ -175,12 +176,17 @@ impl Server {
     /// A server on an existing store.
     pub async fn with_store(config: Config, store: Store) -> Arc<Self> {
         let _ = store.purge_sessions(now()).await;
+        let _ = store.purge_missions(now()).await;
         let (tx, rx) = mpsc::unbounded_channel();
         let stripe = config.stripe.clone().map(payments::Stripe::new);
+        let mut lounge = Lounge::new(config.rules.clone(), tx);
+        if let Ok(notes) = store.board_notes(now()).await {
+            lounge.set_board(notes.into_iter().map(board_note).collect());
+        }
         Arc::new(Server {
             stripe,
             store,
-            lounge: Mutex::new(Lounge::new(config.rules.clone(), tx)),
+            lounge: Mutex::new(lounge),
             next_conn: AtomicU64::new(1),
             auth: Mutex::new(AuthLimiter::default()),
             effects: Mutex::new(Some(rx)),
@@ -190,6 +196,17 @@ impl Server {
             leaderboard: Mutex::new(None),
             connections: Mutex::new(HashMap::new()),
         })
+    }
+
+    /// Reads the board again and shows it to everyone.
+    pub async fn refresh_board(&self) {
+        match self.store.board_notes(now()).await {
+            Ok(notes) => {
+                let notes = notes.into_iter().map(board_note).collect();
+                self.with(|l| l.set_board(notes));
+            }
+            Err(e) => tracing::error!("the board: {e}"),
+        }
     }
 
     /// Runs `f` with the lounge locked.
@@ -380,6 +397,7 @@ pub fn spawn_background(server: Arc<Server>) {
                 last_sweep = Instant::now();
                 ticker.auth().sweep();
                 let _ = ticker.store.purge_sessions(now()).await;
+                let _ = ticker.store.purge_missions(now()).await;
                 // Saved games nobody came back to within a day.
                 let _ = ticker.store.purge_live(now() - 86_400).await;
             }
@@ -431,6 +449,8 @@ async fn run_effect(server: &Arc<Server>, effect: Effect) {
                         server.check_achievements_after(&user, rated_win).await;
                         if pays {
                             account::game_coins(server, &user, record.winner == seat).await;
+                            let won = record.winner == seat;
+                            missions::after_game(server, &user, won, &record.stats[seat]).await;
                             shop::push_wallet(server, &user).await;
                         }
                     }
@@ -949,6 +969,7 @@ async fn handle_socket(server: Arc<Server>, socket: WebSocket, ip: IpAddr) {
                     break;
                 }
             }
+            ClientMsg::Missions => send(missions::message(&server, &me).await),
             ClientMsg::Replays => {
                 let vip =
                     shop::is_vip(&server.store.wallet(me.id).await.unwrap_or_default(), now());
@@ -1184,9 +1205,20 @@ fn is_account_msg(msg: &ClientMsg) -> bool {
             | ClientMsg::SetRecoveryEmail { .. }
             | ClientMsg::DeleteAccount { .. }
             | ClientMsg::Replays
+            | ClientMsg::Missions
             | ClientMsg::Replay { .. }
             | ClientMsg::CreateInviteCode { .. }
     )
+}
+
+fn board_note(n: crate::store::BoardNote) -> snookered_proto::BoardNote {
+    snookered_proto::BoardNote {
+        id: n.id,
+        text: n.text,
+        author: n.author,
+        at: n.created_at,
+        expires_at: n.expires_at,
+    }
 }
 
 /// Free players keep the replays of their last games; VIP members all of them.

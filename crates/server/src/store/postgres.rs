@@ -8,8 +8,8 @@ use snookered_proto::CareerNumbers;
 use snookered_proto::replay::Replay;
 
 use super::{
-    AimRow, AuditRow, BuyOutcome, FriendOutcome, FriendState, HistoryRow, LedgerRow, LiveMatch,
-    MatchRecord, Metrics, NewReport, NewUser, Overview, Payment, ReportRow, SessionKind,
+    AimRow, AuditRow, BoardNote, BuyOutcome, FriendOutcome, FriendState, HistoryRow, LedgerRow,
+    LiveMatch, MatchRecord, Metrics, NewReport, NewUser, Overview, Payment, ReportRow, SessionKind,
     StoreError, StoreResult, StoredReplay, TournamentRecord, User, Wallet, day_of,
 };
 
@@ -623,6 +623,107 @@ impl PgStore {
         }
         tx.commit().await?;
         Ok(())
+    }
+
+    pub async fn mission_progress(
+        &self,
+        user_id: i64,
+        periods: &[String],
+    ) -> StoreResult<Vec<(String, String, u32)>> {
+        let rows = query(
+            "SELECT period, code, progress FROM mission_progress
+             WHERE user_id = $1 AND period = ANY($2)",
+        )
+        .bind(user_id)
+        .bind(periods)
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows
+            .iter()
+            .map(|r| (r.get("period"), r.get("code"), r.get::<i32, _>("progress").max(0) as u32))
+            .collect())
+    }
+
+    pub async fn advance_mission(
+        &self,
+        user_id: i64,
+        period: &str,
+        code: &str,
+        amount: u32,
+        target: u32,
+        ends: i64,
+    ) -> StoreResult<u32> {
+        let r = query(
+            "INSERT INTO mission_progress (user_id, period, code, progress, ends)
+             VALUES ($1, $2, $3, LEAST($4, $5), $6)
+             ON CONFLICT (user_id, period, code) DO UPDATE
+             SET progress = LEAST(mission_progress.progress + $4, $5)
+             RETURNING progress",
+        )
+        .bind(user_id)
+        .bind(period)
+        .bind(code)
+        .bind(amount as i32)
+        .bind(target as i32)
+        .bind(ends)
+        .fetch_one(&self.pool)
+        .await?;
+        Ok(r.get::<i32, _>("progress").max(0) as u32)
+    }
+
+    pub async fn purge_missions(&self, now: i64) -> StoreResult<u64> {
+        let r = query("DELETE FROM mission_progress WHERE ends <= $1")
+            .bind(now)
+            .execute(&self.pool)
+            .await?;
+        Ok(r.rows_affected())
+    }
+
+    pub async fn board_notes(&self, now: i64) -> StoreResult<Vec<BoardNote>> {
+        let rows = query(
+            "SELECT n.id, n.text, COALESCE(u.username, '') AS author, n.created_at, n.expires_at
+             FROM board_notes n LEFT JOIN users u ON u.id = n.author_id
+             WHERE n.expires_at IS NULL OR n.expires_at > $1
+             ORDER BY n.created_at DESC, n.id DESC",
+        )
+        .bind(now)
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows
+            .iter()
+            .map(|r| BoardNote {
+                id: r.get("id"),
+                text: r.get("text"),
+                author: r.get("author"),
+                created_at: r.get("created_at"),
+                expires_at: r.get("expires_at"),
+            })
+            .collect())
+    }
+
+    pub async fn add_board_note(
+        &self,
+        text: &str,
+        author_id: i64,
+        now: i64,
+        expires_at: Option<i64>,
+    ) -> StoreResult<i64> {
+        let r = query(
+            "INSERT INTO board_notes (text, author_id, created_at, expires_at)
+             VALUES ($1, $2, $3, $4) RETURNING id",
+        )
+        .bind(text)
+        .bind(author_id)
+        .bind(now)
+        .bind(expires_at)
+        .fetch_one(&self.pool)
+        .await?;
+        Ok(r.get("id"))
+    }
+
+    pub async fn remove_board_note(&self, id: i64) -> StoreResult<bool> {
+        let r = query("DELETE FROM board_notes WHERE id = $1").bind(id).execute(&self.pool).await?;
+        Ok(r.rows_affected() > 0)
     }
 
     pub async fn claim_daily(&self, user_id: i64, day: i64, coins: i64) -> StoreResult<bool> {

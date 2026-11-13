@@ -51,6 +51,8 @@ pub fn router() -> Router<Arc<Server>> {
         .route("/admin/api/replay/{id}", get(replay))
         .route("/admin/api/announce", post(announce))
         .route("/admin/api/motd", post(motd))
+        .route("/admin/api/board", get(board).post(pin_note))
+        .route("/admin/api/board/{id}", axum::routing::delete(unpin_note))
         .layer(middleware::from_fn(security_headers))
 }
 
@@ -674,6 +676,62 @@ async fn motd(
     require_admin(&s)?;
     server.with(|l| l.set_motd(&body.text));
     log(&server, &s, "motd", "lounge", &clean_text(&body.text, 300)).await;
+    Ok(Json(json!({ "ok": true })))
+}
+
+/// Longest note on the lounge's board.
+pub const MAX_NOTE_LEN: usize = 400;
+
+async fn board(State(server): State<Arc<Server>>, headers: HeaderMap) -> ApiResult {
+    staff(&server, &headers).await?;
+    let notes = server.store.board_notes(now()).await?;
+    let notes: Vec<_> = notes
+        .into_iter()
+        .map(|n| {
+            json!({ "id": n.id, "text": n.text, "author": n.author,
+                    "created_at": n.created_at, "expires_at": n.expires_at })
+        })
+        .collect();
+    Ok(Json(json!({ "notes": notes })))
+}
+
+#[derive(Deserialize)]
+struct NoteBody {
+    text: String,
+    /// Taken down after this many days (none: until removed).
+    #[serde(default)]
+    days: Option<u32>,
+}
+
+async fn pin_note(
+    State(server): State<Arc<Server>>,
+    headers: HeaderMap,
+    Json(body): Json<NoteBody>,
+) -> ApiResult {
+    let s = staff(&server, &headers).await?;
+    let text = clean_text(&body.text, MAX_NOTE_LEN);
+    if text.is_empty() {
+        return Err(err(StatusCode::BAD_REQUEST, "Write a note."));
+    }
+    let t = now();
+    let expires = body.days.filter(|d| (1..=366).contains(d)).map(|d| t + d as i64 * 86_400);
+    let id = server.store.add_board_note(&text, s.user.id, t, expires).await?;
+    server.refresh_board().await;
+    log(&server, &s, "pin", "board", &text).await;
+    Ok(Json(json!({ "ok": true, "id": id })))
+}
+
+async fn unpin_note(
+    State(server): State<Arc<Server>>,
+    headers: HeaderMap,
+    Path(id): Path<i64>,
+) -> ApiResult {
+    let s = staff(&server, &headers).await?;
+    if !server.store.remove_board_note(id).await? {
+        return Err(err(StatusCode::NOT_FOUND, "No such note."));
+    }
+    server.refresh_board().await;
+    log(&server, &s, "unpin", "board", &format!("note {id}")).await;
     Ok(Json(json!({ "ok": true })))
 }
 

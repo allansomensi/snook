@@ -100,6 +100,17 @@ impl User {
     }
 }
 
+/// A note on the lounge's board.
+#[derive(Debug, Clone, PartialEq)]
+pub struct BoardNote {
+    pub id: i64,
+    pub text: String,
+    /// Who pinned it (empty if the account is gone).
+    pub author: String,
+    pub created_at: i64,
+    pub expires_at: Option<i64>,
+}
+
 pub struct NewUser<'a> {
     pub username: &'a str,
     pub password_hash: &'a str,
@@ -671,6 +682,49 @@ impl Store {
     }
     pub async fn payments_of(&self, user_id: i64, limit: u32) -> StoreResult<Vec<Payment>> {
         dispatch!(self, s => s.payments_of(user_id, limit))
+    }
+    /// This player's progress on missions: (period, code, progress) for
+    /// the given periods.
+    pub async fn mission_progress(
+        &self,
+        user_id: i64,
+        periods: &[String],
+    ) -> StoreResult<Vec<(String, String, u32)>> {
+        dispatch!(self, s => s.mission_progress(user_id, periods))
+    }
+    /// Adds `amount` to a mission's progress (never past `target`); returns
+    /// the new progress. `ends`: when the period ends (for clean-up).
+    pub async fn advance_mission(
+        &self,
+        user_id: i64,
+        period: &str,
+        code: &str,
+        amount: u32,
+        target: u32,
+        ends: i64,
+    ) -> StoreResult<u32> {
+        dispatch!(self, s => s.advance_mission(user_id, period, code, amount, target, ends))
+    }
+    /// Removes progress on missions that ended before `now`.
+    pub async fn purge_missions(&self, now: i64) -> StoreResult<u64> {
+        dispatch!(self, s => s.purge_missions(now))
+    }
+    /// The notes on the lounge's board that are up at `now`, newest first.
+    pub async fn board_notes(&self, now: i64) -> StoreResult<Vec<BoardNote>> {
+        dispatch!(self, s => s.board_notes(now))
+    }
+    pub async fn add_board_note(
+        &self,
+        text: &str,
+        author_id: i64,
+        now: i64,
+        expires_at: Option<i64>,
+    ) -> StoreResult<i64> {
+        dispatch!(self, s => s.add_board_note(text, author_id, now, expires_at))
+    }
+    /// Takes a note down; false if there was none.
+    pub async fn remove_board_note(&self, id: i64) -> StoreResult<bool> {
+        dispatch!(self, s => s.remove_board_note(id))
     }
     /// The daily bonus: `coins` once per `day`; false if already claimed.
     pub async fn claim_daily(&self, user_id: i64, day: i64, coins: i64) -> StoreResult<bool> {

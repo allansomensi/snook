@@ -900,3 +900,28 @@ Give a month to a friend · {p}	Dar um mês a um amigo · {p}
 Your friend is already VIP.	Seu amigo já é VIP.
 Game in progress: {n} balls left	Partida em andamento: faltam {n} bolas
 Continue	Continuar
+Missions	Missões
+Board	Mural
+Today	Hoje
+This week	Esta semana
+new missions in {t}	novas missões em {t}
+ends in {t}	termina em {t}
+{n} days	{n} dias
+{n} h	{n} h
+{n} min	{n} min
+mission complete	missão cumprida
+Missions count rated games played to the end. The coins arrive as soon as one is complete.	As missões contam partidas valendo rating jogadas até o fim. As moedas chegam assim que uma é cumprida.
+Nothing on the board right now.	Nada no mural por enquanto.
+Open tournaments	Torneios abertos
+{n}/{size} players	{n}/{size} jogadores
+starts in {t}	começa em {t}
+entry {n} coins	inscrição {n} moedas
+See	Ver
+Play {n} rated games	Jogue {n} partidas valendo rating
+Win {n} rated games	Vença {n} partidas valendo rating
+Pot {n} balls	Encaçape {n} bolas
+Pot {n} balls with spin	Encaçape {n} bolas com efeito
+Pot 3 balls in a row in one visit	Encaçape 3 bolas seguidas numa vez
+Win a game without a foul	Vença uma partida sem cometer falta
+Pot 3 balls in a row {n} times	Encaçape 3 bolas seguidas {n} vezes
+Win {n} games without a foul	Vença {n} partidas sem cometer falta

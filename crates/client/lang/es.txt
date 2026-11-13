@@ -900,3 +900,28 @@ Give a month to a friend · {p}	Regalar un mes a un amigo · {p}
 Your friend is already VIP.	Tu amigo ya es VIP.
 Game in progress: {n} balls left	Partida en curso: quedan {n} bolas
 Continue	Continuar
+Missions	Misiones
+Board	Tablón
+Today	Hoy
+This week	Esta semana
+new missions in {t}	nuevas misiones en {t}
+ends in {t}	termina en {t}
+{n} days	{n} días
+{n} h	{n} h
+{n} min	{n} min
+mission complete	misión cumplida
+Missions count rated games played to the end. The coins arrive as soon as one is complete.	Las misiones cuentan partidas con rating jugadas hasta el final. Las monedas llegan en cuanto se cumple una.
+Nothing on the board right now.	Nada en el tablón por ahora.
+Open tournaments	Torneos abiertos
+{n}/{size} players	{n}/{size} jugadores
+starts in {t}	empieza en {t}
+entry {n} coins	inscripción {n} monedas
+See	Ver
+Play {n} rated games	Juega {n} partidas con rating
+Win {n} rated games	Gana {n} partidas con rating
+Pot {n} balls	Mete {n} bolas
+Pot {n} balls with spin	Mete {n} bolas con efecto
+Pot 3 balls in a row in one visit	Mete 3 bolas seguidas en un turno
+Win a game without a foul	Gana una partida sin cometer falta
+Pot 3 balls in a row {n} times	Mete 3 bolas seguidas {n} veces
+Win {n} games without a foul	Gana {n} partidas sin cometer falta

@@ -8,8 +8,8 @@ use snookered_proto::{LeaderboardEntry, Role};
 use snookered_proto::CareerNumbers;
 
 use super::{
-    AimRow, AuditRow, BuyOutcome, FriendOutcome, FriendState, HistoryRow, LedgerRow, LiveMatch,
-    MatchRecord, Metrics, NewReport, NewUser, Overview, Payment, ReportRow, SessionKind,
+    AimRow, AuditRow, BoardNote, BuyOutcome, FriendOutcome, FriendState, HistoryRow, LedgerRow,
+    LiveMatch, MatchRecord, Metrics, NewReport, NewUser, Overview, Payment, ReportRow, SessionKind,
     StoreResult, StoredReplay, TournamentRecord, User, Wallet, day_of,
 };
 
@@ -44,6 +44,10 @@ struct Inner {
     activity: HashSet<(i64, i64)>,
     /// user -> (daily bonus day, earned day, earned that day)
     earnings: HashMap<i64, (i64, i64, i64)>,
+    /// (user, period, code) -> (progress, period ends)
+    missions: HashMap<(i64, String, String), (u32, i64)>,
+    board: Vec<BoardNote>,
+    next_note: i64,
 }
 
 impl Inner {
@@ -140,6 +144,77 @@ impl MemoryStore {
     pub fn delete_user_sessions(&self, user_id: i64) -> StoreResult<()> {
         self.lock().sessions.retain(|_, (id, ..)| *id != user_id);
         Ok(())
+    }
+
+    pub fn mission_progress(
+        &self,
+        user_id: i64,
+        periods: &[String],
+    ) -> StoreResult<Vec<(String, String, u32)>> {
+        let s = self.lock();
+        Ok(s.missions
+            .iter()
+            .filter(|((u, p, _), _)| *u == user_id && periods.contains(p))
+            .map(|((_, p, c), (n, _))| (p.clone(), c.clone(), *n))
+            .collect())
+    }
+
+    pub fn advance_mission(
+        &self,
+        user_id: i64,
+        period: &str,
+        code: &str,
+        amount: u32,
+        target: u32,
+        ends: i64,
+    ) -> StoreResult<u32> {
+        let mut s = self.lock();
+        let e =
+            s.missions.entry((user_id, period.to_string(), code.to_string())).or_insert((0, ends));
+        e.0 = (e.0 + amount).min(target);
+        Ok(e.0)
+    }
+
+    pub fn purge_missions(&self, now: i64) -> StoreResult<u64> {
+        let mut s = self.lock();
+        let before = s.missions.len();
+        s.missions.retain(|_, (_, ends)| *ends > now);
+        Ok((before - s.missions.len()) as u64)
+    }
+
+    pub fn board_notes(&self, now: i64) -> StoreResult<Vec<BoardNote>> {
+        let s = self.lock();
+        let mut notes: Vec<BoardNote> =
+            s.board.iter().filter(|n| n.expires_at.is_none_or(|e| e > now)).cloned().collect();
+        notes.sort_by_key(|n| std::cmp::Reverse((n.created_at, n.id)));
+        Ok(notes)
+    }
+
+    pub fn add_board_note(
+        &self,
+        text: &str,
+        author_id: i64,
+        now: i64,
+        expires_at: Option<i64>,
+    ) -> StoreResult<i64> {
+        let mut s = self.lock();
+        s.next_note += 1;
+        let note = BoardNote {
+            id: s.next_note,
+            text: text.to_string(),
+            author: s.name(author_id),
+            created_at: now,
+            expires_at,
+        };
+        s.board.push(note);
+        Ok(s.next_note)
+    }
+
+    pub fn remove_board_note(&self, id: i64) -> StoreResult<bool> {
+        let mut s = self.lock();
+        let before = s.board.len();
+        s.board.retain(|n| n.id != id);
+        Ok(s.board.len() < before)
     }
 
     pub fn purge_sessions(&self, now: i64) -> StoreResult<u64> {

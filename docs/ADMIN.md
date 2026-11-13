@@ -16,7 +16,7 @@ API, CORS and a second set of credentials for no gain at this size.
 |---|---|---|---|
 | Overview, players, reports, live games, audit log | | ✓ | ✓ |
 | Ban / unban, mute / unmute, disconnect, sign out everywhere | | ✓ (not on staff) | ✓ |
-| Resolve reports, announcements in the lounge | | ✓ | ✓ |
+| Resolve reports, announcements in the lounge, the lounge's board | | ✓ | ✓ |
 | Change roles, reset a password, change the welcome message | | | ✓ |
 
 The first administrators come from `SNOOKERED_ADMINS`; they can then promote
@@ -34,6 +34,10 @@ VIP days), which goes in the audit log like any other change.
 - **Sign out everywhere**: revokes every saved session.
 - **Reset password**: for account recovery (there are no e-mails): sets a new
   password and signs the player out everywhere.
+- **Board** (Overview page): notes pinned for everyone in the lounge's
+  *Board* tab (rules, events, the next cup), for some days or until taken
+  down. Players see a new note at once, with a dot on the tab until they
+  read it. Tournaments open for registration are listed there on their own.
 - **Reports** come with the reporter, the reason, the player's note and the
   recent chat lines of the reported player (lounge and shared match).
 

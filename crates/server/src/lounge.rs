@@ -239,6 +239,8 @@ pub struct Lounge {
     pair_games: HashMap<(String, String), VecDeque<Instant>>,
     /// Waits in the "Play now" queue (seconds), for the staff panel.
     pub queue_waits: VecDeque<u32>,
+    /// The notes on the board (the store has them; this is what players see).
+    board: Vec<snookered_proto::BoardNote>,
 }
 
 struct Queued {
@@ -513,6 +515,9 @@ impl Lounge {
         let tournaments = self.tournaments.values().map(|t| self.tournament_info(t)).collect();
         self.send(&k, ServerMsg::Tournaments { tournaments });
         self.send(&k, ServerMsg::Featured { featured: self.featured.clone() });
+        if !self.rules.lan {
+            self.send(&k, ServerMsg::Board { notes: self.board.clone() });
+        }
         if let Some(until) = self.draining {
             let secs = until.saturating_duration_since(Instant::now()).as_secs() as u32;
             self.send(&k, ServerMsg::Draining { secs });
@@ -635,6 +640,12 @@ impl Lounge {
         };
         self.push_chat(line.clone());
         self.broadcast(&ServerMsg::Chat { line });
+    }
+
+    /// New notes on the board: everyone sees them at once.
+    pub fn set_board(&mut self, notes: Vec<snookered_proto::BoardNote>) {
+        self.board = notes;
+        self.broadcast(&ServerMsg::Board { notes: self.board.clone() });
     }
 
     pub fn set_motd(&mut self, motd: &str) {
@@ -810,6 +821,7 @@ impl Lounge {
             | ClientMsg::SetRecoveryEmail { .. }
             | ClientMsg::DeleteAccount { .. }
             | ClientMsg::GiftItem { .. }
+            | ClientMsg::Missions
             | ClientMsg::Replays
             | ClientMsg::Replay { .. } => {}
         }
@@ -1630,10 +1642,11 @@ impl Lounge {
         // of aim assistance (measured on the table as it was).
         let in_hand = room.game.ball_in_hand().is_some();
         room.stats[shooter].add(&report, in_hand);
-        if let Some(Stroke::Shot { shot, .. }) = room.replay.strokes.last()
-            && let Some(band) = shot_difficulty(&room.game, shot, &report)
-        {
-            room.bands[shooter].push(band);
+        if let Some(Stroke::Shot { shot, .. }) = room.replay.strokes.last() {
+            room.stats[shooter].add_spin(shot, &report);
+            if let Some(band) = shot_difficulty(&room.game, shot, &report) {
+                room.bands[shooter].push(band);
+            }
         }
         room.game = game;
         let next = room.game.current_player();
@@ -2249,6 +2262,7 @@ impl Rebuilt {
             let report = snookered_proto::replay::apply(&mut game, stroke)?;
             if let (Some(report), Stroke::Shot { shot, .. }) = (report, stroke) {
                 stats[shooter].add(&report, in_hand);
+                stats[shooter].add_spin(shot, &report);
                 if let Some(b) = shot_difficulty(&before, shot, &report) {
                     bands[shooter].push(b);
                 }

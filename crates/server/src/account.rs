@@ -146,6 +146,7 @@ pub async fn signed_in(server: &Server, user: &User) {
             )
         });
     }
+    crate::missions::push(server, user).await;
 }
 
 /// Coins for a finished rated game (capped per day). `won`: the player won.

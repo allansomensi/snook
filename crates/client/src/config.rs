@@ -137,6 +137,13 @@ pub struct Config {
     pub effect: String,
     /// The player declined to use their payment e-mail for recovery.
     pub email_offer_declined: bool,
+    /// The newest note on the lounge's board the player has seen.
+    pub board_seen: i64,
+    /// Watching a game: the camera cuts between angles like on TV.
+    pub tv_camera: bool,
+    /// Windows notifications when a friend comes online or a tournament
+    /// is about to start (while the game is in the background).
+    pub desktop_notifications: bool,
 }
 
 impl Default for Config {
@@ -174,6 +181,9 @@ impl Default for Config {
             balls: "balls_classic".into(),
             effect: "effect_none".into(),
             email_offer_declined: false,
+            board_seen: 0,
+            tv_camera: true,
+            desktop_notifications: true,
         }
     }
 }
@@ -265,6 +275,9 @@ impl Config {
                     }
                 }
                 "email_offer_declined" => c.email_offer_declined = v == "true",
+                "board_seen" => c.board_seen = v.parse().unwrap_or(0),
+                "tv_camera" => c.tv_camera = v != "false",
+                "desktop_notifications" => c.desktop_notifications = v != "false",
                 _ => {}
             }
         }
@@ -275,7 +288,8 @@ impl Config {
         format!(
             "# Snookered settings\nplayer_name = {}\nsecond_player_name = {}\nguide = {}\nshow_help = {}\nshot_camera = {}\ncamera_follow = {}\ngraphics_checked = {}\nlanguage = {}\nvignette = {}\nfocused_scene = {}\nshow_fps = {}\nshow_ping = {}\naim_sensitivity = {:.2}\nui_size = {:.2}\n\
              quality = {}\nmsaa = {}\nfullscreen = {}\nvolume = {:.2}\nserver = {}\nusername = {}\ntoken = {}\n\
-             difficulty = {}\nshot_clock = {}\nlan_name = {}\ncloth = {}\ncue = {}\nchalk = {}\nballs = {}\neffect = {}\nemail_offer_declined = {}\n",
+             difficulty = {}\nshot_clock = {}\nlan_name = {}\ncloth = {}\ncue = {}\nchalk = {}\nballs = {}\neffect = {}\nemail_offer_declined = {}\n\
+             board_seen = {}\ntv_camera = {}\ndesktop_notifications = {}\n",
             self.player_name,
             self.second_player_name,
             self.guide.name(),
@@ -305,7 +319,10 @@ impl Config {
             self.chalk,
             self.balls,
             self.effect,
-            self.email_offer_declined
+            self.email_offer_declined,
+            self.board_seen,
+            self.tv_camera,
+            self.desktop_notifications
         )
     }
 

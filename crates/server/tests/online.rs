@@ -699,7 +699,7 @@ async fn lan_guests_play_casual_games() {
 #[tokio::test]
 async fn admin_panel_requires_staff() {
     let (url, http) = start_with(Rules::default(), vec!["boss".into()]).await;
-    let (_boss, _) = Client::register(&url, "boss").await;
+    let (mut boss, _) = Client::register(&url, "boss").await;
     let (_eve, _) = Client::register(&url, "eve").await;
     let host = http.trim_start_matches("http://").to_string();
     // A minimal HTTP client over a raw socket (no extra dependencies).
@@ -785,6 +785,28 @@ async fn admin_panel_requires_staff() {
     let (code, _) =
         request(&host, "POST", "/admin/api/users/boss/ban", &token, r#"{"reason":"x"}"#).await;
     assert_eq!(code, 400, "nobody bans themselves");
+    // A note on the board reaches everyone in the lounge at once.
+    let (code, body) = request(
+        &host,
+        "POST",
+        "/admin/api/board",
+        &token,
+        r#"{"text":"Cup on Saturday","days":3}"#,
+    )
+    .await;
+    assert_eq!(code, 200, "{body}");
+    let ServerMsg::Board { notes } = boss
+        .expect("board", |m| matches!(m, ServerMsg::Board { notes } if !notes.is_empty()))
+        .await
+    else {
+        unreachable!()
+    };
+    assert_eq!((notes[0].text.as_str(), notes[0].author.as_str()), ("Cup on Saturday", "boss"));
+    let (code, _) =
+        request(&host, "DELETE", &format!("/admin/api/board/{}", notes[0].id), &token, "").await;
+    assert_eq!(code, 200);
+    boss.expect("empty board", |m| matches!(m, ServerMsg::Board { notes } if notes.is_empty()))
+        .await;
     // Eve can't sign in while banned.
     let mut c = Client::connect(&url).await;
     c.send(ClientMsg::Login { username: "eve".into(), password: PASSWORD.into() }).await;
@@ -1054,6 +1076,23 @@ async fn replays_coins_featured_table_and_codes() {
     };
     let alice_won = result.winner == sa;
     assert_eq!(amount, if alice_won { 25 } else { 10 });
+    // The game moved the missions on: one game played, one won (or not).
+    let ServerMsg::Missions { daily, weekly, day_ends, week_ends } =
+        alice.expect("missions", |m| matches!(m, ServerMsg::Missions { .. })).await
+    else {
+        unreachable!()
+    };
+    assert_eq!((daily.len(), weekly.len()), (3, 2));
+    assert!(day_ends > snookered_server::now() && week_ends >= day_ends);
+    for m in daily.iter().chain(&weekly) {
+        let goal = snookered_proto::missions::mission(&m.code).unwrap().goal;
+        use snookered_proto::missions::Goal;
+        match goal {
+            Goal::Play => assert_eq!(m.progress, 1, "{}", m.code),
+            Goal::Win => assert_eq!(m.progress, alice_won as u32, "{}", m.code),
+            _ => {}
+        }
+    }
 
     // The game can be watched again, stroke by stroke.
     alice.send(ClientMsg::Replays).await;

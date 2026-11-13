@@ -22,6 +22,12 @@ pub struct ShotStats {
     pub run: u32,
     /// Shots taken with the cue ball in hand.
     pub in_hand: u32,
+    /// Balls legally made with spin or a raised cue (see [`ShotStats::add_spin`]).
+    #[serde(default)]
+    pub spin_pots: u32,
+    /// Visits to the table with three or more balls made.
+    #[serde(default)]
+    pub runs: u32,
 }
 
 impl ShotStats {
@@ -40,12 +46,24 @@ impl ShotStats {
         if made > 0 {
             self.potting_shots += 1;
             self.balls += made;
+            if self.run < 3 && self.run + made >= 3 {
+                self.runs += 1;
+            }
             self.run += made;
             self.best_run = self.best_run.max(self.run);
         }
         if !report.continues {
             self.run = 0;
         }
+    }
+
+    /// Counts the balls `report` legally made if `shot` had spin: the tip
+    /// clearly off centre, or the cue raised (a jump or a massé).
+    pub fn add_spin(&mut self, shot: &crate::Shot, report: &ShotReport) {
+        if report.is_foul() || (shot.tip.length() < 0.3 && shot.elevation < 0.2) {
+            return;
+        }
+        self.spin_pots += report.pocketed.iter().filter(|(b, _)| b.is_object()).count() as u32;
     }
 
     /// Potting success, 0..=100.

@@ -106,6 +106,35 @@ const views = {
           catch (e) { toast(e.message); }
         },
       }, "Send to the lounge")));
+    // The lounge's board: notes that stay up (rules, events, tournaments).
+    const notes = el("div", {});
+    const loadNotes = async () => {
+      const d = await api("/board");
+      const rows = d.notes.map((n) => el("tr", {},
+        el("td", {}, n.text), el("td", {}, n.author || "—"), el("td", {}, ago(n.created_at)),
+        el("td", {}, n.expires_at ? fmtDate(n.expires_at) : "—"),
+        el("td", {}, el("button", {
+          class: "danger", onclick: async () => {
+            try { await api("/board/" + n.id, { method: "DELETE" }); toast("Taken down."); loadNotes(); }
+            catch (e) { toast(e.message); }
+          },
+        }, "Take down"))));
+      notes.replaceChildren(rows.length
+        ? table(["Note", "By", "Pinned", "Until", ""], rows)
+        : el("p", { class: "muted" }, "The board is empty."));
+    };
+    const note = el("textarea", { rows: "3", maxlength: "400", placeholder: "A note for the lounge's board" });
+    const days = el("input", { type: "number", min: "1", max: "366", placeholder: "Days (empty: until taken down)" });
+    box.append(el("h2", {}, "Board"), note, days,
+      el("div", { class: "actions" }, el("button", {
+        class: "primary", onclick: async () => {
+          try {
+            await api("/board", { method: "POST", body: { text: note.value, days: days.value ? Number(days.value) : null } });
+            note.value = ""; days.value = ""; toast("Pinned."); loadNotes();
+          } catch (e) { toast(e.message); }
+        },
+      }, "Pin to the board")), notes);
+    loadNotes().catch((e) => toast(e.message));
     if (me && me.role === "admin") {
       const motd = el("input", { maxlength: "300" });
       motd.value = o.motd;

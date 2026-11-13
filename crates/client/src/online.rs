@@ -186,6 +186,41 @@ pub struct Online {
     pub draining: Option<std::time::Instant>,
     /// Something happened that a player in another window should notice.
     pub attention: Option<String>,
+    /// What the right side of the lounge shows.
+    side: Side,
+    /// Today's and this week's missions.
+    missions: Option<MissionsView>,
+    /// A mission was finished since the missions were last looked at.
+    mission_done: bool,
+    /// The notes on the lounge's board, newest first.
+    board: Vec<snookered_proto::BoardNote>,
+}
+
+/// "5 h", "3 days", "12 min": how long until something.
+fn time_left(secs: i64) -> String {
+    let secs = secs.max(0);
+    if secs >= 2 * 86_400 {
+        tw("{n} days", &[("n", &(secs / 86_400))])
+    } else if secs >= 3600 {
+        tw("{n} h", &[("n", &(secs / 3600))])
+    } else {
+        tw("{n} min", &[("n", &(secs / 60).max(1))])
+    }
+}
+
+/// The right side of the lounge.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Side {
+    Chat,
+    Missions,
+    Board,
+}
+
+struct MissionsView {
+    daily: Vec<snookered_proto::missions::MissionState>,
+    weekly: Vec<snookered_proto::missions::MissionState>,
+    day_ends: i64,
+    week_ends: i64,
 }
 
 /// The account page.
@@ -281,6 +316,15 @@ impl Online {
             invite_code: None,
             draining: None,
             attention: None,
+            // Development aid: SNOOKERED_LOUNGE_SIDE=missions|board.
+            side: match crate::dev::var("SNOOKERED_LOUNGE_SIDE").as_deref() {
+                Some("missions") => Side::Missions,
+                Some("board") => Side::Board,
+                _ => Side::Chat,
+            },
+            missions: None,
+            mission_done: false,
+            board: Vec::new(),
         }
     }
 
@@ -691,6 +735,12 @@ impl Online {
                     "game" => t("for the game"),
                     "prize" => t("tournament prize"),
                     "refund" => t("entry fee back"),
+                    "mission" => {
+                        if self.side != Side::Missions {
+                            self.mission_done = true;
+                        }
+                        t("mission complete")
+                    }
                     _ => "",
                 };
                 self.toast(tw("+{n} coins · {why}", &[("n", &amount), ("why", &why)]), true);
@@ -716,6 +766,10 @@ impl Online {
             ServerMsg::Replays { games, limit } => self.replays = Some((games, limit)),
             ServerMsg::Replay { replay } => self.replay = Some(replay),
             ServerMsg::Featured { featured } => self.featured = featured,
+            ServerMsg::Missions { daily, weekly, day_ends, week_ends } => {
+                self.missions = Some(MissionsView { daily, weekly, day_ends, week_ends });
+            }
+            ServerMsg::Board { notes } => self.board = notes,
             ServerMsg::InviteCode { code } => self.invite_code = Some(code),
             ServerMsg::Draining { secs } => {
                 self.draining =
@@ -1312,10 +1366,15 @@ impl Online {
             }
         }
 
-        // Right: chat.
+        // Right: the chat, the missions and the board.
         ui.panel(right_panel);
-        ui.text(t("Lounge chat"), right_panel.x + 14.0, right_panel.y + 12.0, 16.0, GOLD, true);
         let mut log_top = right_panel.y + 40.0;
+        if self.lan {
+            ui.text(t("Lounge chat"), right_panel.x + 14.0, right_panel.y + 12.0, 16.0, GOLD, true);
+        } else {
+            self.side_tabs(ui, right_panel, config);
+            log_top = right_panel.y + 50.0;
+        }
         if !self.motd.is_empty() {
             let lines = ui.wrap(&self.motd, right_panel.w - 40.0, 13.0);
             let mh = lines.len().min(2) as f32 * 16.0 + 12.0;
@@ -1353,6 +1412,20 @@ impl Online {
                 ui.text(l, r.x + 10.0, r.y + 7.0 + k as f32 * 16.0, 13.0, CREAM, true);
             }
             log_top += r.h + 8.0;
+        }
+        if self.side != Side::Chat {
+            let area = Rect::new(
+                right_panel.x + 12.0,
+                log_top,
+                right_panel.w - 24.0,
+                right_panel.y + right_panel.h - log_top - 12.0,
+            );
+            match self.side {
+                Side::Missions => self.draw_missions(ui, area),
+                _ => self.draw_board(ui, area),
+            }
+            self.draw_invites(ui, false);
+            return action;
         }
         // The featured game: anyone can watch it.
         if let Some(f) = self.featured.clone()
@@ -1424,6 +1497,182 @@ impl Online {
 
         self.draw_invites(ui, false);
         action
+    }
+
+    /// The tabs over the right side of the lounge.
+    fn side_tabs(&mut self, ui: &mut Ui, panel: Rect, config: &mut Config) {
+        let tabs =
+            [(Side::Chat, t("Chat")), (Side::Missions, t("Missions")), (Side::Board, t("Board"))];
+        let w = (panel.w - 24.0 - 12.0) / 3.0;
+        let newest = self.board.iter().map(|n| n.id).max().unwrap_or(0);
+        // Notes that arrive while the board is open are seen.
+        if self.side == Side::Board && newest > config.board_seen {
+            config.board_seen = newest;
+            config.save();
+        }
+        for (k, (side, label)) in tabs.into_iter().enumerate() {
+            let r = Rect::new(panel.x + 12.0 + k as f32 * (w + 6.0), panel.y + 10.0, w, 32.0);
+            if ui.tab(r, label, self.side == side) {
+                self.side = side;
+                match side {
+                    Side::Missions => {
+                        self.mission_done = false;
+                        self.send(ClientMsg::Missions);
+                    }
+                    Side::Board if newest > config.board_seen => {
+                        config.board_seen = newest;
+                        config.save();
+                    }
+                    _ => {}
+                }
+            }
+            let badge = match side {
+                Side::Missions => self.mission_done,
+                Side::Board => newest > config.board_seen,
+                Side::Chat => false,
+            };
+            if badge {
+                draw_circle(r.x + r.w - 8.0, r.y + 7.0, 4.5, ALERT);
+            }
+        }
+    }
+
+    /// Today's and this week's missions with the player's progress.
+    fn draw_missions(&mut self, ui: &mut Ui, area: Rect) {
+        let Some(v) = &self.missions else {
+            ui.text(t("Loading…"), area.x, area.y + 6.0, 14.0, MUTED, false);
+            return;
+        };
+        let now = crate::game::unix_now();
+        let mut y = area.y + 2.0;
+        let sections = [
+            (
+                t("Today"),
+                tw("new missions in {t}", &[("t", &time_left(v.day_ends - now))]),
+                &v.daily,
+            ),
+            (t("This week"), tw("ends in {t}", &[("t", &time_left(v.week_ends - now))]), &v.weekly),
+        ];
+        for (title, when, list) in sections {
+            ui.text(title, area.x, y, 16.0, GOLD, true);
+            let tw_ = ui.text_size(title, 16.0, true).x;
+            ui.text(&when, area.x + tw_ + 10.0, y + 3.0, 12.0, MUTED, false);
+            y += 26.0;
+            for state in list {
+                let Some(m) = snookered_proto::missions::mission(&state.code) else { continue };
+                let card = Rect::new(area.x, y, area.w, 56.0);
+                let done = state.progress >= m.target;
+                rrect(card, 8.0, Color::new(1.0, 1.0, 1.0, if done { 0.07 } else { 0.035 }));
+                rrect_lines(card, 8.0, 1.0, if done { GOLD } else { BORDER });
+                let text = tw(m.text, &[("n", &m.target)]);
+                let text = ui.ellipsize(&text, card.w - 120.0, 14.0);
+                ui.text(&text, card.x + 12.0, card.y + 9.0, 14.0, CREAM, true);
+                // Progress.
+                let bar = Rect::new(card.x + 12.0, card.y + 36.0, card.w - 130.0, 7.0);
+                rrect(bar, 3.5, Color::new(0.0, 0.0, 0.0, 0.4));
+                let k = (state.progress as f32 / m.target.max(1) as f32).clamp(0.0, 1.0);
+                if k > 0.0 {
+                    let fill = Rect::new(bar.x, bar.y, (bar.w * k).max(7.0), bar.h);
+                    rrect(fill, 3.5, if done { GOLD } else { Color::new(0.35, 0.75, 0.5, 1.0) });
+                }
+                let count = format!("{}/{}", state.progress.min(m.target), m.target);
+                ui.text(&count, bar.x + bar.w + 8.0, card.y + 31.0, 12.0, MUTED, false);
+                // The reward.
+                let reward = m.reward.to_string();
+                let rw = ui.text_size(&reward, 15.0, true).x;
+                let rx = card.x + card.w - rw - 14.0;
+                if done {
+                    crate::icons::draw(Icon::Check, vec2(rx - 16.0, card.y + 28.0), 18.0, GOLD);
+                } else {
+                    crate::icons::draw(Icon::Coin, vec2(rx - 14.0, card.y + 28.0), 18.0, GOLD);
+                }
+                ui.text(&reward, rx, card.y + 19.0, 15.0, if done { GOLD } else { CREAM }, true);
+                y += card.h + 8.0;
+            }
+            y += 10.0;
+        }
+        let note = t(
+            "Missions count rated games played to the end. The coins arrive as soon as one is complete.",
+        );
+        for (i, line) in ui.wrap(note, area.w, 12.0).iter().enumerate() {
+            if y + i as f32 * 16.0 > area.y + area.h - 14.0 {
+                break;
+            }
+            ui.text(line, area.x, y + i as f32 * 16.0, 12.0, MUTED, false);
+        }
+    }
+
+    /// The staff's notes and the tournaments open for registration.
+    fn draw_board(&mut self, ui: &mut Ui, area: Rect) {
+        let now = crate::game::unix_now();
+        let bottom = area.y + area.h;
+        let mut y = area.y + 2.0;
+        let notes: Vec<_> =
+            self.board.iter().filter(|n| n.expires_at.is_none_or(|e| e > now)).cloned().collect();
+        let open: Vec<TournamentInfo> = self
+            .tournaments
+            .iter()
+            .filter(|t| t.state == TournamentState::Registering && !t.private)
+            .cloned()
+            .collect();
+        if notes.is_empty() && open.is_empty() {
+            ui.text(t("Nothing on the board right now."), area.x, y + 4.0, 14.0, MUTED, false);
+            return;
+        }
+        for n in &notes {
+            let lines = ui.wrap(&n.text, area.w - 44.0, 14.0);
+            let h = lines.len() as f32 * 19.0 + 38.0;
+            if y + h > bottom {
+                break;
+            }
+            let card = Rect::new(area.x, y, area.w, h);
+            rrect(card, 8.0, Color::new(0.91, 0.75, 0.38, 0.07));
+            rrect_lines(card, 8.0, 1.0, BORDER);
+            draw_circle(card.x + card.w - 14.0, card.y + 12.0, 4.0, GOLD);
+            for (i, l) in lines.iter().enumerate() {
+                ui.text(l, card.x + 12.0, card.y + 10.0 + i as f32 * 19.0, 14.0, CREAM, false);
+            }
+            let by = if n.author.is_empty() {
+                crate::profile::date(n.at)
+            } else {
+                format!("{} · {}", n.author, crate::profile::date(n.at))
+            };
+            ui.text(&by, card.x + 12.0, card.y + h - 22.0, 12.0, MUTED, false);
+            y += h + 8.0;
+        }
+        if open.is_empty() || y + 60.0 > bottom {
+            return;
+        }
+        y += 6.0;
+        ui.text(t("Open tournaments"), area.x, y, 16.0, GOLD, true);
+        y += 26.0;
+        for tour in open {
+            if y + 50.0 > bottom {
+                break;
+            }
+            let card = Rect::new(area.x, y, area.w, 50.0);
+            rrect(card, 8.0, Color::new(1.0, 1.0, 1.0, 0.035));
+            rrect_lines(card, 8.0, 1.0, BORDER);
+            crate::icons::draw(Icon::Trophy, vec2(card.x + 20.0, card.y + 25.0), 20.0, GOLD);
+            let name = ui.ellipsize(&tour.name, card.w - 140.0, 14.0);
+            ui.text(&name, card.x + 40.0, card.y + 8.0, 14.0, CREAM, true);
+            let mut sub =
+                tw("{n}/{size} players", &[("n", &tour.players.len()), ("size", &tour.size)]);
+            if let Some(at) = tour.starts_at.filter(|&a| a > now) {
+                sub = format!("{sub} · {}", tw("starts in {t}", &[("t", &time_left(at - now))]));
+            }
+            if tour.entry_fee > 0 {
+                sub = format!("{sub} · {}", tw("entry {n} coins", &[("n", &tour.entry_fee)]));
+            }
+            let sub = ui.ellipsize(&sub, card.w - 140.0, 12.0);
+            ui.text(&sub, card.x + 40.0, card.y + 28.0, 12.0, MUTED, false);
+            let b = Rect::new(card.x + card.w - 90.0, card.y + 10.0, 80.0, 30.0);
+            if ui.button(b, t("See"), true) {
+                self.tab = Tab::Tournaments;
+                self.selected_tournament = Some(tour.id);
+            }
+            y += card.h + 8.0;
+        }
     }
 
     fn rated_toggle(&mut self, ui: &mut Ui, r: Rect) {
