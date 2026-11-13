@@ -27,3 +27,7 @@ CREATE TABLE board_notes (
     -- or NULL.
     action     TEXT
 );
+
+-- Payments made with the payment provider's test keys (no real money):
+-- shown apart and left out of the revenue.
+ALTER TABLE payments ADD COLUMN test BOOLEAN NOT NULL DEFAULT FALSE;

@@ -310,6 +310,8 @@ pub struct Payment {
     pub refunded: bool,
     /// The e-mail the customer gave at checkout.
     pub email: Option<String>,
+    /// Made with the provider's test keys: no real money.
+    pub test: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize)]
@@ -688,6 +690,10 @@ impl Store {
     }
     pub async fn payment(&self, id: &str) -> StoreResult<Option<Payment>> {
         dispatch!(self, s => s.payment(id))
+    }
+    /// Marks a payment as made in test mode (or not); false if unknown.
+    pub async fn set_payment_test(&self, id: &str, test: bool) -> StoreResult<bool> {
+        dispatch!(self, s => s.set_payment_test(id, test))
     }
     /// Marks a payment refunded; false if it already was (or is unknown).
     pub async fn refund_payment(&self, id: &str) -> StoreResult<bool> {

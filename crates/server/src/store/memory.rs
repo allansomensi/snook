@@ -406,7 +406,7 @@ impl MemoryStore {
         };
         let games = |u: &User| u.games + u.casual_games;
         let mut revenue: BTreeMap<String, (i64, i64)> = BTreeMap::new();
-        for p in s.payments.iter().filter(|p| !p.refunded && p.at > now - 30 * 86_400) {
+        for p in s.payments.iter().filter(|p| !p.refunded && !p.test && p.at > now - 30 * 86_400) {
             let e = revenue.entry(p.currency.clone()).or_default();
             e.0 += p.amount;
             e.1 += 1;
@@ -908,6 +908,17 @@ impl MemoryStore {
 
     pub fn payment(&self, id: &str) -> StoreResult<Option<Payment>> {
         Ok(self.lock().payments.iter().find(|p| p.id == id).cloned())
+    }
+
+    pub fn set_payment_test(&self, id: &str, test: bool) -> StoreResult<bool> {
+        let mut s = self.lock();
+        match s.payments.iter_mut().find(|p| p.id == id) {
+            Some(p) => {
+                p.test = test;
+                Ok(true)
+            }
+            None => Ok(false),
+        }
     }
 
     pub fn refund_payment(&self, id: &str) -> StoreResult<bool> {

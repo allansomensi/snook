@@ -52,6 +52,7 @@ pub fn router() -> Router<Arc<Server>> {
         .route("/admin/api/announce", post(announce))
         .route("/admin/api/motd", post(motd))
         .route("/admin/api/board", get(board).post(pin_note))
+        .route("/admin/api/payments/{id}/test", post(payment_test))
         .route("/admin/api/board/{id}", axum::routing::delete(unpin_note))
         .layer(middleware::from_fn(security_headers))
 }
@@ -676,6 +677,29 @@ async fn motd(
     require_admin(&s)?;
     server.with(|l| l.set_motd(&body.text));
     log(&server, &s, "motd", "lounge", &clean_text(&body.text, 300)).await;
+    Ok(Json(json!({ "ok": true })))
+}
+
+#[derive(Deserialize)]
+struct TestBody {
+    test: bool,
+}
+
+/// Marks a payment as made with the provider's test keys (no real money),
+/// or back: test payments stay out of the revenue.
+async fn payment_test(
+    State(server): State<Arc<Server>>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+    Json(body): Json<TestBody>,
+) -> ApiResult {
+    let s = staff(&server, &headers).await?;
+    require_admin(&s)?;
+    if !server.store.set_payment_test(&id, body.test).await? {
+        return Err(err(StatusCode::NOT_FOUND, "No such payment."));
+    }
+    let what = if body.test { "test" } else { "real" };
+    log(&server, &s, "payment", &id, what).await;
     Ok(Json(json!({ "ok": true })))
 }
 

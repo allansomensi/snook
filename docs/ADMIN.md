@@ -42,6 +42,11 @@ VIP days), which goes in the audit log like any other change.
   once, in the lounge and on the main menu, with a dot on the tab until
   they read it. Tournaments open for registration are listed there on
   their own.
+- **Test payments**: payments made with Stripe's test keys are marked
+  *test* on the player's page and left out of the revenue. Payments
+  recorded before the server knew (or by mistake) can be marked by hand
+  (*Mark as test* / *Mark as real*, administrators). Coins they brought
+  stay in the wallet: take them back with *Give / remove coins*.
 - **Reports** come with the reporter, the reason, the player's note and the
   recent chat lines of the reported player (lounge and shared match).
 

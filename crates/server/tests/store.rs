@@ -163,6 +163,7 @@ async fn exercise(store: Store) {
         currency: "brl".into(),
         at: t,
         refunded: false,
+        test: false,
         email: Some("alice@example.com".into()),
     };
     assert!(store.record_payment(&p).await.unwrap());

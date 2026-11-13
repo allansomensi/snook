@@ -559,7 +559,7 @@ impl PgStore {
         .await?;
         let revenue = query(
             "SELECT currency, SUM(amount)::bigint AS cents, COUNT(*) AS n FROM payments
-             WHERE NOT refunded AND at > $1 GROUP BY currency ORDER BY currency",
+             WHERE NOT refunded AND NOT test AND at > $1 GROUP BY currency ORDER BY currency",
         )
         .bind(now - 30 * 86_400)
         .fetch_all(&self.pool)
@@ -1559,8 +1559,8 @@ impl PgStore {
 
     pub async fn record_payment(&self, p: &Payment) -> StoreResult<bool> {
         let added = query(
-            "INSERT INTO payments (id, user_id, kind, coins, amount, currency, at, refunded, email)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) ON CONFLICT DO NOTHING",
+            "INSERT INTO payments (id, user_id, kind, coins, amount, currency, at, refunded, email, test)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) ON CONFLICT DO NOTHING",
         )
         .bind(&p.id)
         .bind(p.user_id)
@@ -1571,6 +1571,7 @@ impl PgStore {
         .bind(p.at)
         .bind(p.refunded)
         .bind(&p.email)
+        .bind(p.test)
         .execute(&self.pool)
         .await?
         .rows_affected();
@@ -1583,6 +1584,15 @@ impl PgStore {
             .fetch_optional(&self.pool)
             .await?;
         Ok(row.map(|r| payment_row(&r)))
+    }
+
+    pub async fn set_payment_test(&self, id: &str, test: bool) -> StoreResult<bool> {
+        let r = query("UPDATE payments SET test = $2 WHERE id = $1")
+            .bind(id)
+            .bind(test)
+            .execute(&self.pool)
+            .await?;
+        Ok(r.rows_affected() > 0)
     }
 
     pub async fn refund_payment(&self, id: &str) -> StoreResult<bool> {
@@ -1635,5 +1645,6 @@ fn payment_row(r: &PgRow) -> Payment {
         at: r.get("at"),
         refunded: r.get("refunded"),
         email: r.get("email"),
+        test: r.get("test"),
     }
 }

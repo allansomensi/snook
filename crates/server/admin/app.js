@@ -404,10 +404,19 @@ async function showUser(name) {
     el("p", {}, el("b", {}, d.wallet.coins + " coins"), " · VIP ",
       d.wallet.vip_until > now ? "until " + fmtDate(d.wallet.vip_until) : "no",
       " · items: " + (d.wallet.owned.join(", ") || "none")),
-    d.payments.length ? table(["When", "Kind", "Coins", "Amount", "Refunded", "Id"], d.payments.map((p) => el("tr", {},
-      el("td", {}, fmtDate(p.at)), el("td", {}, p.kind), el("td", {}, p.coins),
+    d.payments.length ? table(["When", "Kind", "Coins", "Amount", "Refunded", "Id", ""], d.payments.map((p) => el("tr", {},
+      el("td", {}, fmtDate(p.at)), el("td", {}, p.kind, p.test ? el("span", { class: "tag mute" }, " test") : null),
+      el("td", {}, p.coins),
       el("td", {}, (p.amount / 100).toFixed(2) + " " + p.currency.toUpperCase()), el("td", {}, p.refunded ? "yes" : ""),
-      el("td", {}, p.id)))) : el("p", { class: "muted" }, "No payments."),
+      el("td", {}, p.id),
+      el("td", {}, me && me.role === "admin" ? el("button", {
+        onclick: async () => {
+          try {
+            await api("/payments/" + encodeURIComponent(p.id) + "/test", { method: "POST", body: { test: !p.test } });
+            toast(p.test ? "Marked as real money." : "Marked as a test payment."); showUser(name);
+          } catch (e) { toast(e.message); }
+        },
+      }, p.test ? "Mark as real" : "Mark as test") : null)))) : el("p", { class: "muted" }, "No payments."),
     d.ledger.length ? table(["When", "Coins", "Why"], d.ledger.map((l) => el("tr", {},
       el("td", {}, fmtDate(l.at)), el("td", {}, (l.delta > 0 ? "+" : "") + l.delta), el("td", {}, l.reason)))) : null,
     el("h2", {}, "Reports about this player (" + d.reports.length + ")"),

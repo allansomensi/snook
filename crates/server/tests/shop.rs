@@ -252,3 +252,18 @@ async fn the_welcome_pack_brings_its_items_and_coins_once() {
     apply_event(&server, &refund).await.unwrap();
     assert_eq!(server.store.wallet(id).await.unwrap().coins, 0);
 }
+
+#[tokio::test]
+async fn test_mode_payments_are_marked_and_left_out_of_the_revenue() {
+    let (server, id) = setup().await;
+    let mut paid = checkout(id, "paid", "checkout.session.completed");
+    paid["livemode"] = json!(false);
+    apply_event(&server, &paid).await.unwrap();
+    let p = server.store.payment("pi_7").await.unwrap().unwrap();
+    assert!(p.test, "made with the test keys");
+    let revenue = server.store.metrics(now()).await.unwrap().revenue;
+    assert!(revenue.is_empty(), "{revenue:?}");
+    // Marked as real money by hand: it counts.
+    server.store.set_payment_test("pi_7", false).await.unwrap();
+    assert_eq!(server.store.metrics(now()).await.unwrap().revenue.len(), 1);
+}

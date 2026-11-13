@@ -424,6 +424,7 @@ async fn vip_paid(
             currency: currency.to_string(),
             at: now(),
             refunded: false,
+            test: false,
             email,
         })
         .await
@@ -485,6 +486,7 @@ async fn vip_gift_paid(
             currency: str_of(obj, "currency").unwrap_or("").to_string(),
             at: now(),
             refunded: false,
+            test: false,
             email: email_of(obj),
         })
         .await
@@ -542,6 +544,7 @@ async fn welcome_paid(server: &Server, user: &User, obj: &Value) -> Result<(), S
             currency: str_of(obj, "currency").unwrap_or("").to_string(),
             at: now(),
             refunded: false,
+            test: false,
             email: email_of(obj),
         })
         .await
@@ -575,6 +578,22 @@ async fn welcome_paid(server: &Server, user: &User, obj: &Value) -> Result<(), S
 
 /// Applies one Stripe event. Safe to run more than once.
 pub async fn apply_event(server: &Server, event: &Value) -> Result<(), String> {
+    apply(server, event).await?;
+    // Made with the test keys: kept apart from real money.
+    if event["livemode"].as_bool() == Some(false)
+        && let Some(obj) = event.pointer("/data/object")
+    {
+        for id in [str_of(obj, "payment_intent"), str_of(obj, "invoice"), str_of(obj, "id")]
+            .into_iter()
+            .flatten()
+        {
+            server.store.set_payment_test(id, true).await.map_err(|e| e.to_string())?;
+        }
+    }
+    Ok(())
+}
+
+async fn apply(server: &Server, event: &Value) -> Result<(), String> {
     let kind = str_of(event, "type").unwrap_or("");
     let obj = event.pointer("/data/object").ok_or("no object")?;
     let err = |e: crate::store::StoreError| e.to_string();
@@ -630,6 +649,7 @@ pub async fn apply_event(server: &Server, event: &Value) -> Result<(), String> {
                         currency: str_of(obj, "currency").unwrap_or("").to_string(),
                         at: now(),
                         refunded: false,
+                        test: false,
                         email: email_of(obj),
                     })
                     .await
