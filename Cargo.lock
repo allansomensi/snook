@@ -2072,7 +2072,7 @@ dependencies = [
 
 [[package]]
 name = "snookered"
-version = "0.1.3"
+version = "0.1.4"
 dependencies = [
  "embed-resource",
  "fontdue",
@@ -2094,7 +2094,7 @@ dependencies = [
 
 [[package]]
 name = "snookered_core"
-version = "0.1.3"
+version = "0.1.4"
 dependencies = [
  "glam 0.33.12",
  "libm",
@@ -2104,7 +2104,7 @@ dependencies = [
 
 [[package]]
 name = "snookered_proto"
-version = "0.1.3"
+version = "0.1.4"
 dependencies = [
  "glam 0.33.12",
  "serde",
@@ -2114,7 +2114,7 @@ dependencies = [
 
 [[package]]
 name = "snookered_server"
-version = "0.1.3"
+version = "0.1.4"
 dependencies = [
  "argon2",
  "axum",

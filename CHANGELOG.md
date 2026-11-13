@@ -1,6 +1,9 @@
 # Changelog
 
-## Unreleased
+## 0.1.4 (protocol 12)
+
+Only additions to the protocol: the server still lets 0.1.2 and 0.1.3 in
+(they don't see deleted chat lines go, nor the new reactions).
 
 ### Lounge
 - "Play now": after half a minute without an opponent, a game against the
