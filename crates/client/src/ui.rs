@@ -157,8 +157,18 @@ pub struct Ui {
     pub wants_keyboard: bool,
     /// Caret position in the focused field, in characters.
     cursor: usize,
-    /// Ctrl+A in the focused field: the next key replaces everything.
-    all_selected: bool,
+    /// The other end of the selection in the focused field (the selection
+    /// runs from here to the caret).
+    anchor: Option<usize>,
+    /// The text fields drawn this frame and last frame, in order (Tab moves
+    /// between them).
+    fields: Vec<u64>,
+    prev_fields: Vec<u64>,
+    /// Tab (+1) or Shift+Tab (-1) was pressed in a field: the focus moves on
+    /// at the start of the next frame, once every field has been drawn.
+    tab_move: Option<i32>,
+    /// The last click in a field: (field, time, caret), for double clicks.
+    last_click: Option<(u64, f64, usize)>,
     /// The editing key being held and when it repeats next.
     repeat: Option<(KeyCode, f64)>,
     /// The field `cursor` belongs to (focus can also be set from outside).
@@ -194,7 +204,11 @@ impl Ui {
             prev_blocks: Vec::new(),
             wants_keyboard: false,
             cursor: 0,
-            all_selected: false,
+            anchor: None,
+            fields: Vec::new(),
+            prev_fields: Vec::new(),
+            tab_move: None,
+            last_click: None,
             repeat: None,
             cursor_owner: None,
             overlays: std::cell::RefCell::new(Vec::new()),
@@ -217,6 +231,17 @@ impl Ui {
         self.released_active = None;
         if !self.down {
             self.released_active = self.active.take();
+        }
+        self.prev_fields = std::mem::take(&mut self.fields);
+        // Tab: the next (or previous) field of last frame, in drawing order.
+        if let Some(step) = self.tab_move.take()
+            && let Some(f) = self.focus
+            && let Some(i) = self.prev_fields.iter().position(|&x| x == f)
+        {
+            let n = self.prev_fields.len() as i32;
+            let next = self.prev_fields[(i as i32 + step).rem_euclid(n) as usize];
+            self.focus = Some(next);
+            self.cursor_owner = None;
         }
         self.wants_keyboard = self.focus.is_some();
         if self.focus.is_none() {
@@ -563,97 +588,18 @@ impl Ui {
         masked: bool,
     ) -> bool {
         self.block(r);
+        self.fields.push(id);
         let mut submitted = false;
         let size = (r.h * 0.5).clamp(12.0, 18.0);
         if self.focus == Some(id) && self.cursor_owner != Some(id) {
+            // Focus arrived from elsewhere (Tab, or set by the page): the
+            // whole text is selected, ready to be replaced, as in a form.
             self.cursor_owner = Some(id);
             self.cursor = value.chars().count();
-            self.all_selected = false;
+            self.anchor = (self.cursor > 0).then_some(0);
         }
         if self.focus == Some(id) {
-            let ctrl = is_key_down(KeyCode::LeftControl)
-                || is_key_down(KeyCode::RightControl)
-                || is_key_down(KeyCode::LeftSuper)
-                || is_key_down(KeyCode::RightSuper);
-            let mut chars: Vec<char> = value.chars().collect();
-            let mut cursor = self.cursor.min(chars.len());
-            let mut changed = false;
-            let mut typed: Vec<char> = Vec::new();
-            while let Some(c) = get_char_pressed() {
-                if !c.is_control() && !ctrl {
-                    typed.push(c);
-                }
-            }
-            if ctrl
-                && is_key_pressed(KeyCode::V)
-                && let Some(text) = macroquad::miniquad::window::clipboard_get()
-            {
-                typed.extend(text.chars().filter(|c| !c.is_control()));
-            }
-            if ctrl && is_key_pressed(KeyCode::A) {
-                self.all_selected = !chars.is_empty();
-                cursor = chars.len();
-            }
-            if ctrl && is_key_pressed(KeyCode::C) && !masked {
-                macroquad::miniquad::window::clipboard_set(value);
-            }
-            let erase_back = self.key_fires(KeyCode::Backspace);
-            let erase_fwd = self.key_fires(KeyCode::Delete);
-            if self.all_selected && (erase_back || erase_fwd || !typed.is_empty()) {
-                chars.clear();
-                cursor = 0;
-                changed = true;
-                self.all_selected = false;
-            } else if erase_back && cursor > 0 {
-                let from = if ctrl { word_start(&chars, cursor) } else { cursor - 1 };
-                chars.drain(from..cursor);
-                cursor = from;
-                changed = true;
-            } else if erase_fwd && cursor < chars.len() {
-                let to = if ctrl { word_end(&chars, cursor) } else { cursor + 1 };
-                chars.drain(cursor..to);
-                changed = true;
-            }
-            for c in typed {
-                if chars.len() >= max_len {
-                    break;
-                }
-                chars.insert(cursor, c);
-                cursor += 1;
-                changed = true;
-            }
-            let mut moved = false;
-            if self.key_fires(KeyCode::Left) {
-                cursor = if ctrl { word_start(&chars, cursor) } else { cursor.saturating_sub(1) };
-                moved = true;
-            }
-            if self.key_fires(KeyCode::Right) {
-                cursor =
-                    if ctrl { word_end(&chars, cursor) } else { (cursor + 1).min(chars.len()) };
-                moved = true;
-            }
-            if is_key_pressed(KeyCode::Home) || is_key_pressed(KeyCode::Up) {
-                cursor = 0;
-                moved = true;
-            }
-            if is_key_pressed(KeyCode::End) || is_key_pressed(KeyCode::Down) {
-                cursor = chars.len();
-                moved = true;
-            }
-            if moved {
-                self.all_selected = false;
-            }
-            if changed {
-                *value = chars.into_iter().collect();
-            }
-            self.cursor = cursor;
-            if is_key_pressed(KeyCode::Enter) || is_key_pressed(KeyCode::KpEnter) {
-                submitted = true;
-                self.all_selected = false;
-            }
-            if is_key_pressed(KeyCode::Escape) || is_key_pressed(KeyCode::Tab) {
-                self.focus = None;
-            }
+            submitted = self.edit(value, max_len, masked);
         }
         let shown: Vec<char> =
             if masked { vec!['•'; value.chars().count()] } else { value.chars().collect() };
@@ -672,6 +618,26 @@ impl Ui {
         while last < shown.len() && width_of(self, first, last + 1) <= room {
             last += 1;
         }
+        // The character boundary nearest the pointer.
+        let at_mouse = |ui: &Ui| {
+            let mx = ui.mouse.x - (r.x + 8.0);
+            let mut best = first;
+            let mut best_d = f32::MAX;
+            for i in first..=last {
+                let d = (width_of(ui, first, i) - mx).abs();
+                if d < best_d {
+                    best = i;
+                    best_d = d;
+                }
+            }
+            // Dragged past an edge: scroll that way.
+            if mx < 0.0 {
+                best = first.saturating_sub(1);
+            } else if mx > room && last < shown.len() {
+                best = last + 1;
+            }
+            best
+        };
         // Focus changes after typing is handled, so nothing typed is lost.
         if self.pressed {
             if r.contains(self.mouse) {
@@ -679,43 +645,193 @@ impl Ui {
                     while get_char_pressed().is_some() {}
                     self.focus = Some(id);
                     self.cursor_owner = Some(id);
-                    self.cursor = shown.len();
-                    self.all_selected = false;
-                } else {
-                    // Put the caret where the click was.
-                    let mx = self.mouse.x - (r.x + 8.0);
-                    let mut best = first;
-                    for i in first..=last {
-                        if width_of(self, first, i) <= mx + 3.0 {
-                            best = i;
-                        }
+                }
+                let at = at_mouse(self);
+                let now = get_time();
+                let double = self
+                    .last_click
+                    .is_some_and(|(f, t, c)| f == id && now - t < 0.4 && c.abs_diff(at) <= 1);
+                if double && !masked {
+                    // A double click selects the word.
+                    let chars: Vec<char> = value.chars().collect();
+                    let at = at.min(chars.len());
+                    let mut a = at;
+                    while a > 0 && !chars[a - 1].is_whitespace() {
+                        a -= 1;
                     }
-                    self.cursor = best;
-                    self.all_selected = false;
+                    let mut b = at;
+                    while b < chars.len() && !chars[b].is_whitespace() {
+                        b += 1;
+                    }
+                    self.anchor = (b > a).then_some(a);
+                    self.cursor = b;
+                    self.last_click = None;
+                } else {
+                    let shift = is_key_down(KeyCode::LeftShift) || is_key_down(KeyCode::RightShift);
+                    if shift {
+                        self.anchor.get_or_insert(self.cursor);
+                    } else {
+                        self.anchor = None;
+                    }
+                    self.cursor = at;
+                    self.last_click = Some((id, now, at));
+                    self.active = Some(id);
                 }
             } else if self.focus == Some(id) {
                 self.focus = None;
+                self.anchor = None;
+            }
+        } else if self.down && self.active == Some(id) && self.focus == Some(id) {
+            // Dragging selects.
+            let at = at_mouse(self);
+            if at != self.cursor {
+                self.anchor.get_or_insert(self.cursor);
+                self.cursor = at;
             }
         }
         let focused = self.focus == Some(id);
         rrect(r, 5.0, Color::new(0.04, 0.03, 0.02, 1.0));
         rrect_lines(r, 5.0, if focused { 1.6 } else { 1.2 }, if focused { GOLD } else { BORDER });
         let visible: String = shown[first..last].iter().collect();
-        if focused && self.all_selected && !visible.is_empty() {
-            let w = self.text_size(&visible, size, false).x;
-            draw_rectangle(
-                r.x + 7.0,
-                r.y + 5.0,
-                w + 2.0,
-                r.h - 10.0,
-                Color::new(0.75, 0.55, 0.2, 0.45),
-            );
+        if focused && let Some((a, b)) = self.selection() {
+            let (a, b) = (a.clamp(first, last), b.clamp(first, last));
+            if b > a {
+                let x0 = width_of(self, first, a);
+                let x1 = width_of(self, first, b);
+                draw_rectangle(
+                    r.x + 8.0 + x0,
+                    r.y + 5.0,
+                    x1 - x0 + 1.0,
+                    r.h - 10.0,
+                    Color::new(0.75, 0.55, 0.2, 0.45),
+                );
+            }
         }
         self.text(&visible, r.x + 8.0, r.y + (r.h - size) / 2.0, size, CREAM, false);
         if focused && (get_time() * 2.0) as i64 % 2 == 0 {
             let caret = self.cursor.min(shown.len()).clamp(first, last);
             let w = width_of(self, first, caret);
             draw_line(r.x + 9.0 + w, r.y + 6.0, r.x + 9.0 + w, r.y + r.h - 6.0, 1.5, CREAM);
+        }
+        submitted
+    }
+
+    /// The selected characters of the focused field: (start, end).
+    fn selection(&self) -> Option<(usize, usize)> {
+        let a = self.anchor?;
+        (a != self.cursor).then(|| (a.min(self.cursor), a.max(self.cursor)))
+    }
+
+    /// The keyboard in the focused field. Returns true when Enter is pressed.
+    fn edit(&mut self, value: &mut String, max_len: usize, masked: bool) -> bool {
+        let ctrl = is_key_down(KeyCode::LeftControl)
+            || is_key_down(KeyCode::RightControl)
+            || is_key_down(KeyCode::LeftSuper)
+            || is_key_down(KeyCode::RightSuper);
+        let shift = is_key_down(KeyCode::LeftShift) || is_key_down(KeyCode::RightShift);
+        let mut chars: Vec<char> = value.chars().collect();
+        self.cursor = self.cursor.min(chars.len());
+        self.anchor = self.anchor.map(|a| a.min(chars.len()));
+        let mut changed = false;
+        let mut typed: Vec<char> = Vec::new();
+        while let Some(c) = get_char_pressed() {
+            if !c.is_control() && !ctrl {
+                typed.push(c);
+            }
+        }
+        if ctrl
+            && is_key_pressed(KeyCode::V)
+            && let Some(text) = macroquad::miniquad::window::clipboard_get()
+        {
+            typed.extend(text.chars().filter(|c| !c.is_control()));
+        }
+        if ctrl && is_key_pressed(KeyCode::A) {
+            self.anchor = (!chars.is_empty()).then_some(0);
+            self.cursor = chars.len();
+        }
+        let selected = self.selection();
+        if ctrl && (is_key_pressed(KeyCode::C) || is_key_pressed(KeyCode::X)) && !masked {
+            let text: String = match selected {
+                Some((a, b)) => chars[a..b].iter().collect(),
+                None => value.clone(),
+            };
+            macroquad::miniquad::window::clipboard_set(&text);
+        }
+        let cut = ctrl && is_key_pressed(KeyCode::X) && !masked && selected.is_some();
+        let erase_back = self.key_fires(KeyCode::Backspace);
+        let erase_fwd = self.key_fires(KeyCode::Delete);
+        let mut cursor = self.cursor;
+        if let Some((a, b)) = selected
+            && (erase_back || erase_fwd || cut || !typed.is_empty())
+        {
+            // Whatever is selected goes first.
+            chars.drain(a..b);
+            cursor = a;
+            self.anchor = None;
+            changed = true;
+        } else if erase_back && cursor > 0 {
+            let from = if ctrl { word_start(&chars, cursor) } else { cursor - 1 };
+            chars.drain(from..cursor);
+            cursor = from;
+            changed = true;
+        } else if erase_fwd && cursor < chars.len() {
+            let to = if ctrl { word_end(&chars, cursor) } else { cursor + 1 };
+            chars.drain(cursor..to);
+            changed = true;
+        }
+        for c in typed {
+            if chars.len() >= max_len {
+                break;
+            }
+            chars.insert(cursor, c);
+            cursor += 1;
+            changed = true;
+        }
+        // Moving the caret; with Shift, the selection follows it.
+        let mut moved_to = None;
+        if self.key_fires(KeyCode::Left) {
+            moved_to = Some(match (selected, shift, ctrl) {
+                (Some((a, _)), false, false) => a,
+                (_, _, true) => word_start(&chars, cursor),
+                _ => cursor.saturating_sub(1),
+            });
+        }
+        if self.key_fires(KeyCode::Right) {
+            moved_to = Some(match (selected, shift, ctrl) {
+                (Some((_, b)), false, false) => b,
+                (_, _, true) => word_end(&chars, cursor),
+                _ => (cursor + 1).min(chars.len()),
+            });
+        }
+        if is_key_pressed(KeyCode::Home) || is_key_pressed(KeyCode::Up) {
+            moved_to = Some(0);
+        }
+        if is_key_pressed(KeyCode::End) || is_key_pressed(KeyCode::Down) {
+            moved_to = Some(chars.len());
+        }
+        if let Some(to) = moved_to {
+            if shift {
+                self.anchor.get_or_insert(cursor);
+            } else {
+                self.anchor = None;
+            }
+            cursor = to;
+        }
+        if changed {
+            *value = chars.into_iter().collect();
+        }
+        self.cursor = cursor;
+        let mut submitted = false;
+        if is_key_pressed(KeyCode::Enter) || is_key_pressed(KeyCode::KpEnter) {
+            submitted = true;
+            self.anchor = None;
+        }
+        if is_key_pressed(KeyCode::Tab) {
+            self.tab_move = Some(if shift { -1 } else { 1 });
+        }
+        if is_key_pressed(KeyCode::Escape) {
+            self.focus = None;
+            self.anchor = None;
         }
         submitted
     }
