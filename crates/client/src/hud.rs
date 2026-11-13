@@ -881,16 +881,22 @@ impl Hud {
     /// Offline, what happened in the game so far, in the chat's place (no
     /// one to write to).
     fn draw_history(&mut self, ui: &mut Ui, m: &mut Match) {
-        let sh = crate::ui::vh();
+        // Above the replay's controls when they would be in the way.
+        let bar = video_bar_rect();
+        let bottom = if m.video.is_some() && bar.x < 12.0 + chat_w() + 8.0 {
+            bar.y - 4.0
+        } else {
+            crate::ui::vh() - BOTTOM_BAR
+        };
         if !self.history_open {
             let label = t("History");
             let w = ui.text_size(label, 13.0, true).x + 30.0;
-            if ui.button(Rect::new(12.0, sh - BOTTOM_BAR - 40.0, w, 32.0), label, true) {
+            if ui.button(Rect::new(12.0, bottom - 40.0, w, 32.0), label, true) {
                 self.history_open = true;
             }
             return;
         }
-        let r = Rect::new(12.0, sh - BOTTOM_BAR - chat_h() - 8.0, chat_w(), chat_h());
+        let r = Rect::new(12.0, bottom - chat_h() - 8.0, chat_w(), chat_h());
         ui.panel(r);
         ui.text(t("Game history"), r.x + 10.0, r.y + 7.0, 14.0, GOLD, true);
         if ui.button(Rect::new(r.x + r.w - 30.0, r.y + 5.0, 24.0, 20.0), "–", true) {
@@ -1118,6 +1124,13 @@ fn media_button(ui: &mut Ui, r: Rect, kind: Media, tip: &str) -> bool {
     clicked
 }
 
+/// Where the replay's controls go.
+fn video_bar_rect() -> Rect {
+    let sw = crate::ui::vw();
+    let w = (sw - 24.0).min(680.0);
+    Rect::new((sw - w) / 2.0, crate::ui::vh() - BOTTOM_BAR - 64.0, w, 52.0)
+}
+
 /// Watching a stored game: play and pause, the shot before and after, the
 /// speed, and a line to drag to any moment of the game.
 fn draw_video_bar(ui: &mut Ui, m: &mut Match) {
@@ -1127,10 +1140,7 @@ fn draw_video_bar(ui: &mut Ui, m: &mut Match) {
         return;
     }
     let marks: Vec<Option<crate::game::ShotMark>> = v.marks.clone();
-    let sw = crate::ui::vw();
-    let sh = crate::ui::vh();
-    let w = (sw - 24.0).min(680.0);
-    let r = Rect::new((sw - w) / 2.0, sh - BOTTOM_BAR - 64.0, w, 52.0);
+    let r = video_bar_rect();
     ui.panel(r);
     // The shot on screen: the one being played, or the next to come.
     let pos = m.video_position();

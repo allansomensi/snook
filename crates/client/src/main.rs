@@ -678,6 +678,18 @@ async fn main() {
                     let mut next: Option<Screen> = None;
                     match &mut screen {
                         Screen::Menu => match menu.draw(&mut ui, &online, saved_balls) {
+                            action @ (MenuAction::VsComputer | MenuAction::TwoPlayers) => {
+                                // Signed in: the account's name, which can still be changed.
+                                if let Some(me) = online.me.as_ref().filter(|m| !m.guest) {
+                                    config.player_name = me.username.clone();
+                                }
+                                let kind = if matches!(action, MenuAction::VsComputer) {
+                                    SetupKind::VsComputer
+                                } else {
+                                    SetupKind::TwoPlayers
+                                };
+                                next = Some(Screen::Setup(Setup::new(kind)))
+                            }
                             MenuAction::ContinueGame => match saved::load() {
                                 Some(s) => {
                                     current = Some(Match::resume(&s, config.guide));
@@ -690,12 +702,6 @@ async fn main() {
                             MenuAction::Online => {
                                 online.connect();
                                 next = Some(Screen::Online);
-                            }
-                            MenuAction::VsComputer => {
-                                next = Some(Screen::Setup(Setup::new(SetupKind::VsComputer)))
-                            }
-                            MenuAction::TwoPlayers => {
-                                next = Some(Screen::Setup(Setup::new(SetupKind::TwoPlayers)))
                             }
                             MenuAction::Lan => {
                                 lan_screen.get_or_insert_with(LanScreen::new);
