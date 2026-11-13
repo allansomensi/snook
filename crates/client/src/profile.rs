@@ -176,44 +176,51 @@ impl ProfileScreen {
 
     fn header(&mut self, ui: &mut Ui, online: &mut Online, p: &Profile, r: Rect) {
         let player = &p.player;
-        let x = r.x + 64.0;
-        let mut nx = x;
-        if crate::flags::draw(&player.country, x, r.y + 22.0, 26.0) {
-            nx += crate::flags::width(26.0) + 12.0;
-        }
+        let framed = snookered_proto::shop::item(&player.frame)
+            .map(|i| i.look)
+            .filter(|_| player.frame != "frame_none");
+        // With a frame, everything moves in a little: the frame keeps clear
+        // of the back button and of the line under it.
+        let pad = if framed.is_some() { 14.0 } else { 0.0 };
+        let x = r.x + 64.0 + pad;
+        let name_y = r.y + 18.0;
+        let flag_w = if player.country.is_empty() { 0.0 } else { crate::flags::width(26.0) + 12.0 };
         let name_w = ui.text_size(&player.username, 30.0, true).x;
-        // The frame from the shop, around the flag and the name.
-        if let Some(snookered_proto::shop::Look::Frame { a, b, shine }) =
-            snookered_proto::shop::item(&player.frame).map(|i| i.look)
-            && player.frame != "frame_none"
-        {
-            let fr = Rect::new(x - 12.0, r.y + 10.0, nx - x + name_w + 24.0, 48.0);
+        let crown_w = if player.vip { 30.0 } else { 0.0 };
+        let dot_w = if p.online { 16.0 } else { 0.0 };
+        if let Some(snookered_proto::shop::Look::Frame { a, b, shine }) = framed {
+            // The frame from the shop, around the flag, the name, the crown
+            // and the online dot.
+            let w = flag_w + name_w + crown_w + dot_w + 2.0 * pad;
+            let fr = Rect::new(x - pad, r.y + 8.0, w, 48.0);
             crate::shop::frame(fr, a, b, shine, get_time() as f32);
             rrect(
                 Rect::new(fr.x + 3.0, fr.y + 3.0, fr.w - 6.0, fr.h - 6.0),
                 10.0,
                 Color::new(0.09, 0.055, 0.035, 1.0),
             );
-            crate::flags::draw(&player.country, x, r.y + 22.0, 26.0);
         }
-        crate::ui::draw_name(ui, player, nx, r.y + 18.0, 30.0);
-        let mut after = nx + name_w + 14.0;
+        crate::flags::draw(&player.country, x, r.y + 22.0, 26.0);
+        let nx = x + flag_w;
+        crate::ui::draw_name(ui, player, nx, name_y, 30.0);
+        let mut after = nx + name_w + 4.0;
         if player.vip {
             crate::icons::draw(
                 crate::icons::Icon::Crown,
-                vec2(after + 10.0, r.y + 34.0),
+                vec2(after + 14.0, r.y + 34.0),
                 22.0,
                 GOLD,
             );
-            after += 28.0;
+            after += crown_w;
         }
         if p.online {
-            draw_circle(after, r.y + 36.0, 5.0, Color::new(0.35, 0.85, 0.45, 1.0));
+            draw_circle(after + 8.0, r.y + 33.0, 5.0, Color::new(0.35, 0.85, 0.45, 1.0));
         }
+        let x = r.x + 64.0;
         let tier = player.tier();
         let mut info_x = x;
         if !player.guest {
-            info_x += ui.pill(t(tier.name()), info_x, r.y + 60.0, tier_color(tier)) + 10.0;
+            info_x += ui.pill(t(tier.name()), info_x, r.y + 62.0, tier_color(tier)) + 10.0;
         }
         let mut parts = Vec::new();
         if let Some(rank) = p.rank {
@@ -229,7 +236,7 @@ impl ProfileScreen {
         if !p.online && p.last_seen > 0 {
             parts.push(crate::online::last_seen(p.last_seen));
         }
-        ui.text(&parts.join("  ·  "), info_x, r.y + 61.0, 13.0, MUTED, false);
+        ui.text(&parts.join("  ·  "), info_x, r.y + 63.0, 13.0, MUTED, false);
 
         // The rating, large, on the right.
         if !player.guest {
