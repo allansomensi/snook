@@ -52,8 +52,15 @@ Not released yet: the server must go out together with the new game
   installed (.msi) game downloads the new installer, closes and runs it;
   other copies open the releases page. The saved session is kept.
 
+### Interface
+- Text fields: Tab and Shift+Tab move between fields; a click puts the
+  caret where it lands; drag, Shift+arrows or a double click select;
+  typing replaces the selection; Ctrl+C / Ctrl+X / Ctrl+V.
+
 ### Server and panel
 - Administrators may change their own wallet (coins, items, VIP days).
+- Payments made with Stripe's test keys are marked *test* and left out of
+  the revenue; older ones can be marked by hand on the player's page.
 - Migration 0005 (missions and the board).
 - The README lists Spanish among the languages.
 
