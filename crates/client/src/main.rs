@@ -633,14 +633,26 @@ async fn main() {
                 Some(m) => {
                     let action =
                         hud_draw(&mut hud, &mut ui, m, controls.aiming(), &mut hud_opacity, dt);
+                    // Passing the time while "Play now" looks for an opponent.
+                    if m.practice {
+                        online.draw_queue_banner(&mut ui);
+                    }
                     match action {
                         HudAction::MainMenu => {
-                            // Back from a replay: to the profile it was opened from.
+                            // Back from a replay: to the profile it was opened
+                            // from; from a game while waiting: to the lounge.
                             let replay = m.is_replay();
+                            let practice = m.practice;
                             current = None;
                             hud = Hud::new(config.show_help);
                             rig.reset();
-                            screen = if replay { Screen::Profile } else { Screen::Menu };
+                            screen = if replay {
+                                Screen::Profile
+                            } else if practice {
+                                Screen::Online
+                            } else {
+                                Screen::Menu
+                            };
                         }
                         HudAction::Lounge => {
                             if match_from_lan {
@@ -790,6 +802,25 @@ async fn main() {
                                 shop.open(&mut online);
                                 back_to_lounge = true;
                                 next = Some(Screen::Shop);
+                            }
+                            OnlineAction::PracticeWhileWaiting => {
+                                let level = match config.difficulty {
+                                    0 => Difficulty::Easy,
+                                    2 => Difficulty::Hard,
+                                    _ => Difficulty::Medium,
+                                };
+                                let mut settings = MatchSettings::from_config(
+                                    MatchMode::VsComputer(level),
+                                    &config,
+                                );
+                                if let Some(me) = online.me.as_ref() {
+                                    settings.names[0] = me.username.clone();
+                                }
+                                let mut m = Match::new(&settings, game::clock_seed());
+                                m.practice = true;
+                                current = Some(m);
+                                hud = Hud::new(config.show_help);
+                                rig.reset();
                             }
                             OnlineAction::ShopVip => {
                                 shop.open(&mut online);

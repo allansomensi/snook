@@ -2,7 +2,34 @@
 
 ## Unreleased
 
+### Lounge
+- "Play now": after half a minute without an opponent, a game against the
+  computer while the search goes on (not saved); the online game takes
+  its place as soon as someone is found.
+- Chat moderation: anyone can delete their own lines (shown as deleted by
+  the author); administrators can delete any line (shown as deleted by an
+  administrator) or remove it without a trace, and clear the chat (from
+  the game or the panel; everyone is told who did). The text stays on the
+  server for reports.
+- Administrators' names are red everywhere, and only theirs (name styles
+  and the Grandmaster tier moved away from red); their badge in the panel
+  is red too.
+- An administrator watching a game reads the players' chat (read only);
+  other spectators still don't.
+
+### Games and shop
+- Cues on the table show their pattern (points, spiral, weave), so the
+  opponent sees the cue you bought; a cue, chalk or effect changed during
+  a game shows at once.
+- VIP members have six reactions of their own while they are VIP.
+- The shop shows clearly when a category has more items than fit, with
+  buttons to the next and previous ones.
+- Against the computer, the name is the signed-in account's (editable).
+
 ### Fixes
+- Profile: a shop frame crowded the header (back button, crown, the line
+  below).
+- Replays: on small windows the History button sat on the playback bar.
 - Profile: the hover hints of the achievements showed through the account
   dialog (and any dialog over the page); the page under a dialog (and
   under the e-mail offer) no longer reacts to the pointer.

@@ -974,3 +974,6 @@ The chat was cleared by {name}.	O chat foi limpo por {name}.
 Click again to clear	Clique de novo para limpar
 Clear the chat	Limpar o chat
 Players' chat (administrator)	Chat dos jogadores (administrador)
+Play the computer while you wait	Jogar contra o computador enquanto espera
+Looking for an opponent… {t} · the game starts as soon as one is found	Procurando adversário… {t} · a partida começa assim que alguém aparecer
+Stop	Parar

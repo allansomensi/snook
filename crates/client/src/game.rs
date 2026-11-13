@@ -253,6 +253,9 @@ pub struct Match {
     pub script: Option<std::collections::VecDeque<snookered_proto::replay::Stroke>>,
     /// A stored game watched like a video: pause, speed and seeking.
     pub video: Option<Video>,
+    /// A game against the computer to pass the time while "Play now"
+    /// looks for an opponent (not saved; the online game takes its place).
+    pub practice: bool,
     /// The exact shot the computer (or a replay) plays, not rebuilt from
     /// the power bar (which would round it).
     forced_shot: Option<Shot>,
@@ -382,6 +385,7 @@ impl Match {
             seed,
             script: None,
             video: None,
+            practice: false,
             forced_shot: None,
             events_seen: 0,
             demo_timer: 0.0,
@@ -454,6 +458,7 @@ impl Match {
         matches!(self.controllers, [Controller::Human, Controller::Computer(_)])
             && !self.is_online()
             && !self.is_replay()
+            && !self.practice
     }
 
     /// The seed of this match (the computer's choices follow from it).
@@ -564,6 +569,7 @@ impl Match {
             seed: match_id,
             script: None,
             video: None,
+            practice: false,
             forced_shot: None,
             events_seen: 0,
             demo_timer: 0.0,

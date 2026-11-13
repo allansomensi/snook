@@ -51,6 +51,8 @@ pub enum OnlineAction {
     Shop,
     /// The shop, on the VIP page.
     ShopVip,
+    /// A game against the computer while "Play now" keeps looking.
+    PracticeWhileWaiting,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -275,6 +277,10 @@ pub fn draw_note(
     let b = Rect::new(card.x + 14.0, by_y + 22.0, bw.min(card.w - 28.0), 28.0);
     ui.button(b, label, true).then_some(a)
 }
+
+/// After this long without an opponent, "Play now" offers a game against
+/// the computer while it keeps looking.
+const PRACTICE_AFTER_SECS: u32 = 30;
 
 /// "5 h", "3 days", "12 min": how long until something.
 fn time_left(secs: i64) -> String {
@@ -1936,6 +1942,33 @@ impl Online {
     }
 
     /// "Play now": one click to be paired with someone of a similar rating.
+    /// Seconds "Play now" has been looking for an opponent.
+    pub fn queue_secs(&self) -> Option<u32> {
+        self.queue.map(|(_, waited, _, at)| waited + at.elapsed().as_secs() as u32)
+    }
+
+    /// While a game against the computer fills the wait: the search, under
+    /// the top bar, with a way to stop it.
+    pub fn draw_queue_banner(&mut self, ui: &mut Ui) {
+        let Some(secs) = self.queue_secs() else { return };
+        let sw = crate::ui::vw();
+        let text = tw(
+            "Looking for an opponent… {t} · the game starts as soon as one is found",
+            &[("t", &format!("{}:{:02}", secs / 60, secs % 60))],
+        );
+        let w = (ui.text_size(&text, 13.0, false).x + 130.0).min(sw - 20.0);
+        let r = Rect::new((sw - w) / 2.0, 92.0, w, 34.0);
+        rrect(r, 8.0, Color::new(0.06, 0.2, 0.12, 0.92));
+        rrect_lines(r, 8.0, 1.2, Color::new(0.35, 0.8, 0.5, 0.8));
+        let text = ui.ellipsize(&text, w - 120.0, 13.0);
+        ui.text(&text, r.x + 12.0, r.y + 10.0, 13.0, CREAM, false);
+        ui.block(r);
+        if ui.button(Rect::new(r.x + r.w - 96.0, r.y + 4.0, 90.0, 26.0), t("Stop"), true) {
+            self.send(ClientMsg::QueueLeave);
+            self.queue = None;
+        }
+    }
+
     fn draw_play_now(&mut self, ui: &mut Ui, r: Rect) {
         match self.queue {
             None => {
@@ -1988,7 +2021,18 @@ impl Online {
 
     fn draw_players(&mut self, ui: &mut Ui, area: Rect) -> Option<OnlineAction> {
         self.draw_play_now(ui, Rect::new(area.x, area.y, area.w, 44.0));
-        let area = Rect::new(area.x, area.y + 54.0, area.w, area.h - 54.0);
+        let mut top = 54.0;
+        let mut action = None;
+        // Nobody yet after half a minute: a game against the computer while
+        // the search goes on.
+        if self.queue_secs().is_some_and(|s| s >= PRACTICE_AFTER_SECS) && !self.lan {
+            let b = Rect::new(area.x, area.y + top - 4.0, area.w, 34.0);
+            if ui.button(b, t("Play the computer while you wait"), true) {
+                action = Some(OnlineAction::PracticeWhileWaiting);
+            }
+            top += 38.0;
+        }
+        let area = Rect::new(area.x, area.y + top, area.w, area.h - top);
         self.rated_toggle(ui, Rect::new(area.x, area.y, area.w.min(260.0), 30.0));
         let me = self.me.as_ref().map(|m| m.username.clone()).unwrap_or_default();
         let mut players: Vec<PlayerInfo> =
@@ -2013,7 +2057,7 @@ impl Online {
             if ui.primary_button(b, t("Open a table")) {
                 self.tab = Tab::Tables;
             }
-            return None;
+            return action;
         }
         let row_h = 46.0;
         let visible = (list.h / row_h).floor().max(1.0) as usize;
@@ -2053,7 +2097,7 @@ impl Online {
         if let Some(name) = watch {
             self.spectate(&name);
         }
-        open.map(OnlineAction::Profile)
+        open.map(OnlineAction::Profile).or(action)
     }
 
     fn draw_tables(&mut self, ui: &mut Ui, area: Rect) {

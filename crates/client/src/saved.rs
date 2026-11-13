@@ -34,6 +34,7 @@ impl SavedGame {
     pub fn of(m: &Match) -> Option<SavedGame> {
         let Controller::Computer(level) = m.controllers[1] else { return None };
         if m.controllers[0] != Controller::Human
+            || m.practice
             || m.is_online()
             || m.is_replay()
             || m.game.game_over().is_some()
