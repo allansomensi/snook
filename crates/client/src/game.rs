@@ -98,6 +98,17 @@ pub struct Notice {
 
 pub use snookered_core::stats::ShotStats;
 
+/// One shot of the game, for the end-of-game charts.
+#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct ShotMark {
+    pub shooter: usize,
+    /// Where the cue ball was when it was struck (table coordinates).
+    pub cue: (f64, f64),
+    /// Object balls legally made.
+    pub made: u32,
+    pub foul: bool,
+}
+
 pub struct Match {
     /// Each player's cue and chalk (shop codes).
     pub cue_looks: [(String, String); 2],
@@ -107,6 +118,8 @@ pub struct Match {
     pub win_effect: Option<(usize, snookered_core::PocketId)>,
     /// Each player's numbers this game.
     pub stats: [ShotStats; 2],
+    /// Every shot of this game, in order (the momentum and the shot map).
+    pub timeline: Vec<ShotMark>,
     /// The shot being shown was taken with the cue ball in hand.
     shot_in_hand: bool,
     pub game: EightBallGame,
@@ -239,6 +252,7 @@ impl Match {
             log: Vec::new(),
             last_report: None,
             stats: [ShotStats::default(); 2],
+            timeline: Vec::new(),
             cue_looks: Default::default(),
             effects: Default::default(),
             win_effect: None,
@@ -290,6 +304,7 @@ impl Match {
         m.game = saved.game.clone();
         m.names = saved.names.clone();
         m.stats = saved.stats;
+        m.timeline = saved.timeline.clone();
         m.wins = saved.wins;
         m.games_played = saved.games_played;
         m.begin_turn();
@@ -360,6 +375,7 @@ impl Match {
             log: Vec::new(),
             last_report: None,
             stats: [ShotStats::default(); 2],
+            timeline: Vec::new(),
             shot_in_hand: false,
             // No full guide against people.
             guide: guide.online(),
@@ -460,6 +476,7 @@ impl Match {
         let breaker = (self.games_played % 2) as usize;
         self.game = EightBallGame::new(self.seed, breaker);
         self.stats = [ShotStats::default(); 2];
+        self.timeline.clear();
         self.last_report = None;
         self.last_shot = None;
         self.replay = None;
@@ -697,6 +714,21 @@ impl Match {
 
     fn report_shot(&mut self, report: &ShotReport) {
         self.stats[report.shooter % 2].add(report, self.shot_in_hand);
+        if let Some(last) = &self.last_shot {
+            self.stats[report.shooter % 2].add_spin(&last.shot, report);
+            let cue = last.start.ball(BallId::CUE).position;
+            let made = if report.is_foul() {
+                0
+            } else {
+                report.pocketed.iter().filter(|(b, _)| b.is_object()).count() as u32
+            };
+            self.timeline.push(ShotMark {
+                shooter: report.shooter % 2,
+                cue: (cue.x, cue.y),
+                made,
+                foul: report.is_foul(),
+            });
+        }
         self.shot_in_hand = false;
         let shooter = self.names[report.shooter].clone();
         for foul in &report.fouls {
@@ -1038,6 +1070,28 @@ impl Match {
 impl Match {
     /// Development aid (`--on-eight`): clears the solids so player 0 is on the
     /// 8-ball, to try the pocket call.
+    /// Development aid: a made-up game's worth of shots for the end-of-game
+    /// charts (with SNOOKERED_RESIGN).
+    pub fn debug_shots(&mut self) {
+        let mut x = self.seed | 1;
+        let mut next = || {
+            x ^= x << 13;
+            x ^= x >> 7;
+            x ^= x << 17;
+            (x % 1000) as f64 / 1000.0
+        };
+        let mut shooter = 0;
+        for _ in 0..34 {
+            let made = if next() < 0.55 { 1 + (next() < 0.2) as u32 } else { 0 };
+            let foul = made == 0 && next() < 0.15;
+            let cue = ((next() - 0.5) * 2.1, (next() - 0.5) * 1.0);
+            self.timeline.push(ShotMark { shooter, cue, made, foul });
+            if made == 0 {
+                shooter = 1 - shooter;
+            }
+        }
+    }
+
     pub fn debug_on_eight(&mut self) {
         let Ok(mut v) = serde_json::to_value(&self.game) else { return };
         if let Some(balls) = v["balls"].as_array_mut() {

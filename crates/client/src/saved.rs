@@ -4,7 +4,7 @@
 use serde::{Deserialize, Serialize};
 use snookered_core::{Difficulty, EightBallGame};
 
-use crate::game::{Controller, Match, ShotStats};
+use crate::game::{Controller, Match, ShotMark, ShotStats};
 
 /// Bumped when the saved fields change (an older file is then ignored).
 const VERSION: u32 = 1;
@@ -17,6 +17,9 @@ pub struct SavedGame {
     pub seed: u64,
     pub game: EightBallGame,
     pub stats: [ShotStats; 2],
+    /// The shots so far (the end-of-game charts).
+    #[serde(default)]
+    pub timeline: Vec<ShotMark>,
     pub wins: [u32; 2],
     pub games_played: u32,
     /// Seconds per shot, if timed.
@@ -45,6 +48,7 @@ impl SavedGame {
             seed: m.seed(),
             game: m.game.clone(),
             stats: m.stats,
+            timeline: m.timeline.clone(),
             wins: m.wins,
             games_played: m.games_played,
             shot_clock: m.clock.map(|(s, _)| s.round() as u32),
@@ -102,12 +106,14 @@ mod tests {
         };
         let mut m = Match::new(&settings, 77);
         m.wins = [2, 1];
+        m.timeline.push(ShotMark { shooter: 0, cue: (0.5, 0.1), made: 1, foul: false });
         let saved = SavedGame::of(&m).expect("a game at rest is saved");
         let text = serde_json::to_string(&saved).unwrap();
         let back: SavedGame = serde_json::from_str(&text).unwrap();
         assert_eq!(back.balls_left(), 15);
         let r = Match::resume(&back, settings.guide);
         assert_eq!(r.game, m.game);
+        assert_eq!(r.timeline, m.timeline);
         assert_eq!((r.wins, r.names.clone()), ([2, 1], m.names.clone()));
         assert_eq!(r.controllers, m.controllers);
         assert_eq!(r.clock.map(|c| c.0), Some(45.0));

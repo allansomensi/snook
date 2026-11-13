@@ -930,3 +930,9 @@ System notifications	Avisos do sistema
 {name} starts in a few minutes: get ready!	{name} começa em poucos minutos: prepare-se!
 {name} starts in a few minutes: there is still room.	{name} começa em poucos minutos: ainda há vagas.
 {name} has started!	{name} começou!
+Momentum	Momento
+Shot map	Mapa de tacadas
+No shots yet.	Nenhuma tacada ainda.
+made	encaçapou
+missed	errou
+foul	falta

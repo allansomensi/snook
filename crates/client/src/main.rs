@@ -283,6 +283,7 @@ async fn main() {
         }
         // Development aid: SNOOKERED_RESIGN=1 resigns at once (the game-over panel).
         if crate::dev::flag("SNOOKERED_RESIGN") {
+            m.debug_shots();
             m.resign();
         }
         current = Some(m);

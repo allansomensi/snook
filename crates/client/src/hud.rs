@@ -16,6 +16,9 @@ use crate::ui::{ALERT, BORDER, CREAM, FeedKind, FeedLine, GOLD, MUTED, Ui};
 pub struct Hud {
     /// The pause menu is open (online, the game keeps running behind it).
     pub paused: bool,
+    /// What the panel under the game-over panel shows: 0 numbers,
+    /// 1 momentum, 2 the shot map.
+    stats_view: usize,
     pub show_help: bool,
     chat_input: String,
     chat_open: bool,
@@ -67,6 +70,10 @@ impl Default for Hud {
     fn default() -> Self {
         Hud {
             paused: false,
+            // Development aid: SNOOKERED_STATS_VIEW=1|2 opens the charts.
+            stats_view: crate::dev::var("SNOOKERED_STATS_VIEW")
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(0),
             show_help: false,
             chat_input: String::new(),
             // Development aid: SNOOKERED_CHAT_CLOSED starts with the chat folded.
@@ -475,7 +482,8 @@ impl Hud {
             let won = over.winner == me && !o.spectator;
             let r = Rect::new(sw / 2.0 - 220.0, sh / 2.0 - 110.0 - STATS_H / 2.0, 440.0, 220.0);
             ui.panel(r);
-            draw_match_stats(ui, m, Rect::new(r.x, r.y + r.h + 8.0, r.w, STATS_H - 8.0));
+            let view = &mut self.stats_view;
+            draw_match_stats(ui, m, Rect::new(r.x, r.y + r.h + 8.0, r.w, STATS_H - 8.0), view);
             crate::ui::rrect_lines(r, 8.0, 2.0, if won { GOLD } else { BORDER });
             let title = if won {
                 t("You win!").to_string()
@@ -578,7 +586,8 @@ impl Hud {
             let all_computers = m.controllers.iter().all(|c| matches!(c, Controller::Computer(_)));
             let r = Rect::new(sw / 2.0 - 210.0, sh / 2.0 - 95.0 - STATS_H / 2.0, 420.0, 190.0);
             ui.panel(r);
-            draw_match_stats(ui, m, Rect::new(r.x, r.y + r.h + 8.0, r.w, STATS_H - 8.0));
+            let view = &mut self.stats_view;
+            draw_match_stats(ui, m, Rect::new(r.x, r.y + r.h + 8.0, r.w, STATS_H - 8.0), view);
             ui.text_centered(
                 &tw("{name} wins!", &[("name", &m.names[over.winner])]),
                 sw / 2.0,
@@ -1022,12 +1031,31 @@ impl Hud {
 
 const PREVIEW_TIME: f32 = 5.0;
 /// Height of the numbers panel under the game-over panel (and the gap).
-const STATS_H: f32 = 150.0;
+const STATS_H: f32 = 196.0;
 
-/// The game in numbers, per player: potting success, balls made, best run,
-/// fouls and how often they had the cue ball in hand.
-fn draw_match_stats(ui: &mut Ui, m: &Match, r: Rect) {
+/// The game in numbers, per player (potting success, balls made, best run,
+/// fouls, ball in hand), how the lead went back and forth, and where each
+/// shot was played from.
+fn draw_match_stats(ui: &mut Ui, m: &Match, r: Rect, view: &mut usize) {
     ui.panel(r);
+    let options = [t("Numbers"), t("Momentum"), t("Shot map")];
+    let seg = Rect::new(r.x + 10.0, r.y + 8.0, r.w - 20.0, 26.0);
+    if let Some(i) = ui.segmented(seg, &options, *view) {
+        *view = i;
+    }
+    let body = Rect::new(r.x + 10.0, r.y + 42.0, r.w - 20.0, r.h - 50.0);
+    match *view {
+        1 => draw_momentum(ui, m, body),
+        2 => draw_shot_map(ui, m, body),
+        _ => draw_numbers(ui, m, body),
+    }
+}
+
+/// The two players' colours on the charts.
+const SEAT_COLORS: [Color; 2] =
+    [Color::new(0.91, 0.75, 0.38, 1.0), Color::new(0.45, 0.72, 1.0, 1.0)];
+
+fn draw_numbers(ui: &mut Ui, m: &Match, r: Rect) {
     let s = &m.stats;
     let rows = [
         (t("Potting success"), format!("{}%", s[0].pot_rate()), format!("{}%", s[1].pot_rate())),
@@ -1040,17 +1068,17 @@ fn draw_match_stats(ui: &mut Ui, m: &Match, r: Rect) {
             format!("{}%", s[1].in_hand_rate()),
         ),
     ];
-    let label_x = r.x + 16.0;
+    let label_x = r.x + 6.0;
     let col = [r.x + r.w * 0.62, r.x + r.w * 0.86];
     for (k, name) in m.names.iter().enumerate() {
         let (name, size) = ui.fitted(name, 13.0, r.w * 0.22, true);
-        ui.text_centered(&name, col[k], r.y + 10.0, size, GOLD, true);
+        ui.text_centered(&name, col[k], r.y, size, GOLD, true);
     }
     for (i, (label, a, b)) in rows.iter().enumerate() {
-        let y = r.y + 32.0 + i as f32 * 21.0;
+        let y = r.y + 22.0 + i as f32 * 21.0;
         if i % 2 == 0 {
             crate::ui::rrect(
-                Rect::new(r.x + 8.0, y - 3.0, r.w - 16.0, 20.0),
+                Rect::new(r.x - 2.0, y - 3.0, r.w + 4.0, 20.0),
                 4.0,
                 Color::new(1.0, 1.0, 1.0, 0.035),
             );
@@ -1061,6 +1089,153 @@ fn draw_match_stats(ui: &mut Ui, m: &Match, r: Rect) {
         ui.text_centered(b, col[1], y, 13.0, CREAM, true);
     }
 }
+
+/// Who was on top, shot by shot: each ball made moves the line towards its
+/// player, each foul away from the one who made it.
+pub fn momentum(timeline: &[crate::game::ShotMark]) -> Vec<f32> {
+    let mut v = 0.0;
+    let mut out = vec![0.0];
+    for s in timeline {
+        let gain = s.made as f32 - if s.foul { 1.0 } else { 0.0 };
+        v += if s.shooter == 0 { gain } else { -gain };
+        out.push(v);
+    }
+    out
+}
+
+fn chart_legend(ui: &mut Ui, m: &Match, r: Rect) {
+    let mut x = r.x + r.w;
+    for seat in [1, 0] {
+        let (name, size) = ui.fitted(&m.names[seat], 12.0, r.w * 0.3, false);
+        let w = ui.text_size(&name, size, false).x;
+        x -= w;
+        ui.text(&name, x, r.y, size, MUTED, false);
+        draw_circle(x - 8.0, r.y + 7.0, 4.0, SEAT_COLORS[seat]);
+        x -= 22.0;
+    }
+}
+
+fn draw_momentum(ui: &mut Ui, m: &Match, r: Rect) {
+    let values = momentum(&m.timeline);
+    if values.len() < 2 {
+        ui.text_centered(
+            t("No shots yet."),
+            r.x + r.w / 2.0,
+            r.y + r.h / 2.0 - 8.0,
+            13.0,
+            MUTED,
+            false,
+        );
+        return;
+    }
+    chart_legend(ui, m, r);
+    let plot = Rect::new(r.x + 4.0, r.y + 20.0, r.w - 8.0, r.h - 24.0);
+    crate::ui::rrect(plot, 6.0, Color::new(0.0, 0.0, 0.0, 0.25));
+    let mid = plot.y + plot.h / 2.0;
+    let top = values.iter().fold(3.0f32, |a, v| a.max(v.abs()));
+    let half = plot.h / 2.0 - 6.0;
+    let step = plot.w / (values.len() - 1) as f32;
+    let at = |i: usize, v: f32| vec2(plot.x + i as f32 * step, mid - v / top * half);
+    for i in 1..values.len() {
+        let (a, b) = (at(i - 1, values[i - 1]), at(i, values[i]));
+        // The area between the line and the middle, in the leader's colour.
+        let lead = values[i - 1] + values[i];
+        let mut c = SEAT_COLORS[if lead >= 0.0 { 0 } else { 1 }];
+        c.a = 0.28;
+        let (a0, b0) = (vec2(a.x, mid), vec2(b.x, mid));
+        draw_triangle(a0, a, b, c);
+        draw_triangle(a0, b, b0, c);
+    }
+    draw_line(plot.x, mid, plot.x + plot.w, mid, 1.0, Color::new(1.0, 1.0, 1.0, 0.2));
+    for i in 1..values.len() {
+        let (a, b) = (at(i - 1, values[i - 1]), at(i, values[i]));
+        let lead = values[i];
+        let c = SEAT_COLORS[if lead >= 0.0 { 0 } else { 1 }];
+        draw_line(a.x, a.y, b.x, b.y, 2.0, c);
+    }
+    // Fouls: a small mark on the line.
+    for (i, s) in m.timeline.iter().enumerate() {
+        if s.foul {
+            let p = at(i + 1, values[i + 1]);
+            draw_circle(p.x, p.y, 3.0, ALERT);
+        }
+    }
+}
+
+fn draw_shot_map(ui: &mut Ui, m: &Match, r: Rect) {
+    if m.timeline.is_empty() {
+        ui.text_centered(
+            t("No shots yet."),
+            r.x + r.w / 2.0,
+            r.y + r.h / 2.0 - 8.0,
+            13.0,
+            MUTED,
+            false,
+        );
+        return;
+    }
+    let spec = &m.game.table().spec;
+    let (len, wid) = (spec.length as f32, spec.width as f32);
+    // The table, as large as fits beside the legend.
+    let avail = Rect::new(r.x, r.y, r.w - 120.0, r.h);
+    let scale = (avail.w / (len + 0.16)).min(avail.h / (wid + 0.16));
+    let (tw_, th) = (len * scale, wid * scale);
+    let cloth = Rect::new(avail.x + (avail.w - tw_) / 2.0, avail.y + (avail.h - th) / 2.0, tw_, th);
+    let rail = 0.06 * scale;
+    crate::ui::rrect(
+        Rect::new(cloth.x - rail, cloth.y - rail, cloth.w + 2.0 * rail, cloth.h + 2.0 * rail),
+        6.0,
+        Color::new(0.30, 0.17, 0.09, 1.0),
+    );
+    draw_rectangle(cloth.x, cloth.y, cloth.w, cloth.h, Color::new(0.08, 0.36, 0.22, 1.0));
+    let to_screen = |x: f64, y: f64| {
+        vec2(cloth.x + (x as f32 / len + 0.5) * cloth.w, cloth.y + (0.5 - y as f32 / wid) * cloth.h)
+    };
+    for p in &m.game.table().pockets {
+        let c = to_screen(p.mouth_center.x, p.mouth_center.y);
+        draw_circle(c.x, c.y, 0.055 * scale, Color::new(0.02, 0.02, 0.02, 1.0));
+    }
+    // Soft blobs where shots were played from (the heat), then the shots.
+    for s in &m.timeline {
+        let p = to_screen(s.cue.0, s.cue.1);
+        let mut c = SEAT_COLORS[s.shooter];
+        c.a = 0.16;
+        draw_circle(p.x, p.y, 0.09 * scale, c);
+    }
+    for s in &m.timeline {
+        let p = to_screen(s.cue.0, s.cue.1);
+        let c = SEAT_COLORS[s.shooter];
+        if s.foul {
+            draw_line(p.x - 3.0, p.y - 3.0, p.x + 3.0, p.y + 3.0, 1.5, ALERT);
+            draw_line(p.x - 3.0, p.y + 3.0, p.x + 3.0, p.y - 3.0, 1.5, ALERT);
+        } else if s.made > 0 {
+            draw_circle(p.x, p.y, 3.5, c);
+        } else {
+            draw_circle_lines(p.x, p.y, 3.0, 1.2, c);
+        }
+    }
+    // The legend.
+    let lx = r.x + r.w - 112.0;
+    let mut y = r.y + 4.0;
+    for (seat, color) in SEAT_COLORS.into_iter().enumerate() {
+        let made = m.timeline.iter().filter(|s| s.shooter == seat && s.made > 0).count();
+        let shots = m.timeline.iter().filter(|s| s.shooter == seat).count();
+        draw_circle(lx + 5.0, y + 7.0, 4.0, color);
+        let (name, size) = ui.fitted(&m.names[seat], 12.0, 96.0, true);
+        ui.text(&name, lx + 14.0, y, size, CREAM, true);
+        ui.text(&format!("{made}/{shots}"), lx + 14.0, y + 15.0, 12.0, MUTED, false);
+        y += 38.0;
+    }
+    draw_circle(lx + 5.0, y + 7.0, 3.5, CREAM);
+    ui.text(t("made"), lx + 14.0, y, 12.0, MUTED, false);
+    draw_circle_lines(lx + 5.0, y + 25.0, 3.0, 1.2, CREAM);
+    ui.text(t("missed"), lx + 14.0, y + 18.0, 12.0, MUTED, false);
+    let fy = y + 43.0;
+    draw_line(lx + 2.0, fy - 3.0, lx + 8.0, fy + 3.0, 1.5, ALERT);
+    draw_line(lx + 2.0, fy + 3.0, lx + 8.0, fy - 3.0, 1.5, ALERT);
+    ui.text(t("foul"), lx + 14.0, fy - 7.0, 12.0, MUTED, false);
+}
+
 const REACTION_TIME: f32 = 2.8;
 
 /// Reactions float down from the sender's card and fade (drawn even while
@@ -1633,4 +1808,18 @@ fn shoot_button(ui: &mut Ui, r: Rect, enabled: bool) -> bool {
         });
     }
     clicked
+}
+
+#[cfg(test)]
+mod chart_tests {
+    use super::momentum;
+    use crate::game::ShotMark;
+
+    #[test]
+    fn momentum_follows_the_balls_and_the_fouls() {
+        let mark = |shooter, made, foul| ShotMark { shooter, cue: (0.0, 0.0), made, foul };
+        let v =
+            momentum(&[mark(0, 2, false), mark(0, 0, false), mark(1, 1, false), mark(1, 0, true)]);
+        assert_eq!(v, vec![0.0, 2.0, 2.0, 1.0, 2.0]);
+    }
 }
