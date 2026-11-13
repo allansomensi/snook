@@ -1246,11 +1246,12 @@ impl Ui {
             }
         }
         if rows > visible && visible > 0 {
-            // A thin scroll indicator on the right.
-            let track = Rect::new(area.x + area.w - 3.0, area.y, 3.0, area.h);
+            // A scroll bar on the right: the track shows there is more.
+            let track = Rect::new(area.x + area.w - 5.0, area.y, 5.0, area.h);
+            rrect(track, 2.5, Color::new(1.0, 1.0, 1.0, 0.06));
             let h = (track.h * visible as f32 / rows as f32).max(16.0);
             let y = track.y + (track.h - h) * first as f32 / max.max(1) as f32;
-            rrect(Rect::new(track.x, y, 3.0, h), 1.5, Color::new(0.91, 0.75, 0.38, 0.45));
+            rrect(Rect::new(track.x, y, 5.0, h), 2.5, Color::new(0.91, 0.75, 0.38, 0.7));
         }
         first
     }

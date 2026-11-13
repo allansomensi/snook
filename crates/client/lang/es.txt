@@ -962,3 +962,7 @@ Speed	Velocidad
 Shot {n} of {total}	Tiro {n} de {total}
 For VIP members	Para miembros VIP
 {n} reactions of your own to send during games	{n} reacciones exclusivas para enviar en las partidas
+Items {a}–{b} of {n}	Artículos {a}–{b} de {n}
+▲ Previous	▲ Anteriores
+More items ▼ ({n})	Más artículos ▼ ({n})
+More items ▼	Más artículos ▼

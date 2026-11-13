@@ -441,9 +441,45 @@ impl ShopScreen {
         let cols = ((area.w + 12.0) / 206.0).floor().max(1.0) as usize;
         let cw = (area.w - (cols - 1) as f32 * 12.0) / cols as f32;
         let ch = 206.0;
-        let rows_fit = ((area.h + 12.0) / (ch + 12.0)).floor().max(1.0) as usize;
         let total_rows = items.len().div_ceil(cols);
-        self.first = ui.scroll_list(area, self.first, total_rows, rows_fit);
+        let fits = |h: f32| ((h + 12.0) / (ch + 12.0)).floor().max(1.0) as usize;
+        // More than fits: a bar under the cards says so and pages through.
+        let paged = total_rows > fits(area.h);
+        let grid = if paged { Rect::new(area.x, area.y, area.w, area.h - 46.0) } else { area };
+        let rows_fit = fits(grid.h);
+        self.first = ui.scroll_list(grid, self.first, total_rows, rows_fit);
+        if paged {
+            let bar = Rect::new(area.x, area.y + area.h - 38.0, area.w, 38.0);
+            let shown_from = self.first * cols + 1;
+            let shown_to = ((self.first + rows_fit) * cols).min(items.len());
+            let count = tw(
+                "Items {a}–{b} of {n}",
+                &[("a", &shown_from), ("b", &shown_to), ("n", &items.len())],
+            );
+            ui.text_centered(&count, bar.x + bar.w / 2.0, bar.y + 10.0, 14.0, MUTED, false);
+            let max_first = total_rows - rows_fit;
+            let prev = Rect::new(bar.x, bar.y + 2.0, 150.0f32.min(bar.w * 0.3), 34.0);
+            if ui.button(prev, t("▲ Previous"), self.first > 0) {
+                self.first = self.first.saturating_sub(rows_fit);
+            }
+            let next_w = 170.0f32.min(bar.w * 0.34);
+            let next = Rect::new(bar.x + bar.w - next_w, bar.y + 2.0, next_w, 34.0);
+            let more = items.len() - shown_to;
+            let label = if more > 0 {
+                tw("More items ▼ ({n})", &[("n", &more)])
+            } else {
+                t("More items ▼").to_string()
+            };
+            let hit = if more > 0 && self.first == 0 {
+                // Never looked further: the way on stands out.
+                ui.primary_button(next, &label)
+            } else {
+                ui.button(next, &label, more > 0)
+            };
+            if hit && more > 0 {
+                self.first = (self.first + rows_fit).min(max_first);
+            }
+        }
         let mut tip = None;
         let mut action = None;
         for (k, item) in items.iter().enumerate().skip(self.first * cols).take(rows_fit * cols) {
