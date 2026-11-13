@@ -767,6 +767,10 @@ pub fn coin_pack(code: &str) -> Option<&'static CoinPack> {
 /// The VIP subscription's product code, and the coins each paid month brings.
 pub const VIP_PLAN: &str = "vip_monthly";
 pub const VIP_MONTHLY_COINS: u32 = 400;
+/// A month of VIP given to a friend (a one-off payment, not a subscription).
+pub const VIP_GIFT: &str = "vip_gift";
+/// How long a given VIP month lasts, in seconds.
+pub const VIP_GIFT_SECS: i64 = 31 * 86_400;
 
 /// Whether a player owns or may use `item`.
 pub fn can_use(item: &Item, owned: &[String], achievements: &[String], vip: bool) -> bool {

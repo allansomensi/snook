@@ -108,7 +108,7 @@ which every desktop installation has. How releases are made is described in
 ## Controls
 
 Everything can be played with the mouse alone; the keyboard is optional.
-The interface is available in English and Brazilian Portuguese (Settings → Game).
+The interface is available in English, Brazilian Portuguese and Spanish (Settings → Game).
 
 | Action | Mouse | Keyboard |
 |---|---|---|

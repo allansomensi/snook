@@ -892,3 +892,9 @@ In this version of the game, coins are earned by playing:	Nesta versão do jogo,
 rated games, and a bonus every day you play.	partidas valendo rating e um bônus a cada dia em que você joga.
 Coins are earned by playing:	As moedas vêm de jogar:
 If you like, you can also buy them:	Se quiser, você também pode comprá-las:
+one month	um mês
+already VIP	já é VIP
+Give a month to a friend · {p}	Dar um mês a um amigo · {p}
+{from} gave you a month of VIP!	{from} te deu um mês de VIP!
+{name} received a month of VIP.	{name} recebeu um mês de VIP.
+Your friend is already VIP.	Seu amigo já é VIP.

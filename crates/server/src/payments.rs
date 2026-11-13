@@ -12,7 +12,8 @@
 //! - `SNOOKERED_PUBLIC_URL`: the server's public address (for the pages Stripe
 //!   sends the player back to);
 //! - `SNOOKERED_STRIPE_PRICES`: `code=price_id|label` pairs separated by `;`,
-//!   one per coin pack and `vip_monthly`, e.g.
+//!   one per coin pack, `vip_monthly` and `vip_gift` (a one-off price: a
+//!   month of VIP given to a friend), e.g.
 //!   `coins_500=price_1Abc|R$ 4,90;vip_monthly=price_9Xyz|R$ 14,90/mês`.
 
 use std::collections::HashMap;
@@ -168,6 +169,36 @@ impl Stripe {
         ];
         if let Some(c) = customer {
             form.push(("customer".into(), c.to_string()));
+        }
+        form.extend(self.return_urls());
+        let session = self.post("checkout/sessions", &form).await?;
+        session["url"].as_str().map(str::to_string).ok_or_else(|| "no payment page".into())
+    }
+
+    /// A payment page for a month of VIP given to `friend` (one payment).
+    pub async fn checkout_vip_gift(
+        &self,
+        user_id: i64,
+        username: &str,
+        customer: Option<&str>,
+        friend_id: i64,
+    ) -> Result<String, String> {
+        let (price, _) =
+            self.cfg.prices.get(snookered_proto::shop::VIP_GIFT).ok_or("VIP can't be given.")?;
+        let mut form = vec![
+            ("mode".to_string(), "payment".to_string()),
+            ("line_items[0][price]".into(), price.clone()),
+            ("line_items[0][quantity]".into(), "1".into()),
+            ("client_reference_id".into(), user_id.to_string()),
+            ("metadata[user_id]".into(), user_id.to_string()),
+            ("metadata[username]".into(), username.to_string()),
+            ("metadata[gift_vip_to]".into(), friend_id.to_string()),
+            ("payment_intent_data[metadata][user_id]".into(), user_id.to_string()),
+            ("payment_intent_data[metadata][gift_vip_to]".into(), friend_id.to_string()),
+        ];
+        match customer {
+            Some(c) => form.push(("customer".into(), c.to_string())),
+            None => form.push(("customer_creation".into(), "always".into())),
         }
         form.extend(self.return_urls());
         let session = self.post("checkout/sessions", &form).await?;

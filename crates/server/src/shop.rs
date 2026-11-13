@@ -11,7 +11,9 @@ use axum::extract::State;
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::{Html, IntoResponse, Response};
 use serde_json::Value;
-use snookered_proto::shop::{self, COIN_PACKS, Category, Price, VIP_MONTHLY_COINS, VIP_PLAN};
+use snookered_proto::shop::{
+    self, COIN_PACKS, Category, Price, VIP_GIFT, VIP_GIFT_SECS, VIP_MONTHLY_COINS, VIP_PLAN,
+};
 use snookered_proto::{ClientMsg, PackOffer, ServerMsg};
 
 use crate::lounge::Look;
@@ -102,12 +104,14 @@ fn shop_info(server: &Server) -> ServerMsg {
                 .collect(),
             vip_price: stripe.label(VIP_PLAN).unwrap_or_default(),
             vip_coins: VIP_MONTHLY_COINS,
+            vip_gift_price: stripe.label(VIP_GIFT).unwrap_or_default(),
         },
         None => ServerMsg::ShopInfo {
             payments: false,
             packs: Vec::new(),
             vip_price: String::new(),
             vip_coins: VIP_MONTHLY_COINS,
+            vip_gift_price: String::new(),
         },
     }
 }
@@ -146,16 +150,10 @@ pub async fn handle(server: &Arc<Server>, me: &User, msg: ClientMsg, send: &impl
             let Some(price) = item.coins() else {
                 return error("Only items sold for coins can be given.");
             };
-            let Ok(Some(friend)) = server.store.user_by_name(to.trim()).await else {
-                return error("No such player.");
+            let friend = match friend_named(server, me, &to).await {
+                Ok(f) => f,
+                Err(e) => return error(e),
             };
-            let friends = server.store.friends(me.id).await.unwrap_or_default();
-            let is_friend = friends
-                .iter()
-                .any(|(u, st)| u.id == friend.id && *st == crate::store::FriendState::Friends);
-            if !is_friend {
-                return error("You can only give items to your friends.");
-            }
             match server.store.gift_item(me.id, friend.id, item.code, price as i64, now()).await {
                 Ok(BuyOutcome::Bought) => {
                     tracing::info!(from = me.id, to = friend.id, item = item.code, "item given");
@@ -219,6 +217,30 @@ pub async fn handle(server: &Arc<Server>, me: &User, msg: ClientMsg, send: &impl
                 }
             }
         }
+        ClientMsg::GiftVip { to } => {
+            let Some(stripe) = &server.stripe else { return error("Purchases are not available.") };
+            let friend = match friend_named(server, me, &to).await {
+                Ok(f) => f,
+                Err(e) => return error(e),
+            };
+            // A subscriber's months come from the subscription; a gift on top
+            // would be cut short by its next renewal.
+            let theirs = server.store.wallet(friend.id).await.unwrap_or_default();
+            if is_vip(&theirs, now()) {
+                return error("Your friend is already VIP.");
+            }
+            let customer = server.store.wallet(me.id).await.ok().and_then(|w| w.stripe_customer);
+            match stripe
+                .checkout_vip_gift(me.id, &me.username, customer.as_deref(), friend.id)
+                .await
+            {
+                Ok(url) => send(ServerMsg::PaymentPage { url }),
+                Err(e) => {
+                    tracing::warn!("VIP gift checkout for {}: {e}", me.username);
+                    error("The payment page could not be opened. Try again in a moment.")
+                }
+            }
+        }
         ClientMsg::ManageVip => {
             let Some(stripe) = &server.stripe else { return error("Purchases are not available.") };
             let w = server.store.wallet(me.id).await.unwrap_or_default();
@@ -235,6 +257,21 @@ pub async fn handle(server: &Arc<Server>, me: &User, msg: ClientMsg, send: &impl
         }
         _ => {}
     }
+}
+
+/// The friend called `name`, or why a present can't go to them.
+async fn friend_named(server: &Server, me: &User, name: &str) -> Result<User, &'static str> {
+    let Ok(Some(friend)) = server.store.user_by_name(name.trim()).await else {
+        return Err("No such player.");
+    };
+    let friends = server.store.friends(me.id).await.unwrap_or_default();
+    let is_friend = friends
+        .iter()
+        .any(|(u, st)| u.id == friend.id && *st == crate::store::FriendState::Friends);
+    if !is_friend {
+        return Err("You can only give items to your friends.");
+    }
+    Ok(friend)
 }
 
 /// `POST /stripe/webhook`: Stripe's signed notifications.
@@ -395,6 +432,77 @@ async fn vip_paid(
     Ok(())
 }
 
+/// A month of VIP given by `giver` to the player with id `friend` was paid
+/// (checkout session `obj`). Safe to run more than once.
+async fn vip_gift_paid(
+    server: &Server,
+    giver: &User,
+    friend: &str,
+    obj: &Value,
+) -> Result<(), String> {
+    let err = |e: crate::store::StoreError| e.to_string();
+    let Some(friend) = friend.parse::<i64>().ok() else {
+        return Err(format!("bad gift_vip_to {friend}"));
+    };
+    let Some(friend) = server.store.user_by_id(friend).await.map_err(err)? else {
+        tracing::warn!("VIP gift for a deleted player");
+        return Ok(());
+    };
+    let payment_id = str_of(obj, "payment_intent").or(str_of(obj, "id")).unwrap_or("");
+    // A month that was refunded stays refunded, whatever arrives after.
+    if server.store.payment(payment_id).await.map_err(err)?.is_some_and(|p| p.refunded) {
+        return Ok(());
+    }
+    // Recorded under the friend: a refund takes back what they were given.
+    let first = server
+        .store
+        .record_payment(&Payment {
+            id: payment_id.to_string(),
+            user_id: friend.id,
+            kind: "vip_gift".into(),
+            coins: VIP_MONTHLY_COINS as i64,
+            amount: obj["amount_total"].as_i64().unwrap_or(0),
+            currency: str_of(obj, "currency").unwrap_or("").to_string(),
+            at: now(),
+            refunded: false,
+            email: email_of(obj),
+        })
+        .await
+        .map_err(err)?;
+    // The month counts from the payment. Two gifts at once add up; a
+    // repeated delivery only makes sure the month is there.
+    let from = obj["created"].as_i64().unwrap_or(now());
+    let until = if first {
+        let w = server.store.wallet(friend.id).await.map_err(err)?;
+        w.vip_until.max(from) + VIP_GIFT_SECS
+    } else {
+        from + VIP_GIFT_SECS
+    };
+    server.store.set_vip(friend.id, until, false).await.map_err(err)?;
+    server
+        .store
+        .credit(
+            friend.id,
+            VIP_MONTHLY_COINS as i64,
+            &format!("vip gift from {}", giver.username),
+            Some(&format!("vipgift:{payment_id}")),
+            now(),
+        )
+        .await
+        .map_err(err)?;
+    if first {
+        tracing::info!(from = giver.id, to = friend.id, "VIP given");
+        let msg = ServerMsg::VipGift { from: giver.username.clone(), to: friend.username.clone() };
+        server.with(|l| {
+            l.notify(&friend.username, msg.clone());
+            l.notify(&giver.username, msg);
+        });
+        offer_email(server, giver).await;
+    }
+    push_wallet(server, &friend).await;
+    Ok(())
+}
+
 /// Applies one Stripe event. Safe to run more than once.
 pub async fn apply_event(server: &Server, event: &Value) -> Result<(), String> {
     let kind = str_of(event, "type").unwrap_or("");
@@ -423,6 +531,12 @@ pub async fn apply_event(server: &Server, event: &Value) -> Result<(), String> {
                     .await?;
             }
             // Coin packs; Pix and boleto are paid later (async_payment_succeeded).
+            if str_of(obj, "mode") == Some("payment")
+                && str_of(obj, "payment_status") == Some("paid")
+                && let Some(friend) = obj.pointer("/metadata/gift_vip_to").and_then(Value::as_str)
+            {
+                return vip_gift_paid(server, &user, friend, obj).await;
+            }
             if str_of(obj, "mode") == Some("payment")
                 && str_of(obj, "payment_status") == Some("paid")
             {
@@ -519,7 +633,7 @@ pub async fn apply_event(server: &Server, event: &Value) -> Result<(), String> {
                 .credit(p.user_id, -p.coins, kind, Some(&format!("refund:{}", p.id)), now())
                 .await
                 .map_err(err)?;
-            if first && p.kind == "vip" {
+            if first && (p.kind == "vip" || p.kind == "vip_gift") {
                 server.store.set_vip(p.user_id, now(), true).await.map_err(err)?;
             }
             if first || taken {

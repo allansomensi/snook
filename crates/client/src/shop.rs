@@ -8,7 +8,7 @@
 
 use macroquad::prelude::*;
 use snookered_proto::ClientMsg;
-use snookered_proto::shop::{Category, ITEMS, Item, Look, Price};
+use snookered_proto::shop::{Category, ITEMS, Item, Look, Price, VIP_GIFT};
 
 #[allow(unused_imports)]
 use crate::paint::{draw_circle, draw_circle_lines, draw_line, draw_rectangle};
@@ -757,7 +757,11 @@ impl ShopScreen {
         ui.panel(r);
         crate::icons::draw(Icon::Gift, vec2(r.x + 30.0, r.y + 30.0), 22.0, GOLD);
         ui.text(t("Give to a friend"), r.x + 50.0, r.y + 18.0, 20.0, GOLD, true);
-        if let Some(item) = snookered_proto::shop::item(code) {
+        let vip = code == VIP_GIFT;
+        if vip {
+            let what = format!("{} VIP · {}", snookered_proto::GAME_NAME, t("one month"));
+            ui.text(&what, r.x + 50.0, r.y + 44.0, 14.0, MUTED, false);
+        } else if let Some(item) = snookered_proto::shop::item(code) {
             ui.text(t(item.name), r.x + 50.0, r.y + 44.0, 14.0, MUTED, false);
         }
         let friends = online.friends.friends.clone();
@@ -772,14 +776,26 @@ impl ShopScreen {
         let row_h = 40.0;
         for (k, f) in friends.iter().enumerate().take((list.h / row_h) as usize) {
             let row = Rect::new(list.x, list.y + k as f32 * row_h, list.w, row_h - 4.0);
-            let hover = ui.hovering(row);
+            // A friend who is VIP already can't be given VIP.
+            let taken = vip && f.player.vip;
+            let hover = !taken && ui.hovering(row);
             rrect(row, 6.0, Color::new(1.0, 1.0, 1.0, if hover { 0.09 } else { 0.04 }));
             ui.player_name(&f.player, row.x + 10.0, row.y + 10.0, 15.0, row.w - 20.0);
+            if taken {
+                let note = t("already VIP");
+                let nw = ui.text_size(note, 13.0, false).x;
+                ui.text(note, row.x + row.w - nw - 10.0, row.y + 11.0, 13.0, MUTED, false);
+            }
             ui.block(row);
             if hover && ui.clicked(row) {
                 self.gift_pick = None;
-                self.confirm = Some(Confirm { code, gift_to: Some(f.player.username.clone()) });
                 online.shop_error = None;
+                if vip {
+                    // The payment page shows the price and asks for confirmation.
+                    online.send(ClientMsg::GiftVip { to: f.player.username.clone() });
+                } else {
+                    self.confirm = Some(Confirm { code, gift_to: Some(f.player.username.clone()) });
+                }
             }
         }
         let b = Rect::new(r.x + (w - 160.0) / 2.0, r.y + h - 54.0, 160.0, 38.0);
@@ -946,6 +962,19 @@ impl ShopScreen {
             }
         } else {
             ui.text(t("VIP can't be bought on this server yet."), area.x, y, 15.0, MUTED, false);
+        }
+        // A month for a friend: one payment, no subscription.
+        if crate::channel::real_money_purchases()
+            && offers.payments
+            && !offers.vip_gift_price.is_empty()
+        {
+            let y = y + if wallet.is_vip() { 74.0 } else { 54.0 };
+            let g = Rect::new(area.x, y, 280.0f32.min(area.w), 38.0);
+            let label = tw("Give a month to a friend · {p}", &[("p", &offers.vip_gift_price)]);
+            if ui.button(g, &label, online.signed_in()) {
+                self.gift_pick = Some(VIP_GIFT);
+                online.send(ClientMsg::Friends);
+            }
         }
     }
 }

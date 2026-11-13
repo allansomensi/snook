@@ -974,7 +974,8 @@ async fn handle_socket(server: Arc<Server>, socket: WebSocket, ip: IpAddr) {
             | ClientMsg::Equip { .. }
             | ClientMsg::BuyCoins { .. }
             | ClientMsg::SubscribeVip
-            | ClientMsg::ManageVip) => {
+            | ClientMsg::ManageVip
+            | ClientMsg::GiftVip { .. }) => {
                 // Opening payment pages costs a call to the provider: a few
                 // per minute at most.
                 if shop_bucket.take() {
@@ -1176,6 +1177,7 @@ fn is_account_msg(msg: &ClientMsg) -> bool {
             | ClientMsg::BuyCoins { .. }
             | ClientMsg::SubscribeVip
             | ClientMsg::ManageVip
+            | ClientMsg::GiftVip { .. }
             | ClientMsg::GiftItem { .. }
             | ClientMsg::Account
             | ClientMsg::ChangePassword { .. }

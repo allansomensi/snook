@@ -39,7 +39,7 @@ pub const SPECTATOR_SEAT: usize = 2;
 pub const GAME_NAME: &str = "Snookered";
 
 /// Bumped whenever messages change incompatibly.
-pub const PROTOCOL_VERSION: u32 = 11;
+pub const PROTOCOL_VERSION: u32 = 12;
 
 /// Username rules: 3–16 characters, letters, digits and underscores.
 pub fn valid_username(name: &str) -> bool {
@@ -594,6 +594,10 @@ pub enum ClientMsg {
     SubscribeVip,
     /// Opens the page that manages (or cancels) the subscription.
     ManageVip,
+    /// Starts paying for a month of VIP for a friend (a payment page).
+    GiftVip {
+        to: String,
+    },
     /// "Play now": wait for an opponent of a similar rating.
     QueueJoin {
         rated: bool,
@@ -900,6 +904,9 @@ pub enum ServerMsg {
         /// The VIP price as shown to players (e.g. "R$ 14,90/mês").
         vip_price: String,
         vip_coins: u32,
+        /// The price of a VIP month given to a friend (empty: not on sale).
+        #[serde(default)]
+        vip_gift_price: String,
     },
     /// This player's coins, VIP time, items and what they use (after
     /// signing in and whenever it changes).
@@ -1008,6 +1015,12 @@ pub enum ServerMsg {
     GiftReceived {
         from: String,
         code: String,
+    },
+    /// A friend gave this player a month of VIP (`from` is the giver), or
+    /// this player's gift reached `to`.
+    VipGift {
+        from: String,
+        to: String,
     },
     /// Coins for playing (a finished game, the daily bonus, a prize).
     CoinsEarned {

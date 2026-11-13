@@ -85,7 +85,7 @@ repeat. The LAN name field no longer refills itself when emptied.
 
 - Interface scale follows the window, with a manual size in settings.
 - Disabled buttons look disabled; every icon has a tooltip.
-- English and Brazilian Portuguese for every text, including server messages,
+- English, Brazilian Portuguese and Spanish for every text, including server messages,
   achievements, countries (249) and match history.
 - Gradients are textures (no banding); rounded rectangles no longer allocate
   every frame.

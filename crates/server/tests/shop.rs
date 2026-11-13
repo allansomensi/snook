@@ -185,3 +185,50 @@ async fn a_new_subscription_is_granted_whatever_the_order_of_events() {
     assert!(w.vip_until > now() + 59 * 86_400);
     assert_eq!(w.coins, 2 * VIP_MONTHLY_COINS as i64);
 }
+
+#[tokio::test]
+async fn a_vip_month_given_to_a_friend_is_theirs_once_and_taken_back_on_refund() {
+    let (server, giver) = setup().await;
+    let friend = server
+        .store
+        .create_user(&NewUser {
+            username: "bob",
+            password_hash: "h",
+            country: "BR",
+            rating: 1200,
+            role: Role::Player,
+            ip: "1.2.3.5",
+        })
+        .await
+        .unwrap()
+        .unwrap()
+        .id;
+    let paid_at = now();
+    let gift = json!({
+        "type": "checkout.session.completed",
+        "data": { "object": {
+            "id": "cs_2", "mode": "payment", "payment_status": "paid", "created": paid_at,
+            "client_reference_id": giver.to_string(), "customer": "cus_9",
+            "payment_intent": "pi_gift", "amount_total": 1490, "currency": "brl",
+            "metadata": { "user_id": giver.to_string(), "gift_vip_to": friend.to_string() }
+        }}
+    });
+    apply_event(&server, &gift).await.unwrap();
+    apply_event(&server, &gift).await.unwrap(); // delivered twice
+    let month = snookered_proto::shop::VIP_GIFT_SECS;
+    let w = server.store.wallet(friend).await.unwrap();
+    assert_eq!(w.vip_until, paid_at + month, "one month, once");
+    assert_eq!(w.coins, VIP_MONTHLY_COINS as i64);
+    let mine = server.store.wallet(giver).await.unwrap();
+    assert_eq!((mine.coins, mine.vip_until), (0, 0), "the giver gets nothing");
+    assert_eq!(mine.stripe_customer.as_deref(), Some("cus_9"));
+    let refund =
+        json!({ "type": "charge.refunded", "data": { "object": { "payment_intent": "pi_gift" } } });
+    apply_event(&server, &refund).await.unwrap();
+    let w = server.store.wallet(friend).await.unwrap();
+    assert!(w.vip_until <= now());
+    assert_eq!(w.coins, 0);
+    // A late delivery doesn't bring a refunded month back.
+    apply_event(&server, &gift).await.unwrap();
+    assert!(server.store.wallet(friend).await.unwrap().vip_until <= now());
+}

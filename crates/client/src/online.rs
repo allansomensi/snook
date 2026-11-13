@@ -100,6 +100,8 @@ pub struct ShopOffers {
     pub packs: Vec<snookered_proto::PackOffer>,
     pub vip_price: String,
     pub vip_coins: u32,
+    /// The price of a VIP month given to a friend (empty: not on sale).
+    pub vip_gift_price: String,
 }
 
 pub struct Online {
@@ -744,8 +746,18 @@ impl Online {
                 }
                 self.wallet = Some(wallet);
             }
-            ServerMsg::ShopInfo { payments, packs, vip_price, vip_coins } => {
-                self.offers = Some(ShopOffers { payments, packs, vip_price, vip_coins });
+            ServerMsg::ShopInfo { payments, packs, vip_price, vip_coins, vip_gift_price } => {
+                self.offers =
+                    Some(ShopOffers { payments, packs, vip_price, vip_coins, vip_gift_price });
+            }
+            ServerMsg::VipGift { from, to } => {
+                let text = if self.me.as_ref().is_some_and(|me| me.username == to) {
+                    tw("{from} gave you a month of VIP!", &[("from", &from)])
+                } else {
+                    tw("{name} received a month of VIP.", &[("name", &to)])
+                };
+                self.toast(text.clone(), true);
+                self.attention = Some(text);
             }
             // The Store build asks for none, and opens none.
             ServerMsg::PaymentPage { .. } if !crate::channel::real_money_purchases() => {}

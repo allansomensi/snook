@@ -798,6 +798,7 @@ impl Lounge {
             | ClientMsg::BuyCoins { .. }
             | ClientMsg::SubscribeVip
             | ClientMsg::ManageVip
+            | ClientMsg::GiftVip { .. }
             | ClientMsg::FriendRequest { .. }
             | ClientMsg::FriendAnswer { .. }
             | ClientMsg::FriendRemove { .. }
