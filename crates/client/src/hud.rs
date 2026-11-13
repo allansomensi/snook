@@ -363,6 +363,7 @@ impl Hud {
         }
 
         self.draw_turn_banner(ui, m);
+        draw_video_bar(ui, m);
 
         // Cue panel (spin, elevation, fine aim) and the power stroke bar:
         // everything can be played with the mouse alone.
@@ -1073,6 +1074,118 @@ impl Hud {
             ui.tooltip(&text, tip);
         }
     }
+}
+
+#[derive(Clone, Copy)]
+enum Media {
+    Previous,
+    Play,
+    Pause,
+    Next,
+}
+
+/// A round media button drawn from shapes (no font glyphs needed).
+fn media_button(ui: &mut Ui, r: Rect, kind: Media, tip: &str) -> bool {
+    let clicked = ui.button(r, "", true);
+    let c = vec2(r.x + r.w / 2.0, r.y + r.h / 2.0);
+    let s = r.h * 0.22;
+    let tri = |dir: f32, x: f32| {
+        draw_triangle(
+            vec2(x - dir * s * 0.8, c.y - s),
+            vec2(x - dir * s * 0.8, c.y + s),
+            vec2(x + dir * s * 0.9, c.y),
+            CREAM,
+        );
+    };
+    match kind {
+        Media::Play => tri(1.0, c.x + s * 0.1),
+        Media::Pause => {
+            draw_rectangle(c.x - s * 0.8, c.y - s, s * 0.55, s * 2.0, CREAM);
+            draw_rectangle(c.x + s * 0.25, c.y - s, s * 0.55, s * 2.0, CREAM);
+        }
+        Media::Previous => {
+            draw_rectangle(c.x - s * 1.2, c.y - s, s * 0.35, s * 2.0, CREAM);
+            tri(-1.0, c.x + s * 0.2);
+        }
+        Media::Next => {
+            tri(1.0, c.x - s * 0.2);
+            draw_rectangle(c.x + s * 0.85, c.y - s, s * 0.35, s * 2.0, CREAM);
+        }
+    }
+    if ui.hovering(r) {
+        ui.tooltip(tip, r);
+    }
+    clicked
+}
+
+/// Watching a stored game: play and pause, the shot before and after, the
+/// speed, and a line to drag to any moment of the game.
+fn draw_video_bar(ui: &mut Ui, m: &mut Match) {
+    let Some(v) = m.video.as_ref() else { return };
+    let (total, paused, speed) = (v.states.len() - 1, v.paused, v.speed);
+    if total == 0 {
+        return;
+    }
+    let marks: Vec<Option<crate::game::ShotMark>> = v.marks.clone();
+    let sw = crate::ui::vw();
+    let sh = crate::ui::vh();
+    let w = (sw - 24.0).min(680.0);
+    let r = Rect::new((sw - w) / 2.0, sh - BOTTOM_BAR - 64.0, w, 52.0);
+    ui.panel(r);
+    // The shot on screen: the one being played, or the next to come.
+    let pos = m.video_position();
+    let shown = pos.max(1);
+    let mut x = r.x + 10.0;
+    let b = |x: f32| Rect::new(x, r.y + 9.0, 34.0, 34.0);
+    let keys = !ui.wants_keyboard;
+    if media_button(ui, b(x), Media::Previous, t("Previous shot (←)"))
+        || (keys && is_key_pressed(KeyCode::Left))
+    {
+        m.seek(shown.saturating_sub(2));
+    }
+    x += 40.0;
+    let (kind, tip) =
+        if paused { (Media::Play, t("Play (Space)")) } else { (Media::Pause, t("Pause (Space)")) };
+    if (media_button(ui, b(x), kind, tip) || (keys && is_key_pressed(KeyCode::Space)))
+        && let Some(v) = m.video.as_mut()
+    {
+        v.paused = !v.paused;
+    }
+    x += 40.0;
+    if media_button(ui, b(x), Media::Next, t("Next shot (→)"))
+        || (keys && is_key_pressed(KeyCode::Right))
+    {
+        m.seek(shown.min(total));
+    }
+    x += 44.0;
+    let label = if speed < 1.0 { "½×".to_string() } else { format!("{speed}×") };
+    if ui.button(Rect::new(x, r.y + 11.0, 46.0, 30.0), &label, true)
+        && let Some(v) = m.video.as_mut()
+    {
+        v.next_speed();
+    }
+    if ui.hovering(Rect::new(x, r.y + 11.0, 46.0, 30.0)) {
+        ui.tooltip(t("Speed"), Rect::new(x, r.y + 11.0, 46.0, 30.0));
+    }
+    x += 58.0;
+    // The time line: one step per stroke, a tick where balls were made.
+    let count = tw("Shot {n} of {total}", &[("n", &shown.min(total)), ("total", &total)]);
+    let cw = ui.text_size(&count, 13.0, true).x;
+    let line = Rect::new(x, r.y + 14.0, r.x + r.w - x - cw - 24.0, 24.0);
+    for (i, mark) in marks.iter().enumerate() {
+        let Some(mark) = mark.filter(|k| k.made > 0 || k.foul) else { continue };
+        let tx = line.x + line.w * (i as f32 + 0.5) / total as f32;
+        let color = if mark.foul { ALERT } else { SEAT_COLORS[mark.shooter] };
+        draw_line(tx, line.y + 1.0, tx, line.y + 6.0, 2.0, color);
+    }
+    let mut value = (shown - 1) as f32;
+    if ui.slider(9_100, line, &mut value, 0.0, (total - 1).max(1) as f32) {
+        let k = value.round() as usize;
+        if k + 1 != shown {
+            m.seek(k);
+        }
+    }
+    ui.text(&count, r.x + r.w - cw - 12.0, r.y + 18.0, 13.0, CREAM, true);
 }
 
 const PREVIEW_TIME: f32 = 5.0;

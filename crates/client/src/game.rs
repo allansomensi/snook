@@ -98,6 +98,109 @@ pub struct Notice {
 
 pub use snookered_core::stats::ShotStats;
 
+/// A stored game, worked out shot by shot once, so it can be watched like
+/// a video: the table before every stroke is known, and seeking is instant.
+pub struct Video {
+    pub strokes: Vec<snookered_proto::replay::Stroke>,
+    /// The table before stroke `i` (and after the last one).
+    pub states: Vec<EightBallGame>,
+    /// Each player's numbers before stroke `i`.
+    pub stats: Vec<[ShotStats; 2]>,
+    /// The shot of each stroke (none for a time foul or a resignation).
+    pub marks: Vec<Option<ShotMark>>,
+    pub paused: bool,
+    /// 0.5, 1, 2 or 4.
+    pub speed: f32,
+}
+
+impl Video {
+    pub fn of(replay: &snookered_proto::replay::Replay) -> Option<Video> {
+        use snookered_proto::replay::{Stroke, apply};
+        let mut game = replay.start();
+        let mut stats = [ShotStats::default(); 2];
+        let mut v = Video {
+            strokes: replay.strokes.clone(),
+            states: vec![game.clone()],
+            stats: vec![stats],
+            marks: Vec::new(),
+            paused: false,
+            speed: 1.0,
+        };
+        for stroke in &replay.strokes {
+            let shooter = game.current_player();
+            let in_hand = game.ball_in_hand().is_some();
+            let cue = match stroke {
+                Stroke::Shot { cue_ball: Some(p), .. } if in_hand => *p,
+                _ => game.ball(BallId::CUE).xy(),
+            };
+            let report = apply(&mut game, stroke).ok()?;
+            let mark = match (report, stroke) {
+                (Some(r), Stroke::Shot { shot, .. }) => {
+                    stats[shooter % 2].add(&r, in_hand);
+                    stats[shooter % 2].add_spin(shot, &r);
+                    let made = if r.is_foul() {
+                        0
+                    } else {
+                        r.pocketed.iter().filter(|(b, _)| b.is_object()).count() as u32
+                    };
+                    Some(ShotMark {
+                        shooter: shooter % 2,
+                        cue: (cue.x, cue.y),
+                        made,
+                        foul: r.is_foul(),
+                    })
+                }
+                _ => None,
+            };
+            v.marks.push(mark);
+            v.states.push(game.clone());
+            v.stats.push(stats);
+        }
+        Some(v)
+    }
+
+    /// Development aid and tests: a game the computer plays against itself,
+    /// recorded (`shots` strokes at most).
+    pub fn sample(seed: u64, shots: usize) -> snookered_proto::ReplayInfo {
+        use snookered_proto::replay::{Replay, Stroke};
+        let mut replay = Replay::new(seed, 0);
+        let mut game = replay.start();
+        while replay.strokes.len() < shots && game.game_over().is_none() {
+            let d = ai::decide(&game, Difficulty::Easy, seed ^ replay.strokes.len() as u64);
+            let stroke = Stroke::Shot {
+                shot: d.shot,
+                called: d.called_pocket,
+                cue_ball: d.cue_ball,
+                timeout: false,
+            };
+            if snookered_proto::replay::apply(&mut game, &stroke).is_err() {
+                break;
+            }
+            replay.strokes.push(stroke);
+        }
+        snookered_proto::ReplayInfo {
+            match_id: 0,
+            players: ["Ana".into(), "Bia".into()],
+            countries: ["BR".into(), "AR".into()],
+            ratings: [1200, 1200],
+            winner: game.game_over().map_or(0, |o| o.winner),
+            rated: false,
+            at: 0,
+            replay,
+        }
+    }
+
+    /// The next speed (0.5 → 1 → 2 → 4 → 0.5).
+    pub fn next_speed(&mut self) {
+        self.speed = match self.speed {
+            s if s < 0.75 => 1.0,
+            s if s < 1.5 => 2.0,
+            s if s < 3.0 => 4.0,
+            _ => 0.5,
+        };
+    }
+}
+
 /// One shot of the game, for the end-of-game charts.
 #[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ShotMark {
@@ -148,6 +251,8 @@ pub struct Match {
     seed: u64,
     /// A stored game being watched again: the strokes still to play.
     pub script: Option<std::collections::VecDeque<snookered_proto::replay::Stroke>>,
+    /// A stored game watched like a video: pause, speed and seeking.
+    pub video: Option<Video>,
     /// The exact shot the computer (or a replay) plays, not rebuilt from
     /// the power bar (which would round it).
     forced_shot: Option<Shot>,
@@ -272,6 +377,7 @@ impl Match {
             escape_used: false,
             seed,
             script: None,
+            video: None,
             forced_shot: None,
             events_seen: 0,
             demo_timer: 0.0,
@@ -292,8 +398,32 @@ impl Match {
         m.game = info.replay.start();
         m.names = info.players.clone();
         m.script = Some(info.replay.strokes.iter().copied().collect());
+        m.video = Video::of(&info.replay);
         m.begin_turn();
         m
+    }
+
+    /// Strokes of the stored game already played (or being played).
+    pub fn video_position(&self) -> usize {
+        let total = self.video.as_ref().map_or(0, |v| v.strokes.len());
+        total - self.script.as_ref().map_or(0, |s| s.len())
+    }
+
+    /// Jumps to the table as it was before stroke `k` of the stored game.
+    pub fn seek(&mut self, k: usize) {
+        let Some(v) = &self.video else { return };
+        let k = k.min(v.strokes.len());
+        self.game = v.states[k].clone();
+        self.stats = v.stats[k];
+        self.timeline = v.marks[..k].iter().flatten().copied().collect();
+        self.script = Some(v.strokes[k..].iter().copied().collect());
+        self.phase = Phase::GameOver;
+        self.replay = None;
+        self.last_shot = None;
+        self.last_report = None;
+        self.win_effect = None;
+        self.notices.clear();
+        self.begin_turn();
     }
 
     /// A game against the computer saved by [`crate::saved`], picked up again.
@@ -427,6 +557,7 @@ impl Match {
             escape_used: false,
             seed: match_id,
             script: None,
+            video: None,
             forced_shot: None,
             events_seen: 0,
             demo_timer: 0.0,
@@ -803,6 +934,12 @@ const AI_STROKE_TIME: f32 = 1.1;
 impl Match {
     /// Advances the match by `dt` seconds of real time.
     pub fn update(&mut self, dt: f32) {
+        // A stored game: paused, slowed down or sped up.
+        let dt = match &self.video {
+            Some(v) if v.paused => return,
+            Some(v) => dt * v.speed,
+            None => dt,
+        };
         self.run_online(dt);
         self.run_offline_clock(dt);
         self.run_computer_turn(dt);
@@ -1774,5 +1911,40 @@ mod tests {
             }
         }
         assert_eq!(m.game, after);
+    }
+}
+
+#[cfg(test)]
+mod video_tests {
+    use super::*;
+
+    #[test]
+    fn a_stored_game_can_be_watched_from_any_shot() {
+        let info = Video::sample(7, 8);
+        let n = info.replay.strokes.len();
+        assert!(n >= 4, "a few shots were played");
+        let mut m = Match::replay_of(&info, crate::config::AimGuide::Standard);
+        let v = m.video.as_ref().expect("the game works out");
+        assert_eq!((v.states.len(), v.stats.len(), v.marks.len()), (n + 1, n + 1, n));
+        assert_eq!(m.video_position(), 1, "the first shot is next");
+        // Straight to the fourth shot: the table as it was then.
+        m.seek(3);
+        assert_eq!(m.game, m.video.as_ref().unwrap().states[3]);
+        assert_eq!(m.video_position(), 4);
+        assert_eq!(m.timeline.len(), m.video.as_ref().unwrap().marks[..3].iter().flatten().count());
+        // Back to the start, then past the end.
+        m.seek(0);
+        assert_eq!(m.game, info.replay.start());
+        m.seek(n + 5);
+        assert_eq!(m.video_position(), n);
+        assert!(matches!(m.phase, Phase::GameOver));
+        // Paused, the table doesn't move.
+        m.seek(1);
+        m.video.as_mut().unwrap().paused = true;
+        let before = m.game.clone();
+        for _ in 0..50 {
+            m.update(0.1);
+        }
+        assert_eq!(m.game, before);
     }
 }

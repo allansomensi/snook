@@ -954,3 +954,9 @@ Cue “{cue}”, cloth “{cloth}” and {n} coins · only once, sold nowhere el
 Lagoon	Lagoa
 You already have the welcome pack.	Você já tem o pacote de boas-vindas.
 Your welcome pack is here!	Seu pacote de boas-vindas chegou!
+Previous shot (←)	Tacada anterior (←)
+Next shot (→)	Próxima tacada (→)
+Play (Space)	Reproduzir (Espaço)
+Pause (Space)	Pausar (Espaço)
+Speed	Velocidade
+Shot {n} of {total}	Tacada {n} de {total}

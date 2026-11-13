@@ -954,3 +954,9 @@ Cue “{cue}”, cloth “{cloth}” and {n} coins · only once, sold nowhere el
 Lagoon	Laguna
 You already have the welcome pack.	Ya tienes el pack de bienvenida.
 Your welcome pack is here!	¡Tu pack de bienvenida llegó!
+Previous shot (←)	Tiro anterior (←)
+Next shot (→)	Siguiente tiro (→)
+Play (Space)	Reproducir (Espacio)
+Pause (Space)	Pausa (Espacio)
+Speed	Velocidad
+Shot {n} of {total}	Tiro {n} de {total}

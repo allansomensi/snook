@@ -277,6 +277,10 @@ async fn main() {
     if options.top_view {
         rig.mode = CameraMode::Top;
     }
+    // Development aid: SNOOKERED_SAMPLE_REPLAY=1 watches a recorded game.
+    if crate::dev::flag("SNOOKERED_SAMPLE_REPLAY") {
+        current = Some(Match::replay_of(&game::Video::sample(11, 30), config.guide));
+    }
     if let Some(mode) = options.start {
         let mut m = Match::new(&MatchSettings::from_config(mode, &config), game::clock_seed());
         if options.on_eight {
