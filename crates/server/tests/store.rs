@@ -8,8 +8,8 @@ use snookered_core::{GameOverReason, Shot};
 use snookered_proto::Role;
 use snookered_proto::replay::{Replay, Stroke};
 use snookered_server::store::{
-    BuyOutcome, FriendOutcome, FriendState, LiveMatch, MatchRecord, NewReport, NewUser, Payment,
-    SessionKind, Store, TournamentRecord, day_of,
+    BuyOutcome, FriendOutcome, FriendState, LiveMatch, MatchRecord, NewNote, NewReport, NewUser,
+    Payment, SessionKind, Store, TournamentRecord, day_of,
 };
 
 fn new_user<'a>(name: &'a str) -> NewUser<'a> {
@@ -368,12 +368,24 @@ async fn exercise(store: Store) {
     assert_eq!(store.purge_missions(t + 100).await.unwrap(), 1, "the day is over");
     assert_eq!(store.mission_progress(a.id, &[day]).await.unwrap(), vec![]);
 
-    // The lounge's board.
-    let first = store.add_board_note("Welcome!", a.id, t, None).await.unwrap();
-    let second = store.add_board_note("Cup on Saturday", a.id, t + 1, Some(t + 60)).await.unwrap();
+    // The lounge's board: pinned notes first, then the newest.
+    let note = |text, at, expires_at, pinned, action| NewNote {
+        text,
+        author_id: a.id,
+        at,
+        expires_at,
+        kind: "event",
+        pinned,
+        action,
+    };
+    let first = store.add_board_note(&note("Rules", t, None, true, None)).await.unwrap();
+    let second =
+        store.add_board_note(&note("Cup", t + 1, Some(t + 60), false, Some("shop"))).await.unwrap();
     let notes = store.board_notes(t + 10).await.unwrap();
-    assert_eq!(notes.iter().map(|n| n.id).collect::<Vec<_>>(), vec![second, first]);
+    assert_eq!(notes.iter().map(|n| n.id).collect::<Vec<_>>(), vec![first, second]);
     assert_eq!(notes[0].author, "Alice");
+    assert_eq!((notes[1].kind.as_str(), notes[1].action.as_deref()), ("event", Some("shop")));
+    assert!(notes[0].pinned && !notes[1].pinned);
     assert_eq!(store.board_notes(t + 61).await.unwrap().len(), 1, "expired");
     assert!(store.remove_board_note(first).await.unwrap());
     assert!(!store.remove_board_note(first).await.unwrap());

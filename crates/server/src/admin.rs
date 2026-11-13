@@ -689,7 +689,8 @@ async fn board(State(server): State<Arc<Server>>, headers: HeaderMap) -> ApiResu
         .into_iter()
         .map(|n| {
             json!({ "id": n.id, "text": n.text, "author": n.author,
-                    "created_at": n.created_at, "expires_at": n.expires_at })
+                    "created_at": n.created_at, "expires_at": n.expires_at,
+                    "kind": n.kind, "pinned": n.pinned, "action": n.action })
         })
         .collect();
     Ok(Json(json!({ "notes": notes })))
@@ -701,6 +702,14 @@ struct NoteBody {
     /// Taken down after this many days (none: until removed).
     #[serde(default)]
     days: Option<u32>,
+    /// `notice`, `event` or `rule`.
+    #[serde(default)]
+    kind: String,
+    #[serde(default)]
+    pinned: bool,
+    /// A button under the note (`tournaments`, `shop`, `vip`, `missions`).
+    #[serde(default)]
+    action: Option<String>,
 }
 
 async fn pin_note(
@@ -715,7 +724,27 @@ async fn pin_note(
     }
     let t = now();
     let expires = body.days.filter(|d| (1..=366).contains(d)).map(|d| t + d as i64 * 86_400);
-    let id = server.store.add_board_note(&text, s.user.id, t, expires).await?;
+    let kind = snookered_proto::NoteKind::from_code(&body.kind).code();
+    let action = body
+        .action
+        .as_deref()
+        .filter(|a| !a.is_empty())
+        .map(|a| {
+            snookered_proto::NoteAction::from_code(a)
+                .map(|a| a.code())
+                .ok_or_else(|| err(StatusCode::BAD_REQUEST, "Unknown button."))
+        })
+        .transpose()?;
+    let note = crate::store::NewNote {
+        text: &text,
+        author_id: s.user.id,
+        at: t,
+        expires_at: expires,
+        kind,
+        pinned: body.pinned,
+        action,
+    };
+    let id = server.store.add_board_note(&note).await?;
     server.refresh_board().await;
     log(&server, &s, "pin", "board", &text).await;
     Ok(Json(json!({ "ok": true, "id": id })))

@@ -14,7 +14,7 @@ const APPLIED: &[(&str, &str)] = &[
         "0004_accounts_replays_stats.sql",
         "80f780c14dc752c522e2f5f49e17763d09cf062bf048e5f30c33845f2b963708",
     ),
-    ("0005_missions_board.sql", "e55b1a656123ea455a06463207d21be25dbb6cc9f229e10a794c8b49db07c6a7"),
+    ("0005_missions_board.sql", "d2809259b0e5384f454c26256f92f9378a6d5f400cf5d2c4cd2c9da14d2f8ad2"),
 ];
 
 #[test]

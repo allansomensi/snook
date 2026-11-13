@@ -36,8 +36,12 @@ VIP days), which goes in the audit log like any other change.
   password and signs the player out everywhere.
 - **Board** (Overview page): notes pinned for everyone in the lounge's
   *Board* tab (rules, events, the next cup), for some days or until taken
-  down. Players see a new note at once, with a dot on the tab until they
-  read it. Tournaments open for registration are listed there on their own.
+  down. Each note is a notice (gold), an event (green) or a rule (blue),
+  may be pinned above the others and may carry a button (to the
+  tournaments, the shop, VIP or the missions). Players see a new note at
+  once, in the lounge and on the main menu, with a dot on the tab until
+  they read it. Tournaments open for registration are listed there on
+  their own.
 - **Reports** come with the reporter, the reason, the player's note and the
   recent chat lines of the reported player (lounge and shared match).
 

@@ -49,6 +49,8 @@ pub enum OnlineAction {
     Profile(String),
     Ranking,
     Shop,
+    /// The shop, on the VIP page.
+    ShopVip,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -196,6 +198,64 @@ pub struct Online {
     board: Vec<snookered_proto::BoardNote>,
     /// Scheduled tournaments the player was already told are about to start.
     told_starting: Vec<u64>,
+}
+
+/// A note's colour: gold notices, green events, blue rules.
+pub fn note_color(kind: snookered_proto::NoteKind) -> Color {
+    match kind {
+        snookered_proto::NoteKind::Notice => GOLD,
+        snookered_proto::NoteKind::Event => Color::new(0.38, 0.8, 0.5, 1.0),
+        snookered_proto::NoteKind::Rule => Color::new(0.48, 0.72, 1.0, 1.0),
+    }
+}
+
+fn note_button(a: snookered_proto::NoteAction) -> &'static str {
+    use snookered_proto::NoteAction;
+    match a {
+        NoteAction::Tournaments => t("See the tournaments"),
+        NoteAction::Shop => t("Open the shop"),
+        NoteAction::Vip => t("See VIP"),
+        NoteAction::Missions => t("See the missions"),
+    }
+}
+
+/// How tall a note is drawn `w` wide.
+pub fn note_height(ui: &Ui, n: &snookered_proto::BoardNote, w: f32) -> f32 {
+    let lines = ui.wrap(&n.text, w - 44.0, 14.0).len() as f32;
+    lines * 19.0 + 38.0 + if n.action.is_some() { 36.0 } else { 0.0 }
+}
+
+/// Draws a note in `card`; returns its button's action when clicked.
+pub fn draw_note(
+    ui: &mut Ui,
+    n: &snookered_proto::BoardNote,
+    card: Rect,
+) -> Option<snookered_proto::NoteAction> {
+    let color = note_color(n.kind);
+    let tint = Color::new(color.r, color.g, color.b, if n.pinned { 0.13 } else { 0.07 });
+    rrect(card, 8.0, tint);
+    rrect_lines(card, 8.0, if n.pinned { 1.6 } else { 1.0 }, if n.pinned { color } else { BORDER });
+    // A coloured edge on the left: the kind of note.
+    rrect(Rect::new(card.x, card.y + 6.0, 4.0, card.h - 12.0), 2.0, color);
+    if n.pinned {
+        crate::icons::draw(Icon::Star, vec2(card.x + card.w - 16.0, card.y + 14.0), 14.0, color);
+    }
+    let lines = ui.wrap(&n.text, card.w - 44.0, 14.0);
+    for (i, l) in lines.iter().enumerate() {
+        ui.text(l, card.x + 14.0, card.y + 10.0 + i as f32 * 19.0, 14.0, CREAM, false);
+    }
+    let by = if n.author.is_empty() {
+        crate::profile::date(n.at)
+    } else {
+        format!("{} · {}", n.author, crate::profile::date(n.at))
+    };
+    let by_y = card.y + 14.0 + lines.len() as f32 * 19.0;
+    ui.text(&by, card.x + 14.0, by_y, 12.0, MUTED, false);
+    let a = n.action?;
+    let label = note_button(a);
+    let bw = ui.text_size(label, 14.0, true).x + 36.0;
+    let b = Rect::new(card.x + 14.0, by_y + 22.0, bw.min(card.w - 28.0), 28.0);
+    ui.button(b, label, true).then_some(a)
 }
 
 /// "5 h", "3 days", "12 min": how long until something.
@@ -1435,7 +1495,11 @@ impl Online {
             );
             match self.side {
                 Side::Missions => self.draw_missions(ui, area),
-                _ => self.draw_board(ui, area),
+                _ => {
+                    if let Some(a) = self.draw_board(ui, area) {
+                        action = a;
+                    }
+                }
             }
             self.draw_invites(ui, false);
             return action;
@@ -1649,13 +1713,41 @@ impl Online {
         }
     }
 
+    /// Follows a note's button: lounge pages here, the rest for the caller.
+    pub fn note_action(&mut self, a: snookered_proto::NoteAction) -> Option<OnlineAction> {
+        use snookered_proto::NoteAction;
+        match a {
+            NoteAction::Tournaments => {
+                self.tab = Tab::Tournaments;
+                None
+            }
+            NoteAction::Missions => {
+                self.side = Side::Missions;
+                self.mission_done = false;
+                self.send(ClientMsg::Missions);
+                None
+            }
+            NoteAction::Shop => Some(OnlineAction::Shop),
+            NoteAction::Vip => Some(OnlineAction::ShopVip),
+        }
+    }
+
+    /// The notes on the board that are up now, pinned first.
+    pub fn board_now(&self) -> Vec<snookered_proto::BoardNote> {
+        let now = crate::game::unix_now();
+        let mut notes: Vec<_> =
+            self.board.iter().filter(|n| n.expires_at.is_none_or(|e| e > now)).cloned().collect();
+        notes.sort_by_key(|n| !n.pinned);
+        notes
+    }
+
     /// The staff's notes and the tournaments open for registration.
-    fn draw_board(&mut self, ui: &mut Ui, area: Rect) {
+    fn draw_board(&mut self, ui: &mut Ui, area: Rect) -> Option<OnlineAction> {
+        let mut action = None;
         let now = crate::game::unix_now();
         let bottom = area.y + area.h;
         let mut y = area.y + 2.0;
-        let notes: Vec<_> =
-            self.board.iter().filter(|n| n.expires_at.is_none_or(|e| e > now)).cloned().collect();
+        let notes = self.board_now();
         let open: Vec<TournamentInfo> = self
             .tournaments
             .iter()
@@ -1664,31 +1756,20 @@ impl Online {
             .collect();
         if notes.is_empty() && open.is_empty() {
             ui.text(t("Nothing on the board right now."), area.x, y + 4.0, 14.0, MUTED, false);
-            return;
+            return None;
         }
         for n in &notes {
-            let lines = ui.wrap(&n.text, area.w - 44.0, 14.0);
-            let h = lines.len() as f32 * 19.0 + 38.0;
+            let h = note_height(ui, n, area.w);
             if y + h > bottom {
                 break;
             }
-            let card = Rect::new(area.x, y, area.w, h);
-            rrect(card, 8.0, Color::new(0.91, 0.75, 0.38, 0.07));
-            rrect_lines(card, 8.0, 1.0, BORDER);
-            draw_circle(card.x + card.w - 14.0, card.y + 12.0, 4.0, GOLD);
-            for (i, l) in lines.iter().enumerate() {
-                ui.text(l, card.x + 12.0, card.y + 10.0 + i as f32 * 19.0, 14.0, CREAM, false);
+            if let Some(a) = draw_note(ui, n, Rect::new(area.x, y, area.w, h)) {
+                action = self.note_action(a);
             }
-            let by = if n.author.is_empty() {
-                crate::profile::date(n.at)
-            } else {
-                format!("{} · {}", n.author, crate::profile::date(n.at))
-            };
-            ui.text(&by, card.x + 12.0, card.y + h - 22.0, 12.0, MUTED, false);
             y += h + 8.0;
         }
         if open.is_empty() || y + 60.0 > bottom {
-            return;
+            return action;
         }
         y += 6.0;
         ui.text(t("Open tournaments"), area.x, y, 16.0, GOLD, true);
@@ -1720,6 +1801,7 @@ impl Online {
             }
             y += card.h + 8.0;
         }
+        action
     }
 
     fn rated_toggle(&mut self, ui: &mut Ui, r: Rect) {

@@ -109,6 +109,22 @@ pub struct BoardNote {
     pub author: String,
     pub created_at: i64,
     pub expires_at: Option<i64>,
+    /// `notice`, `event` or `rule`.
+    pub kind: String,
+    pub pinned: bool,
+    /// `tournaments`, `shop`, `vip` or `missions`.
+    pub action: Option<String>,
+}
+
+/// A note to pin on the board.
+pub struct NewNote<'a> {
+    pub text: &'a str,
+    pub author_id: i64,
+    pub at: i64,
+    pub expires_at: Option<i64>,
+    pub kind: &'a str,
+    pub pinned: bool,
+    pub action: Option<&'a str>,
 }
 
 pub struct NewUser<'a> {
@@ -709,18 +725,13 @@ impl Store {
     pub async fn purge_missions(&self, now: i64) -> StoreResult<u64> {
         dispatch!(self, s => s.purge_missions(now))
     }
-    /// The notes on the lounge's board that are up at `now`, newest first.
+    /// The notes on the lounge's board that are up at `now`: pinned ones
+    /// first, then newest first.
     pub async fn board_notes(&self, now: i64) -> StoreResult<Vec<BoardNote>> {
         dispatch!(self, s => s.board_notes(now))
     }
-    pub async fn add_board_note(
-        &self,
-        text: &str,
-        author_id: i64,
-        now: i64,
-        expires_at: Option<i64>,
-    ) -> StoreResult<i64> {
-        dispatch!(self, s => s.add_board_note(text, author_id, now, expires_at))
+    pub async fn add_board_note(&self, note: &NewNote<'_>) -> StoreResult<i64> {
+        dispatch!(self, s => s.add_board_note(note))
     }
     /// Takes a note down; false if there was none.
     pub async fn remove_board_note(&self, id: i64) -> StoreResult<bool> {

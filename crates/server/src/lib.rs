@@ -1218,6 +1218,9 @@ fn board_note(n: crate::store::BoardNote) -> snookered_proto::BoardNote {
         author: n.author,
         at: n.created_at,
         expires_at: n.expires_at,
+        kind: snookered_proto::NoteKind::from_code(&n.kind),
+        pinned: n.pinned,
+        action: n.action.as_deref().and_then(snookered_proto::NoteAction::from_code),
     }
 }
 

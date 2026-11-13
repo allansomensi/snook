@@ -9,8 +9,8 @@ use snookered_proto::CareerNumbers;
 
 use super::{
     AimRow, AuditRow, BoardNote, BuyOutcome, FriendOutcome, FriendState, HistoryRow, LedgerRow,
-    LiveMatch, MatchRecord, Metrics, NewReport, NewUser, Overview, Payment, ReportRow, SessionKind,
-    StoreResult, StoredReplay, TournamentRecord, User, Wallet, day_of,
+    LiveMatch, MatchRecord, Metrics, NewNote, NewReport, NewUser, Overview, Payment, ReportRow,
+    SessionKind, StoreResult, StoredReplay, TournamentRecord, User, Wallet, day_of,
 };
 
 #[derive(Default)]
@@ -186,25 +186,22 @@ impl MemoryStore {
         let s = self.lock();
         let mut notes: Vec<BoardNote> =
             s.board.iter().filter(|n| n.expires_at.is_none_or(|e| e > now)).cloned().collect();
-        notes.sort_by_key(|n| std::cmp::Reverse((n.created_at, n.id)));
+        notes.sort_by_key(|n| std::cmp::Reverse((n.pinned, n.created_at, n.id)));
         Ok(notes)
     }
 
-    pub fn add_board_note(
-        &self,
-        text: &str,
-        author_id: i64,
-        now: i64,
-        expires_at: Option<i64>,
-    ) -> StoreResult<i64> {
+    pub fn add_board_note(&self, n: &NewNote<'_>) -> StoreResult<i64> {
         let mut s = self.lock();
         s.next_note += 1;
         let note = BoardNote {
             id: s.next_note,
-            text: text.to_string(),
-            author: s.name(author_id),
-            created_at: now,
-            expires_at,
+            text: n.text.to_string(),
+            author: s.name(n.author_id),
+            created_at: n.at,
+            expires_at: n.expires_at,
+            kind: n.kind.to_string(),
+            pinned: n.pinned,
+            action: n.action.map(str::to_string),
         };
         s.board.push(note);
         Ok(s.next_note)

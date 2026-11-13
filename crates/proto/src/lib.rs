@@ -43,6 +43,71 @@ pub struct BoardNote {
     /// Taken down at this time (Unix seconds), if set.
     #[serde(default)]
     pub expires_at: Option<i64>,
+    #[serde(default)]
+    pub kind: NoteKind,
+    /// Shown above the other notes.
+    #[serde(default)]
+    pub pinned: bool,
+    /// A button under the note.
+    #[serde(default)]
+    pub action: Option<NoteAction>,
+}
+
+/// What a note on the board is about (its colour).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum NoteKind {
+    #[default]
+    Notice,
+    Event,
+    Rule,
+}
+
+impl NoteKind {
+    pub fn code(self) -> &'static str {
+        match self {
+            NoteKind::Notice => "notice",
+            NoteKind::Event => "event",
+            NoteKind::Rule => "rule",
+        }
+    }
+
+    pub fn from_code(code: &str) -> NoteKind {
+        match code {
+            "event" => NoteKind::Event,
+            "rule" => NoteKind::Rule,
+            _ => NoteKind::Notice,
+        }
+    }
+}
+
+/// Where a note's button takes the player.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum NoteAction {
+    /// The lounge's tournaments (e.g. to sign up for the cup).
+    Tournaments,
+    Shop,
+    Vip,
+    Missions,
+}
+
+impl NoteAction {
+    pub const ALL: [NoteAction; 4] =
+        [NoteAction::Tournaments, NoteAction::Shop, NoteAction::Vip, NoteAction::Missions];
+
+    pub fn code(self) -> &'static str {
+        match self {
+            NoteAction::Tournaments => "tournaments",
+            NoteAction::Shop => "shop",
+            NoteAction::Vip => "vip",
+            NoteAction::Missions => "missions",
+        }
+    }
+
+    pub fn from_code(code: &str) -> Option<NoteAction> {
+        NoteAction::ALL.into_iter().find(|a| a.code() == code)
+    }
 }
 
 /// The `seat` of a reaction sent by a spectator.

@@ -301,7 +301,7 @@ async fn main() {
         Some(tab) if tab.starts_with("shop") => {
             online.connect();
             shop.open(&mut online);
-            shop.dev_tab(tab);
+            shop.show_tab(tab);
             screen = Screen::Shop;
         }
         Some("ranking") => {
@@ -715,6 +715,24 @@ async fn main() {
                                 back_to_lounge = false;
                                 next = Some(Screen::Shop);
                             }
+                            MenuAction::Note(a) => match online.note_action(a) {
+                                Some(OnlineAction::ShopVip) => {
+                                    shop.open(&mut online);
+                                    shop.show_tab("shop-vip");
+                                    back_to_lounge = false;
+                                    next = Some(Screen::Shop);
+                                }
+                                Some(_) => {
+                                    shop.open(&mut online);
+                                    back_to_lounge = false;
+                                    next = Some(Screen::Shop);
+                                }
+                                // A page of the lounge.
+                                None => {
+                                    online.connect();
+                                    next = Some(Screen::Online);
+                                }
+                            },
                             MenuAction::Settings => settings_open = true,
                             MenuAction::Quit => break,
                             MenuAction::None => {}
@@ -744,6 +762,12 @@ async fn main() {
                             }
                             OnlineAction::Shop => {
                                 shop.open(&mut online);
+                                back_to_lounge = true;
+                                next = Some(Screen::Shop);
+                            }
+                            OnlineAction::ShopVip => {
+                                shop.open(&mut online);
+                                shop.show_tab("shop-vip");
                                 back_to_lounge = true;
                                 next = Some(Screen::Shop);
                             }

@@ -9,8 +9,8 @@ use snookered_proto::replay::Replay;
 
 use super::{
     AimRow, AuditRow, BoardNote, BuyOutcome, FriendOutcome, FriendState, HistoryRow, LedgerRow,
-    LiveMatch, MatchRecord, Metrics, NewReport, NewUser, Overview, Payment, ReportRow, SessionKind,
-    StoreError, StoreResult, StoredReplay, TournamentRecord, User, Wallet, day_of,
+    LiveMatch, MatchRecord, Metrics, NewNote, NewReport, NewUser, Overview, Payment, ReportRow,
+    SessionKind, StoreError, StoreResult, StoredReplay, TournamentRecord, User, Wallet, day_of,
 };
 
 fn replay_json(r: &Replay) -> String {
@@ -681,10 +681,11 @@ impl PgStore {
 
     pub async fn board_notes(&self, now: i64) -> StoreResult<Vec<BoardNote>> {
         let rows = query(
-            "SELECT n.id, n.text, COALESCE(u.username, '') AS author, n.created_at, n.expires_at
+            "SELECT n.id, n.text, COALESCE(u.username, '') AS author, n.created_at, n.expires_at,
+                    n.kind, n.pinned, n.action
              FROM board_notes n LEFT JOIN users u ON u.id = n.author_id
              WHERE n.expires_at IS NULL OR n.expires_at > $1
-             ORDER BY n.created_at DESC, n.id DESC",
+             ORDER BY n.pinned DESC, n.created_at DESC, n.id DESC",
         )
         .bind(now)
         .fetch_all(&self.pool)
@@ -697,25 +698,25 @@ impl PgStore {
                 author: r.get("author"),
                 created_at: r.get("created_at"),
                 expires_at: r.get("expires_at"),
+                kind: r.get("kind"),
+                pinned: r.get("pinned"),
+                action: r.get("action"),
             })
             .collect())
     }
 
-    pub async fn add_board_note(
-        &self,
-        text: &str,
-        author_id: i64,
-        now: i64,
-        expires_at: Option<i64>,
-    ) -> StoreResult<i64> {
+    pub async fn add_board_note(&self, n: &NewNote<'_>) -> StoreResult<i64> {
         let r = query(
-            "INSERT INTO board_notes (text, author_id, created_at, expires_at)
-             VALUES ($1, $2, $3, $4) RETURNING id",
+            "INSERT INTO board_notes (text, author_id, created_at, expires_at, kind, pinned, action)
+             VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id",
         )
-        .bind(text)
-        .bind(author_id)
-        .bind(now)
-        .bind(expires_at)
+        .bind(n.text)
+        .bind(n.author_id)
+        .bind(n.at)
+        .bind(n.expires_at)
+        .bind(n.kind)
+        .bind(n.pinned)
+        .bind(n.action)
         .fetch_one(&self.pool)
         .await?;
         Ok(r.get("id"))

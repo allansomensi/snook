@@ -16,6 +16,8 @@ pub enum MenuAction {
     VsComputer,
     /// Picks up the saved game against the computer.
     ContinueGame,
+    /// The button under a note on the board.
+    Note(snookered_proto::NoteAction),
     TwoPlayers,
     Lan,
     Ranking,
@@ -184,13 +186,45 @@ impl Menu {
             }
         }
 
-        // Who is signed in, top right.
+        // Who is signed in, top right, and the board under it.
         self.player_card(ui, online, &mut action);
+        self.board(ui, online, &mut action);
 
         let version = concat!("v", env!("CARGO_PKG_VERSION"));
         let vw = ui.text_size(version, 12.0, false).x;
         ui.text(version, sw - vw - 14.0, sh - 24.0, 12.0, MUTED, false);
         action
+    }
+
+    /// The newest notes on the lounge's board (pinned first), for players
+    /// who don't go to the lounge.
+    fn board(&self, ui: &mut Ui, online: &Online, action: &mut MenuAction) {
+        let notes = online.board_now();
+        let sw = crate::ui::vw();
+        let sh = crate::ui::vh();
+        // Beside the menu, only where the window leaves room.
+        let menu_right = (sw * 0.06).clamp(24.0, 90.0) + (sw * 0.36).clamp(300.0, 440.0);
+        let w = 320.0f32.min(sw * 0.3);
+        let x = sw - w - 20.0;
+        if notes.is_empty() || x < menu_right + 24.0 {
+            return;
+        }
+        let mut y = 100.0;
+        ui.text(t("Board"), x + 2.0, y, 15.0, GOLD, true);
+        y += 24.0;
+        for n in notes.iter().take(3) {
+            let h = crate::online::note_height(ui, n, w);
+            if y + h > sh - 60.0 {
+                break;
+            }
+            let card = Rect::new(x, y, w, h);
+            rrect(card, 8.0, Color::new(0.05, 0.035, 0.025, 0.86));
+            if let Some(a) = crate::online::draw_note(ui, n, card) {
+                *action = MenuAction::Note(a);
+            }
+            ui.block(card);
+            y += h + 8.0;
+        }
     }
 
     fn player_card(&self, ui: &mut Ui, online: &Online, action: &mut MenuAction) {

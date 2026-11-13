@@ -111,7 +111,8 @@ const views = {
     const loadNotes = async () => {
       const d = await api("/board");
       const rows = d.notes.map((n) => el("tr", {},
-        el("td", {}, n.text), el("td", {}, n.author || "—"), el("td", {}, ago(n.created_at)),
+        el("td", {}, n.pinned ? "📌 " : "", n.text, n.action ? el("span", { class: "muted" }, " · button: " + n.action) : null),
+        el("td", {}, n.kind), el("td", {}, n.author || "—"), el("td", {}, ago(n.created_at)),
         el("td", {}, n.expires_at ? fmtDate(n.expires_at) : "—"),
         el("td", {}, el("button", {
           class: "danger", onclick: async () => {
@@ -120,17 +121,26 @@ const views = {
           },
         }, "Take down"))));
       notes.replaceChildren(rows.length
-        ? table(["Note", "By", "Pinned", "Until", ""], rows)
+        ? table(["Note", "Kind", "By", "Pinned", "Until", ""], rows)
         : el("p", { class: "muted" }, "The board is empty."));
     };
     const note = el("textarea", { rows: "3", maxlength: "400", placeholder: "A note for the lounge's board" });
     const days = el("input", { type: "number", min: "1", max: "366", placeholder: "Days (empty: until taken down)" });
+    const kind = el("select", {}, [["notice", "Notice (gold)"], ["event", "Event (green)"], ["rule", "Rule (blue)"]]
+      .map(([v, l]) => el("option", { value: v }, l)));
+    const action = el("select", {}, [["", "No button"], ["tournaments", "Button: tournaments"], ["shop", "Button: shop"],
+      ["vip", "Button: VIP"], ["missions", "Button: missions"]].map(([v, l]) => el("option", { value: v }, l)));
+    const pinned = el("input", { type: "checkbox", style: "width:auto" });
     box.append(el("h2", {}, "Board"), note, days,
+      el("div", { class: "actions" }, kind, action, el("label", {}, pinned, " Pinned at the top")),
       el("div", { class: "actions" }, el("button", {
         class: "primary", onclick: async () => {
           try {
-            await api("/board", { method: "POST", body: { text: note.value, days: days.value ? Number(days.value) : null } });
-            note.value = ""; days.value = ""; toast("Pinned."); loadNotes();
+            await api("/board", { method: "POST", body: {
+              text: note.value, days: days.value ? Number(days.value) : null,
+              kind: kind.value, action: action.value || null, pinned: pinned.checked,
+            } });
+            note.value = ""; days.value = ""; pinned.checked = false; action.value = ""; toast("Pinned."); loadNotes();
           } catch (e) { toast(e.message); }
         },
       }, "Pin to the board")), notes);

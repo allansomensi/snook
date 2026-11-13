@@ -936,3 +936,7 @@ No shots yet.	Aún no hay tiros.
 made	metió
 missed	falló
 foul	falta
+See the tournaments	Ver los torneos
+Open the shop	Abrir la tienda
+See VIP	Ver el VIP
+See the missions	Ver las misiones

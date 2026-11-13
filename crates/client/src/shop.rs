@@ -262,8 +262,8 @@ impl ShopScreen {
         self.confirm = Some(Confirm { code, gift_to: None });
     }
 
-    /// Development aid (`--screen shop-coins`…): opens on a tab.
-    pub fn dev_tab(&mut self, name: &str) {
+    /// Opens on a tab (`shop-coins`, `shop-vip`, `shop-balls`…; also `--screen`).
+    pub fn show_tab(&mut self, name: &str) {
         self.tab = match name {
             "shop-coins" => Tab::Coins,
             "shop-vip" => Tab::Vip,

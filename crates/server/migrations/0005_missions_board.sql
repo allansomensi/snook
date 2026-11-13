@@ -18,5 +18,12 @@ CREATE TABLE board_notes (
     author_id  BIGINT REFERENCES users (id) ON DELETE SET NULL,
     created_at BIGINT NOT NULL,
     -- Taken down at this time (Unix seconds); NULL: until removed.
-    expires_at BIGINT
+    expires_at BIGINT,
+    -- 'notice', 'event' or 'rule' (the note's colour).
+    kind       TEXT    NOT NULL DEFAULT 'notice',
+    -- Shown above the others.
+    pinned     BOOLEAN NOT NULL DEFAULT FALSE,
+    -- A button under the note: 'tournaments', 'shop', 'vip', 'missions'
+    -- or NULL.
+    action     TEXT
 );

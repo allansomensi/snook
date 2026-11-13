@@ -936,3 +936,7 @@ No shots yet.	Nenhuma tacada ainda.
 made	encaçapou
 missed	errou
 foul	falta
+See the tournaments	Ver os torneios
+Open the shop	Abrir a loja
+See VIP	Ver o VIP
+See the missions	Ver as missões
