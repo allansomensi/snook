@@ -890,3 +890,5 @@ Your friend already has this item.	Tu amigo ya tiene este objeto.
 VIP isn't sold in this version of the game.	El VIP no se vende en esta versión del juego.
 In this version of the game, coins are earned by playing:	En esta versión del juego, las monedas se ganan jugando:
 rated games, and a bonus every day you play.	partidas con rating y un bono cada día que juegas.
+Coins are earned by playing:	Las monedas se ganan jugando:
+If you like, you can also buy them:	Si quieres, también puedes comprarlas:

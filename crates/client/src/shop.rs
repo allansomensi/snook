@@ -790,29 +790,36 @@ impl ShopScreen {
 
     fn coins(&mut self, ui: &mut Ui, online: &mut Online, area: Rect) {
         let offers = online.offers.clone().unwrap_or_default();
-        if !crate::channel::real_money_purchases() {
-            for (i, line) in [
-                t("In this version of the game, coins are earned by playing:"),
-                t("rated games, and a bonus every day you play."),
-            ]
-            .iter()
-            .enumerate()
-            {
-                ui.text(line, area.x, area.y + 6.0 + i as f32 * 22.0, 15.0, CREAM, false);
-            }
+        // Every version earns coins the same way; buying them is only extra.
+        let store = !crate::channel::real_money_purchases();
+        let earn = [
+            if store {
+                t("In this version of the game, coins are earned by playing:")
+            } else {
+                t("Coins are earned by playing:")
+            },
+            t("rated games, and a bonus every day you play."),
+        ];
+        for (i, line) in earn.iter().enumerate() {
+            ui.text(line, area.x, area.y + 6.0 + i as f32 * 22.0, 15.0, CREAM, false);
+        }
+        if store {
             return;
         }
+        let below = area.y + 6.0 + 2.0 * 22.0 + 10.0;
         if !offers.payments || offers.packs.is_empty() {
             ui.text(
                 t("Coins can't be bought on this server yet."),
                 area.x,
-                area.y + 6.0,
+                below,
                 15.0,
                 MUTED,
                 false,
             );
             return;
         }
+        ui.text(t("If you like, you can also buy them:"), area.x, below, 15.0, MUTED, false);
+        let area = Rect::new(area.x, below + 32.0, area.w, area.h - (below + 32.0 - area.y));
         let signed_in = online.signed_in();
         let n = offers.packs.len();
         let cols = n.min(((area.w + 12.0) / 200.0).floor().max(1.0) as usize);
