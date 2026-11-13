@@ -190,6 +190,10 @@ pub struct OnlineMatch {
     pub spectator: bool,
     /// How many people are watching.
     pub spectators: u32,
+    /// How many spectators cheer for each seat.
+    pub support: [u32; 2],
+    /// The seat this spectator cheers for.
+    pub cheering: Option<usize>,
     /// The opponent has sent their aim this turn (until then their cue is hidden).
     pub remote_aimed: bool,
     /// The opponent's latest aim; the cue glides towards it.
@@ -403,6 +407,8 @@ impl Match {
                 reactions: Vec::new(),
                 spectator: spectating,
                 spectators: 0,
+                support: [0, 0],
+                cheering: None,
                 remote_aimed: false,
                 remote_target: None,
                 sim_turn: None,
@@ -1460,6 +1466,7 @@ impl Match {
                 }
             }
             ServerMsg::Spectators { count } => o.spectators = count,
+            ServerMsg::Support { counts } => o.support = counts,
             ServerMsg::Error { message } => {
                 self.notify(crate::i18n::server_text(&message), true);
             }
@@ -1475,6 +1482,14 @@ impl Match {
     }
 
     /// Watching someone else's game.
+    /// A spectator cheers for the player in `seat`.
+    pub fn cheer(&mut self, seat: usize) {
+        if let Some(o) = self.online.as_mut().filter(|o| o.spectator && o.cheering != Some(seat)) {
+            o.cheering = Some(seat);
+            o.outbox.push(ClientMsg::Cheer { seat });
+        }
+    }
+
     pub fn is_spectating(&self) -> bool {
         self.online.as_ref().is_some_and(|o| o.spectator)
     }

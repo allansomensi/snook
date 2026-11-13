@@ -334,6 +334,7 @@ impl Hud {
                 ui.tooltip(&tw("{n} watching", &[("n", &n)]), tip);
             }
         }
+        self.draw_support(ui, m, x0, card_w, total);
         draw_reactions(m, [x0 + 34.0, x0 + total - 34.0], eye);
         let mut y = TOP_BAR + 8.0;
         if let Some(status) = status_line(m) {
@@ -1025,6 +1026,51 @@ impl Hud {
             || clicked_button
         {
             self.reactions_open = false;
+        }
+    }
+}
+
+impl Hud {
+    /// The crowd: a spectator clicks a player's card to cheer for them; a
+    /// thin bar under the cards shows how the spectators are split.
+    fn draw_support(&mut self, ui: &mut Ui, m: &mut Match, x0: f32, card_w: f32, total: f32) {
+        let Some(o) = m.online.as_ref() else { return };
+        let (support, spectator, cheering) = (o.support, o.spectator, o.cheering);
+        if spectator {
+            for (seat, color) in SEAT_COLORS.into_iter().enumerate() {
+                let card = Rect::new(x0 + seat as f32 * (card_w + 10.0), 6.0, card_w, 42.0);
+                if cheering == Some(seat) {
+                    crate::icons::draw(
+                        Icon::Star,
+                        vec2(card.x + card.w - 12.0, card.y + 10.0),
+                        12.0,
+                        color,
+                    );
+                }
+                if ui.hovering(card) {
+                    let tip = tw("Cheer for {name}", &[("name", &m.names[seat])]);
+                    ui.tooltip(&tip, card);
+                    if ui.clicked(card) {
+                        m.cheer(seat);
+                    }
+                }
+            }
+        }
+        let n = support[0] + support[1];
+        if n == 0 {
+            return;
+        }
+        let bar = Rect::new(x0, TOP_BAR - 4.0, total, 4.0);
+        let k = support[0] as f32 / n as f32;
+        draw_rectangle(bar.x, bar.y, bar.w * k, bar.h, SEAT_COLORS[0]);
+        draw_rectangle(bar.x + bar.w * k, bar.y, bar.w * (1.0 - k), bar.h, SEAT_COLORS[1]);
+        let tip = Rect::new(bar.x, bar.y - 4.0, bar.w, bar.h + 8.0);
+        if ui.hovering(tip) {
+            let text = tw(
+                "Crowd: {a} for {p0}, {b} for {p1}",
+                &[("a", &support[0]), ("p0", &m.names[0]), ("b", &support[1]), ("p1", &m.names[1])],
+            );
+            ui.tooltip(&text, tip);
         }
     }
 }

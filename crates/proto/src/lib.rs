@@ -655,6 +655,10 @@ pub enum ClientMsg {
     React {
         code: String,
     },
+    /// A spectator cheers for the player in `seat` (0 or 1).
+    Cheer {
+        seat: usize,
+    },
     /// The shop: the offers and this player's wallet.
     Shop,
     /// Buys a cosmetic item with coins.
@@ -1014,6 +1018,10 @@ pub enum ServerMsg {
     /// How many people are watching this match.
     Spectators {
         count: u32,
+    },
+    /// How many spectators cheer for each seat (sent when it changes).
+    Support {
+        counts: [u32; 2],
     },
     /// The friend being watched went back to the lounge (or left).
     SpectateEnded {

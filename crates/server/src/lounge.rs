@@ -189,6 +189,8 @@ struct Room {
     chat: VecDeque<ChatLine>,
     /// Reactions from spectators, all together (a crowd must stay quiet).
     crowd: Bucket,
+    /// Spectator -> the seat they cheer for.
+    cheers: HashMap<String, usize>,
     /// The whole game so far (saved after every stroke; the replay).
     replay: Replay,
     /// Each seat's numbers this game.
@@ -748,6 +750,7 @@ impl Lounge {
             ClientMsg::Chat { text } => self.chat(&k, &text),
             ClientMsg::MatchChat { text } => self.match_chat(&k, &text),
             ClientMsg::React { code } => self.react(&k, &code),
+            ClientMsg::Cheer { seat } => self.cheer(&k, seat),
             ClientMsg::StopSpectating => self.stop_watching(&k),
             ClientMsg::QueueJoin { rated } => self.queue_join(&k, rated),
             ClientMsg::QueueLeave => self.queue_leave(&k, true),
@@ -1111,10 +1114,43 @@ impl Lounge {
         }
     }
 
-    /// Tells everyone at the table how many are watching.
+    /// Tells everyone at the table how many are watching, and who they
+    /// cheer for.
     fn announce_spectators(&self, id: u64) {
         let count = self.spectators(id).len() as u32;
         self.send_room(id, &ServerMsg::Spectators { count });
+        self.send_room(id, &ServerMsg::Support { counts: self.support(id) });
+    }
+
+    /// How many of those watching room `id` cheer for each seat.
+    fn support(&self, id: u64) -> [u32; 2] {
+        let mut counts = [0, 0];
+        let Some(room) = self.rooms.get(&id) else { return counts };
+        for w in self.spectators(id) {
+            if let Some(&seat) = room.cheers.get(&w) {
+                counts[seat % 2] += 1;
+            }
+        }
+        counts
+    }
+
+    /// A spectator picks a side (or changes their mind).
+    fn cheer(&mut self, k: &str, seat: usize) {
+        if seat > 1 {
+            return;
+        }
+        let Some(s) = self.sessions.get_mut(k) else { return };
+        if !s.reaction_bucket.take() {
+            return;
+        }
+        let Some(friend) = s.watching.clone() else { return };
+        let Some(id) = self.sessions.get(&friend).and_then(|f| f.room) else { return };
+        let Some(room) = self.rooms.get_mut(&id) else { return };
+        if room.keys.iter().any(|p| p == k) || room.cheers.get(k) == Some(&seat) {
+            return;
+        }
+        room.cheers.insert(k.to_string(), seat);
+        self.send_room(id, &ServerMsg::Support { counts: self.support(id) });
     }
 
     fn send_spectator_start(&self, w: &str, id: u64, seat: usize) {
@@ -1431,6 +1467,7 @@ impl Lounge {
             tournament,
             chat: VecDeque::new(),
             crowd: Bucket::new(4.0, 0.6),
+            cheers: HashMap::new(),
             replay: Replay::new(seed, breaker),
             stats: Default::default(),
             bands: Default::default(),
@@ -2136,6 +2173,7 @@ impl Lounge {
             tournament: None,
             chat: VecDeque::new(),
             crowd: Bucket::new(4.0, 0.6),
+            cheers: HashMap::new(),
             replay: live.replay.clone(),
             stats: rebuilt.stats,
             bands: rebuilt.bands,

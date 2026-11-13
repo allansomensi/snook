@@ -946,3 +946,5 @@ Update now	Atualizar agora
 Download the new version	Baixar a nova versão
 New version out	Nova versão disponível
 Get the new version to play online	Pegue a nova versão para jogar online
+Cheer for {name}	Torcer por {name}
+Crowd: {a} for {p0}, {b} for {p1}	Torcida: {a} por {p0}, {b} por {p1}

@@ -359,6 +359,14 @@ async fn friends_can_watch_and_react() {
         |m| matches!(m, ServerMsg::Reaction { seat, .. } if *seat == snookered_proto::SPECTATOR_SEAT),
     )
     .await;
+    // Carol cheers for Bob's seat: both players see the crowd's side.
+    let bob_seat = 1 - sa;
+    carol.send(ClientMsg::Cheer { seat: bob_seat }).await;
+    alice
+        .expect("support", |m| {
+            matches!(m, ServerMsg::Support { counts } if counts[bob_seat] == 1 && counts[1 - bob_seat] == 0)
+        })
+        .await;
     // Players' chat stays between them.
     alice.send(ClientMsg::MatchChat { text: "psst".into() }).await;
     bob.expect("chat", |m| matches!(m, ServerMsg::MatchChat { .. })).await;
