@@ -45,9 +45,9 @@ use sha2::{Digest, Sha256};
 use snookered_core::GameOverReason;
 use snookered_core::rating::EloConfig;
 use snookered_proto::{
-    ACHIEVEMENTS, ClientMsg, FriendInfo, HistoryEntry, LeaderboardEntry, PROTOCOL_VERSION,
-    PlayerStatus, Profile, Relation, Role, ServerMsg, clean_text, parse_client, valid_country,
-    valid_password, valid_username,
+    ACHIEVEMENTS, ClientMsg, FriendInfo, HistoryEntry, LeaderboardEntry, OLDEST_PROTOCOL_VERSION,
+    PROTOCOL_VERSION, PlayerStatus, Profile, Relation, Role, ServerMsg, clean_text, parse_client,
+    valid_country, valid_password, valid_username,
 };
 use tokio::net::TcpListener;
 use tokio::sync::{Notify, Semaphore, mpsc};
@@ -835,7 +835,11 @@ async fn handle_socket(server: Arc<Server>, socket: WebSocket, ip: IpAddr) {
         };
         if !hello {
             match msg {
-                ClientMsg::Hello { version } if version == PROTOCOL_VERSION => hello = true,
+                ClientMsg::Hello { version }
+                    if (OLDEST_PROTOCOL_VERSION..=PROTOCOL_VERSION).contains(&version) =>
+                {
+                    hello = true
+                }
                 ClientMsg::Hello { .. } => {
                     send(ServerMsg::AuthError {
                         reason: "This version of Snookered is out of date. Please update the game."

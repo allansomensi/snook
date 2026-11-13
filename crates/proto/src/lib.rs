@@ -120,6 +120,11 @@ pub const GAME_NAME: &str = "Snookered";
 /// Bumped whenever messages change incompatibly.
 pub const PROTOCOL_VERSION: u32 = 12;
 
+/// The oldest version the server still lets in. Version 12 only added
+/// messages and fields, which older games ignore, so 0.1.2 (version 11)
+/// keeps playing while the new version reaches everyone.
+pub const OLDEST_PROTOCOL_VERSION: u32 = 11;
+
 /// Username rules: 3–16 characters, letters, digits and underscores.
 pub fn valid_username(name: &str) -> bool {
     (3..=16).contains(&name.chars().count())

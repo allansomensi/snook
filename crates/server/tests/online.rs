@@ -416,6 +416,20 @@ async fn login_errors_and_validation() {
     let url = start(Rules::default()).await;
     let (_alice, token) = Client::register(&url, "Alice").await;
 
+    // The previous version still plays; anything older is told to update.
+    for (version, welcome) in [(snookered_proto::OLDEST_PROTOCOL_VERSION, true), (10, false)] {
+        let (ws, _) = connect_async(&url).await.unwrap();
+        let mut old = Client { ws };
+        old.send(ClientMsg::Hello { version }).await;
+        old.send(ClientMsg::Resume { token: token.clone() }).await;
+        let m = old
+            .expect("answer", |m| {
+                matches!(m, ServerMsg::AuthOk { .. } | ServerMsg::AuthError { .. })
+            })
+            .await;
+        assert_eq!(matches!(m, ServerMsg::AuthOk { .. }), welcome, "version {version}: {m:?}");
+    }
+
     let mut c = Client::connect(&url).await;
     c.send(ClientMsg::Register {
         username: "alice".into(),
